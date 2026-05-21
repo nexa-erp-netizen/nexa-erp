@@ -1,0 +1,697 @@
+import { useEffect, useState } from "react"
+import api from "../services/api"
+
+export default function Clientes() {
+  const [tela, setTela] = useState("lista")
+  const [clienteSelecionado, setClienteSelecionado] = useState(null)
+  const [editandoId, setEditandoId] = useState(null)
+
+  const [nome, setNome] = useState("")
+  const [cpf, setCpf] = useState("")
+  const [telefone, setTelefone] = useState("")
+  const [email, setEmail] = useState("")
+  const [cnpj, setCnpj] = useState("")
+  const [regime, setRegime] = useState("")
+  const [endereco, setEndereco] = useState("")
+  const [cidade, setCidade] = useState("")
+  const [estado, setEstado] = useState("")
+  const [observacao, setObservacao] = useState("")
+  const [anexos, setAnexos] = useState([])
+
+  const regimes = [
+    "MEI",
+    "Simples Nacional",
+    "Lucro Presumido",
+    "Lucro Real",
+  ]
+
+  const estados = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO",
+    "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI",
+    "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+  ]
+
+  const [clientes, setClientes] = useState([])
+
+  useEffect(() => {
+    carregarClientes()
+  }, [])
+
+  async function carregarClientes() {
+    try {
+      const resposta = await api.get("/clientes")
+      setClientes(resposta.data)
+    } catch (error) {
+      alert("Erro ao carregar clientes da API")
+      console.error(error)
+    }
+  }
+
+  function formatarCPF(valor) {
+    return valor
+      .replace(/\D/g, "")
+      .slice(0, 11)
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2")
+  }
+
+  function formatarTelefone(valor) {
+    return valor
+      .replace(/\D/g, "")
+      .slice(0, 11)
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{5})(\d)/, "$1-$2")
+  }
+
+  function formatarCNPJ(valor) {
+    return valor
+      .replace(/\D/g, "")
+      .slice(0, 14)
+      .replace(/(\d{2})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1/$2")
+      .replace(/(\d{4})(\d{1,2})$/, "$1-$2")
+  }
+
+  async function adicionarAnexos(e) {
+    const arquivos = Array.from(e.target.files)
+
+    if (arquivos.length === 0) {
+      return
+    }
+
+    const formData = new FormData()
+
+    arquivos.forEach((arquivo) => {
+      formData.append("arquivos", arquivo)
+    })
+
+    try {
+      const resposta = await api.post(
+        "/clientes/upload",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      )
+
+      setAnexos([...anexos, ...resposta.data])
+    } catch (error) {
+      alert("Erro ao enviar arquivo")
+      console.error(error)
+    }
+  }
+
+  async function salvarCliente() {
+    if (!nome || !cpf || !telefone) {
+      alert("Preencha Cliente, CPF e Telefone")
+      return
+    }
+
+    const dadosCliente = {
+      nome,
+      cpf,
+      telefone,
+      email,
+      cnpj,
+      regime,
+      endereco,
+      cidade,
+      estado,
+      observacao,
+      anexos,
+    }
+
+    try {
+      if (editandoId !== null) {
+        await api.put(`/clientes/${editandoId}`, dadosCliente)
+      } else {
+        await api.post("/clientes", dadosCliente)
+      }
+
+      await carregarClientes()
+      limparCampos()
+      setTela("lista")
+    } catch (error) {
+      alert("Erro ao salvar cliente na API")
+      console.error(error)
+    }
+  }
+
+  function visualizarCliente(cliente) {
+    setClienteSelecionado(cliente)
+    setEditandoId(cliente.id)
+    setTela("detalhes")
+  }
+
+  function editarCliente() {
+    if (!clienteSelecionado) return
+
+    setNome(clienteSelecionado.nome || "")
+    setCpf(clienteSelecionado.cpf || "")
+    setTelefone(clienteSelecionado.telefone || "")
+    setEmail(clienteSelecionado.email || "")
+    setCnpj(clienteSelecionado.cnpj || "")
+    setRegime(clienteSelecionado.regime || "")
+    setEndereco(clienteSelecionado.endereco || "")
+    setCidade(clienteSelecionado.cidade || "")
+    setEstado(clienteSelecionado.estado || "")
+    setObservacao(clienteSelecionado.observacao || "")
+    setAnexos(clienteSelecionado.anexos || [])
+
+    setEditandoId(clienteSelecionado.id)
+    setTela("formulario")
+  }
+
+  async function excluirCliente() {
+    if (!editandoId) return
+
+    const confirmar = window.confirm(
+      "Deseja realmente excluir este cliente?"
+    )
+
+    if (!confirmar) return
+
+    try {
+      await api.delete(`/clientes/${editandoId}`)
+      await carregarClientes()
+
+      setClienteSelecionado(null)
+      setEditandoId(null)
+      setTela("lista")
+    } catch (error) {
+      alert("Erro ao excluir cliente da API")
+      console.error(error)
+    }
+  }
+
+  function removerAnexo(index) {
+    const novaLista = anexos.filter((_, i) => i !== index)
+    setAnexos(novaLista)
+  }
+
+  function abrirArquivo(caminho) {
+    window.open(`http://localhost:3000${caminho}`, "_blank")
+  }
+
+  function novoCliente() {
+    limparCampos()
+    setClienteSelecionado(null)
+    setEditandoId(null)
+    setTela("formulario")
+  }
+
+  function voltarLista() {
+    limparCampos()
+    setClienteSelecionado(null)
+    setEditandoId(null)
+    setTela("lista")
+  }
+
+  function limparCampos() {
+    setNome("")
+    setCpf("")
+    setTelefone("")
+    setEmail("")
+    setCnpj("")
+    setRegime("")
+    setEndereco("")
+    setCidade("")
+    setEstado("")
+    setObservacao("")
+    setAnexos([])
+  }
+
+  return (
+    <div style={box}>
+      {tela === "lista" && (
+        <>
+          <div style={topo}>
+            <h2>Clientes</h2>
+
+            <button style={button} onClick={novoCliente}>
+              Novo Cliente
+            </button>
+          </div>
+
+          <table style={table}>
+            <thead>
+              <tr>
+                <th style={th}>Cliente</th>
+                <th style={th}>CPF</th>
+                <th style={th}>Telefone</th>
+                <th style={th}>Ações</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {clientes.map((cliente) => (
+                <tr key={cliente.id}>
+                  <td style={td}>{cliente.nome}</td>
+                  <td style={td}>{cliente.cpf}</td>
+                  <td style={td}>{cliente.telefone}</td>
+
+                  <td style={td}>
+                    <button
+                      style={viewButton}
+                      onClick={() => visualizarCliente(cliente)}
+                    >
+                      Visualizar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {tela === "formulario" && (
+        <>
+          <div style={topo}>
+            <h2>
+              {editandoId !== null ? "Corrigir Cliente" : "Novo Cliente"}
+            </h2>
+
+            <button style={backButton} onClick={voltarLista}>
+              Voltar
+            </button>
+          </div>
+
+          <div style={form}>
+            <input
+              style={input}
+              placeholder="Cliente"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="CPF"
+              value={cpf}
+              onChange={(e) => setCpf(formatarCPF(e.target.value))}
+            />
+
+            <input
+              style={input}
+              placeholder="Telefone"
+              value={telefone}
+              onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
+            />
+
+            <input
+              style={input}
+              placeholder="E-mail"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="CNPJ"
+              value={cnpj}
+              onChange={(e) => setCnpj(formatarCNPJ(e.target.value))}
+            />
+
+            <select
+              style={input}
+              value={regime}
+              onChange={(e) => setRegime(e.target.value)}
+            >
+              <option value="">Selecione o regime</option>
+
+              {regimes.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+
+            <input
+              style={input}
+              placeholder="Endereço"
+              value={endereco}
+              onChange={(e) => setEndereco(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="Cidade"
+              value={cidade}
+              onChange={(e) => setCidade(e.target.value)}
+            />
+
+            <select
+              style={input}
+              value={estado}
+              onChange={(e) => setEstado(e.target.value)}
+            >
+              <option value="">Selecione o estado</option>
+
+              {estados.map((uf) => (
+                <option key={uf} value={uf}>
+                  {uf}
+                </option>
+              ))}
+            </select>
+
+            <textarea
+              style={textarea}
+              placeholder="Observação"
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+            />
+
+            <div style={uploadBox}>
+              <label style={uploadLabel}>
+                Anexar Arquivo
+                <input
+                  type="file"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={adicionarAnexos}
+                />
+              </label>
+
+              {anexos.length > 0 && (
+                <div style={arquivosLista}>
+                  {anexos.map((arquivo, index) => (
+                    <div key={index} style={arquivoItem}>
+                      <span>📎 {arquivo.nome}</span>
+
+                      <div style={fileActions}>
+                        <button
+                          style={openFileButton}
+                          onClick={() => abrirArquivo(arquivo.caminho)}
+                        >
+                          Abrir
+                        </button>
+
+                        <button
+                          style={removeFileButton}
+                          onClick={() => removerAnexo(index)}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button style={button} onClick={salvarCliente}>
+              {editandoId !== null ? "Salvar Correção" : "Salvar Cliente"}
+            </button>
+          </div>
+        </>
+      )}
+
+      {tela === "detalhes" && clienteSelecionado && (
+        <>
+          <div style={topo}>
+            <h2>Dados do Cliente</h2>
+
+            <button style={backButton} onClick={voltarLista}>
+              Voltar
+            </button>
+          </div>
+
+          <div style={detailsGrid}>
+            <Info label="Cliente" value={clienteSelecionado.nome} />
+            <Info label="CPF" value={clienteSelecionado.cpf} />
+            <Info label="Telefone" value={clienteSelecionado.telefone} />
+            <Info label="E-mail" value={clienteSelecionado.email} />
+            <Info label="CNPJ" value={clienteSelecionado.cnpj} />
+            <Info label="Regime" value={clienteSelecionado.regime} />
+            <Info label="Endereço" value={clienteSelecionado.endereco} />
+            <Info label="Cidade" value={clienteSelecionado.cidade} />
+            <Info label="Estado" value={clienteSelecionado.estado} />
+          </div>
+
+          <div style={observacaoBox}>
+            <span style={infoLabel}>Observação</span>
+
+            <p style={observacaoTexto}>
+              {clienteSelecionado.observacao || "Não informado"}
+            </p>
+          </div>
+
+          <div style={observacaoBox}>
+            <span style={infoLabel}>Arquivos Anexados</span>
+
+            {clienteSelecionado.anexos?.length > 0 ? (
+              <div style={arquivosLista}>
+                {clienteSelecionado.anexos.map((arquivo, index) => (
+                  <div key={index} style={arquivoItem}>
+                    <span>📎 {arquivo.nome}</span>
+
+                    <button
+                      style={openFileButton}
+                      onClick={() => abrirArquivo(arquivo.caminho)}
+                    >
+                      Abrir
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={observacaoTexto}>
+                Nenhum arquivo anexado.
+              </p>
+            )}
+          </div>
+
+          <div style={actions}>
+            <button style={editButton} onClick={editarCliente}>
+              Corrigir
+            </button>
+
+            <button style={deleteButton} onClick={excluirCliente}>
+              Excluir
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function Info({ label, value }) {
+  return (
+    <div style={infoBox}>
+      <span style={infoLabel}>{label}</span>
+      <strong style={infoValue}>{value || "Não informado"}</strong>
+    </div>
+  )
+}
+
+const box = {
+  background: "rgba(255,255,255,0.06)",
+  borderRadius: "24px",
+  padding: "28px",
+}
+
+const topo = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "25px",
+}
+
+const form = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "15px",
+}
+
+const input = {
+  padding: "15px",
+  borderRadius: "12px",
+  border: "1px solid rgba(255,255,255,.15)",
+  background: "#061f47",
+  color: "white",
+  fontSize: "15px",
+}
+
+const textarea = {
+  padding: "15px",
+  borderRadius: "12px",
+  border: "1px solid rgba(255,255,255,.15)",
+  background: "#061f47",
+  color: "white",
+  fontSize: "15px",
+  minHeight: "120px",
+  resize: "vertical",
+  gridColumn: "1 / -1",
+}
+
+const uploadBox = {
+  gridColumn: "1 / -1",
+}
+
+const uploadLabel = {
+  display: "inline-block",
+  padding: "14px 20px",
+  borderRadius: "12px",
+  background: "#00a8ff",
+  color: "white",
+  fontWeight: "bold",
+  cursor: "pointer",
+}
+
+const arquivosLista = {
+  marginTop: "15px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "10px",
+}
+
+const arquivoItem = {
+  background: "#061f47",
+  padding: "12px",
+  borderRadius: "10px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+}
+
+const fileActions = {
+  display: "flex",
+  gap: "8px",
+}
+
+const openFileButton = {
+  padding: "8px 12px",
+  borderRadius: "8px",
+  border: "none",
+  background: "#37ff74",
+  color: "#00112b",
+  fontWeight: "bold",
+  cursor: "pointer",
+}
+
+const removeFileButton = {
+  padding: "8px 12px",
+  borderRadius: "8px",
+  border: "none",
+  background: "#ff4d4f",
+  color: "white",
+  fontWeight: "bold",
+  cursor: "pointer",
+}
+
+const button = {
+  padding: "15px",
+  borderRadius: "12px",
+  border: "none",
+  background: "linear-gradient(90deg, #00a8ff, #37ff74)",
+  color: "#00112b",
+  fontWeight: "bold",
+  cursor: "pointer",
+}
+
+const backButton = {
+  padding: "12px 18px",
+  borderRadius: "12px",
+  border: "1px solid rgba(255,255,255,.15)",
+  background: "#061f47",
+  color: "white",
+  fontWeight: "bold",
+  cursor: "pointer",
+}
+
+const viewButton = {
+  padding: "10px 14px",
+  borderRadius: "10px",
+  border: "none",
+  background: "#37ff74",
+  color: "#00112b",
+  fontWeight: "bold",
+  cursor: "pointer",
+}
+
+const table = {
+  width: "100%",
+  borderCollapse: "collapse",
+}
+
+const th = {
+  textAlign: "left",
+  padding: "16px",
+  color: "#a9b8cc",
+}
+
+const td = {
+  padding: "16px",
+}
+
+const detailsGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: "16px",
+  marginBottom: "20px",
+}
+
+const infoBox = {
+  background: "#061f47",
+  border: "1px solid rgba(255,255,255,.12)",
+  borderRadius: "16px",
+  padding: "18px",
+}
+
+const infoLabel = {
+  display: "block",
+  color: "#a9b8cc",
+  fontSize: "13px",
+  marginBottom: "8px",
+}
+
+const infoValue = {
+  color: "white",
+  fontSize: "16px",
+}
+
+const observacaoBox = {
+  background: "#061f47",
+  border: "1px solid rgba(255,255,255,.12)",
+  borderRadius: "16px",
+  padding: "18px",
+  marginBottom: "25px",
+}
+
+const observacaoTexto = {
+  color: "white",
+  lineHeight: "28px",
+  margin: 0,
+}
+
+const actions = {
+  display: "flex",
+  gap: "12px",
+}
+
+const editButton = {
+  padding: "12px 18px",
+  borderRadius: "12px",
+  border: "none",
+  background: "#00a8ff",
+  color: "white",
+  fontWeight: "bold",
+  cursor: "pointer",
+}
+
+const deleteButton = {
+  padding: "12px 18px",
+  borderRadius: "12px",
+  border: "none",
+  background: "#ff4d4f",
+  color: "white",
+  fontWeight: "bold",
+  cursor: "pointer",
+}
