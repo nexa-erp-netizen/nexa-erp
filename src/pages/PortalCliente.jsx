@@ -1,14 +1,19 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
+import {
+  FaArrowUp,
+  FaArrowDown,
+  FaWallet,
+  FaClipboardList,
+} from "react-icons/fa"
 
-export default function PortalCliente() {
-  const [cliente, setCliente] = useState("")
-  const [titulo, setTitulo] = useState("")
-  const [categoria, setCategoria] = useState("")
-  const [mensagem, setMensagem] = useState("")
-  const [anexos, setAnexos] = useState([])
+export default function PortalCliente({ setPage }) {
+  const usuario = JSON.parse(localStorage.getItem("usuario") || "{}")
 
-  const [clientes, setClientes] = useState([])
+  const nomeEmpresa =
+    usuario?.clienteVinculado || usuario?.nome || "sua empresa"
+
+  const [movimentos, setMovimentos] = useState([])
   const [solicitacoes, setSolicitacoes] = useState([])
 
   useEffect(() => {
@@ -17,528 +22,313 @@ export default function PortalCliente() {
 
   async function carregarDados() {
     try {
-      const clientesResposta = await api.get("/clientes")
-      const solicitacoesResposta = await api.get(
-        "/solicitacoes-clientes"
-      )
+      const movimentosResposta = await api.get("/movimentos-cliente")
 
-      setClientes(clientesResposta.data)
-      setSolicitacoes(solicitacoesResposta.data)
+      setMovimentos(
+        Array.isArray(movimentosResposta.data)
+          ? movimentosResposta.data
+          : []
+      )
     } catch (error) {
-      alert("Erro ao carregar portal do cliente")
-      console.error(error)
+      console.error("ERRO MOVIMENTOS PORTAL:", error)
+      setMovimentos([])
+    }
+
+    try {
+      const solicitacoesResposta = await api.get("/solicitacoes-clientes")
+
+      setSolicitacoes(
+        Array.isArray(solicitacoesResposta.data)
+          ? solicitacoesResposta.data
+          : []
+      )
+    } catch (error) {
+      console.error("ERRO SOLICITAÇÕES PORTAL:", error)
+      setSolicitacoes([])
     }
   }
 
-  async function adicionarAnexos(e) {
-    const arquivos = Array.from(e.target.files)
-
-    if (arquivos.length === 0) {
-      return
+  function valorSeguro(valor) {
+    if (valor === null || valor === undefined || valor === "") {
+      return 0
     }
 
-    const formData = new FormData()
+    let texto = String(valor)
+      .replace("R$", "")
+      .trim()
 
-    arquivos.forEach((arquivo) => {
-      formData.append("arquivos", arquivo)
+    if (texto.includes(",")) {
+      texto = texto.replace(/\./g, "").replace(",", ".")
+    }
+
+    const numero = Number(texto)
+
+    return Number.isFinite(numero) ? numero : 0
+  }
+
+  function formatarMoeda(valor) {
+    return valorSeguro(valor).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     })
-
-    try {
-      const resposta = await api.post(
-        "/solicitacoes-clientes/upload",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      )
-
-      setAnexos([
-        ...anexos,
-        ...resposta.data,
-      ])
-    } catch (error) {
-      alert("Erro ao anexar arquivo")
-      console.error(error)
-    }
   }
 
-  async function enviarSolicitacao() {
-    if (!cliente || !titulo || !categoria || !mensagem) {
-      alert("Preencha cliente, título, categoria e mensagem")
+  function mesAtual(data) {
+    if (!data) return false
+
+    const hoje = new Date()
+    const d = new Date(data + "T00:00:00")
+
+    return (
+      d.getMonth() === hoje.getMonth() &&
+      d.getFullYear() === hoje.getFullYear()
+    )
+  }
+
+  function abrirPendencias() {
+    if (typeof setPage === "function") {
+      setPage("Pendências")
       return
     }
 
-    const dados = {
-      cliente,
-      titulo,
-      categoria,
-      mensagem,
-      status: "Aberta",
-      anexos,
-    }
-
-    try {
-      await api.post("/solicitacoes-clientes", dados)
-
-      await carregarDados()
-
-      limparCampos()
-    } catch (error) {
-      alert("Erro ao enviar solicitação")
-      console.error(error)
-    }
+    console.warn("setPage não foi recebido pelo PortalCliente")
   }
 
-  async function excluirSolicitacao(id) {
-    const confirmar = window.confirm(
-      "Deseja realmente excluir esta solicitação?"
+  const resumo = useMemo(() => {
+    const movimentosMes = movimentos.filter((item) =>
+      mesAtual(item.data)
     )
 
-    if (!confirmar) {
-      return
+    const receitasMes = movimentosMes
+      .filter((item) => item.tipo === "Receita")
+      .reduce((total, item) => total + valorSeguro(item.valor), 0)
+
+    const despesasMes = movimentosMes
+      .filter((item) => item.tipo === "Despesa")
+      .reduce((total, item) => total + valorSeguro(item.valor), 0)
+
+    const saldoTotal = movimentos.reduce((total, item) => {
+      const valor = valorSeguro(item.valor)
+
+      return item.tipo === "Receita"
+        ? total + valor
+        : total - valor
+    }, 0)
+
+    const pendenciasAbertas = solicitacoes.filter(
+      (item) => item.status !== "Concluída"
+    ).length
+
+    return {
+      receitasMes,
+      despesasMes,
+      saldoTotal,
+      pendenciasAbertas,
     }
-
-    try {
-      await api.delete(`/solicitacoes-clientes/${id}`)
-
-      await carregarDados()
-    } catch (error) {
-      alert("Erro ao excluir solicitação")
-      console.error(error)
-    }
-  }
-
-  async function atualizarStatus(item, novoStatus) {
-    try {
-      await api.put(`/solicitacoes-clientes/${item.id}`, {
-        ...item,
-        status: novoStatus,
-      })
-
-      await carregarDados()
-    } catch (error) {
-      alert("Erro ao atualizar status")
-      console.error(error)
-    }
-  }
-
-  function limparCampos() {
-    setCliente("")
-    setTitulo("")
-    setCategoria("")
-    setMensagem("")
-    setAnexos([])
-  }
+  }, [movimentos, solicitacoes])
 
   return (
-    <div style={box}>
-      <h2>Portal do Cliente</h2>
+    <div className="pc-page">
+      <style>{`
+        .pc-page {
+          color: white;
+          padding: 24px 30px;
+        }
 
-      <div style={cards}>
+        .pc-title {
+          font-size: 34px;
+          font-weight: 900;
+          margin-bottom: 5px;
+        }
+
+        .pc-subtitle {
+          opacity: .8;
+          margin-bottom: 24px;
+          line-height: 24px;
+        }
+
+        .pc-cards {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(190px, 1fr));
+          gap: 15px;
+          margin-bottom: 24px;
+        }
+
+        .pc-card {
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 20px;
+          padding: 18px 20px;
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          min-height: 72px;
+        }
+
+        .pc-icon {
+          min-width: 46px;
+          width: 46px;
+          height: 46px;
+          border-radius: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #061f47;
+          font-size: 20px;
+        }
+
+        .pc-card span {
+          display: block;
+          opacity: .72;
+          font-size: 13px;
+          margin-bottom: 7px;
+          white-space: nowrap;
+        }
+
+        .pc-card strong {
+          display: block;
+          font-size: 20px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .pc-card .green,
+        .pc-icon.green {
+          color: #32f06d !important;
+        }
+
+        .pc-card .red,
+        .pc-icon.red {
+          color: #ff5c70 !important;
+        }
+
+        .pc-card .yellow,
+        .pc-icon.yellow {
+          color: #ffc107 !important;
+        }
+
+        .pc-card .blue,
+        .pc-icon.blue {
+          color: #3cbcff !important;
+        }
+
+        .pc-center-box {
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 24px;
+          padding: 34px 30px;
+          text-align: center;
+        }
+
+        .pc-center-box h2 {
+          color: white;
+          font-size: 28px;
+          margin-bottom: 12px;
+        }
+
+        .pc-center-box p {
+          color: #c9d6e6;
+          margin-bottom: 26px;
+          font-size: 16px;
+          line-height: 26px;
+        }
+
+        .pc-center-box strong {
+          color: #ffc107;
+        }
+
+        .pc-pendencias-btn {
+          border: none;
+          border-radius: 14px;
+          padding: 16px 26px;
+          background: linear-gradient(90deg,#17b8ff,#32f06d);
+          color: #00112b;
+          font-weight: 900;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 15px;
+        }
+      `}</style>
+
+      <div
+        style={{
+          marginBottom: "20px",
+          fontSize: "18px",
+          color: "white",
+        }}
+      >
+        Olá, {nomeEmpresa} 👋
+      </div>
+
+      <div className="pc-cards">
         <Card
-          title="Solicitações"
-          value={solicitacoes.length}
+          icon={<FaArrowUp />}
+          label="Receitas do mês"
+          value={formatarMoeda(resumo.receitasMes)}
+          color="green"
         />
 
         <Card
-          title="Abertas"
-          value={
-            solicitacoes.filter(
-              (item) => item.status === "Aberta"
-            ).length
-          }
+          icon={<FaArrowDown />}
+          label="Despesas do mês"
+          value={formatarMoeda(resumo.despesasMes)}
+          color="red"
         />
 
         <Card
-          title="Em análise"
-          value={
-            solicitacoes.filter(
-              (item) => item.status === "Em análise"
-            ).length
-          }
+          icon={<FaWallet />}
+          label="Saldo atual"
+          value={formatarMoeda(resumo.saldoTotal)}
+          color={resumo.saldoTotal >= 0 ? "green" : "red"}
         />
 
         <Card
-          title="Concluídas"
-          value={
-            solicitacoes.filter(
-              (item) => item.status === "Concluída"
-            ).length
-          }
+          icon={<FaClipboardList />}
+          label="Pendências"
+          value={resumo.pendenciasAbertas}
+          color="yellow"
         />
       </div>
 
-      <div style={formBox}>
-        <h3>Nova Solicitação</h3>
+      <div className="pc-center-box">
+        <h2>Bem-vindo ao Portal Nexa</h2>
 
-        <div style={form}>
-          <select
-            style={input}
-            value={cliente}
-            onChange={(e) =>
-              setCliente(e.target.value)
-            }
-          >
-            <option value="">
-              Selecione o cliente
-            </option>
+        <p>
+          Você possui{" "}
+          <strong>{resumo.pendenciasAbertas}</strong>{" "}
+          pendência(s) aberta(s). Acesse a área de pendências
+          para visualizar os detalhes enviados pelo escritório.
+        </p>
 
-            {clientes.map((item) => (
-              <option
-                key={item.id}
-                value={item.nome}
-              >
-                {item.nome}
-              </option>
-            ))}
-          </select>
-
-          <input
-            style={input}
-            placeholder="Título da solicitação"
-            value={titulo}
-            onChange={(e) =>
-              setTitulo(e.target.value)
-            }
-          />
-
-          <select
-            style={input}
-            value={categoria}
-            onChange={(e) =>
-              setCategoria(e.target.value)
-            }
-          >
-            <option value="">
-              Categoria
-            </option>
-
-            <option value="Documento">
-              Documento
-            </option>
-
-            <option value="Fiscal">
-              Fiscal
-            </option>
-
-            <option value="Financeiro">
-              Financeiro
-            </option>
-
-            <option value="Departamento Pessoal">
-              Departamento Pessoal
-            </option>
-
-            <option value="Dúvida">
-              Dúvida
-            </option>
-          </select>
-
-          <textarea
-            style={textarea}
-            placeholder="Mensagem para o escritório"
-            value={mensagem}
-            onChange={(e) =>
-              setMensagem(e.target.value)
-            }
-          />
-
-          <div style={uploadBox}>
-            <label style={uploadLabel}>
-              Anexar Documento
-
-              <input
-                type="file"
-                multiple
-                hidden
-                onChange={adicionarAnexos}
-              />
-            </label>
-
-            {anexos.length > 0 && (
-              <div style={arquivosLista}>
-                {anexos.map((arquivo, index) => (
-                  <div
-                    key={index}
-                    style={arquivoItem}
-                  >
-                    📎 {arquivo.nome}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button
-            style={button}
-            onClick={enviarSolicitacao}
-          >
-            Enviar Solicitação
-          </button>
-        </div>
-      </div>
-
-      <div style={tableBox}>
-        <h3>Histórico de Solicitações</h3>
-
-        <div style={tableWrapper}>
-          <table style={table}>
-            <thead>
-              <tr>
-                <th style={th}>Cliente</th>
-                <th style={th}>Título</th>
-                <th style={th}>Categoria</th>
-                <th style={th}>Status</th>
-                <th style={th}>Anexos</th>
-                <th style={th}>Ações</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {solicitacoes.map((item) => (
-                <tr key={item.id}>
-                  <td style={td}>{item.cliente}</td>
-                  <td style={td}>{item.titulo}</td>
-                  <td style={td}>{item.categoria}</td>
-
-                  <td style={td}>
-                    <select
-                      style={statusSelect}
-                      value={item.status}
-                      onChange={(e) =>
-                        atualizarStatus(
-                          item,
-                          e.target.value
-                        )
-                      }
-                    >
-                      <option value="Aberta">
-                        Aberta
-                      </option>
-
-                      <option value="Em análise">
-                        Em análise
-                      </option>
-
-                      <option value="Concluída">
-                        Concluída
-                      </option>
-                    </select>
-                  </td>
-
-                  <td style={td}>
-                    {item.anexos &&
-                      item.anexos.length > 0 ? (
-                      <div style={arquivosLista}>
-                        {item.anexos.map(
-                          (arquivo, index) => (
-                            <a
-                              key={index}
-                              href={`http://localhost:3000${arquivo.caminho}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={linkArquivo}
-                            >
-                              Abrir Anexo
-                            </a>
-                          )
-                        )}
-                      </div>
-                    ) : (
-                      "Nenhum"
-                    )}
-                  </td>
-
-                  <td style={td}>
-                    <button
-                      style={deleteButton}
-                      onClick={() =>
-                        excluirSolicitacao(item.id)
-                      }
-                    >
-                      Excluir
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <button
+          type="button"
+          className="pc-pendencias-btn"
+          onClick={abrirPendencias}
+        >
+          <FaClipboardList />
+          Ver Pendências
+        </button>
       </div>
     </div>
   )
 }
 
-function Card({ title, value }) {
+function Card({ icon, label, value, color }) {
   return (
-    <div style={card}>
-      <span style={cardTitle}>
-        {title}
-      </span>
+    <div className="pc-card">
+      <div className={`pc-icon ${color}`}>
+        {icon}
+      </div>
 
-      <strong style={cardValue}>
-        {value}
-      </strong>
+      <div>
+        <span>{label}</span>
+
+        <strong className={color}>
+          {value}
+        </strong>
+      </div>
     </div>
   )
-}
-
-const box = {
-  background: "rgba(255,255,255,0.06)",
-  borderRadius: "24px",
-  padding: "28px",
-}
-
-const cards = {
-  display: "grid",
-  gridTemplateColumns:
-    "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "15px",
-  marginBottom: "25px",
-}
-
-const card = {
-  background: "#061f47",
-  border:
-    "1px solid rgba(255,255,255,.12)",
-  borderRadius: "16px",
-  padding: "20px",
-}
-
-const cardTitle = {
-  display: "block",
-  color: "#a9b8cc",
-  marginBottom: "10px",
-}
-
-const cardValue = {
-  color: "white",
-  fontSize: "26px",
-}
-
-const formBox = {
-  background: "rgba(255,255,255,0.06)",
-  borderRadius: "20px",
-  padding: "24px",
-  marginBottom: "25px",
-}
-
-const form = {
-  display: "grid",
-  gridTemplateColumns:
-    "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "15px",
-}
-
-const input = {
-  padding: "15px",
-  borderRadius: "12px",
-  border:
-    "1px solid rgba(255,255,255,.15)",
-  background: "#061f47",
-  color: "white",
-  fontSize: "15px",
-}
-
-const textarea = {
-  padding: "15px",
-  borderRadius: "12px",
-  border:
-    "1px solid rgba(255,255,255,.15)",
-  background: "#061f47",
-  color: "white",
-  fontSize: "15px",
-  minHeight: "110px",
-  resize: "vertical",
-  gridColumn: "1 / -1",
-}
-
-const uploadBox = {
-  gridColumn: "1 / -1",
-}
-
-const uploadLabel = {
-  display: "inline-block",
-  padding: "14px 20px",
-  borderRadius: "12px",
-  background: "#00a8ff",
-  color: "white",
-  fontWeight: "bold",
-  cursor: "pointer",
-}
-
-const arquivosLista = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "8px",
-}
-
-const arquivoItem = {
-  background: "rgba(255,255,255,.05)",
-  padding: "12px",
-  borderRadius: "10px",
-}
-
-const button = {
-  padding: "15px",
-  borderRadius: "12px",
-  border: "none",
-  background:
-    "linear-gradient(90deg, #00a8ff, #37ff74)",
-  color: "#00112b",
-  fontWeight: "bold",
-  cursor: "pointer",
-}
-
-const tableBox = {
-  background: "rgba(255,255,255,0.06)",
-  borderRadius: "20px",
-  padding: "24px",
-}
-
-const tableWrapper = {
-  width: "100%",
-  overflowX: "auto",
-}
-
-const table = {
-  width: "100%",
-  borderCollapse: "collapse",
-}
-
-const th = {
-  textAlign: "left",
-  padding: "16px",
-  color: "#a9b8cc",
-}
-
-const td = {
-  padding: "16px",
-}
-
-const statusSelect = {
-  padding: "10px",
-  borderRadius: "10px",
-  border:
-    "1px solid rgba(255,255,255,.15)",
-  background: "#061f47",
-  color: "white",
-}
-
-const linkArquivo = {
-  color: "#37ff74",
-  textDecoration: "none",
-  fontWeight: "bold",
-}
-
-const deleteButton = {
-  padding: "10px 14px",
-  borderRadius: "10px",
-  border: "none",
-  background: "#ff4d4f",
-  color: "white",
-  fontWeight: "bold",
-  cursor: "pointer",
 }

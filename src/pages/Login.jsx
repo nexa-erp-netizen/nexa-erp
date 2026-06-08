@@ -3,12 +3,8 @@ import api from "../services/api"
 import logo from "../assets/logo.png"
 
 export default function Login({ onLogin }) {
-  const [modo, setModo] = useState("login")
-
-  const [nome, setNome] = useState("")
   const [email, setEmail] = useState("")
   const [senha, setSenha] = useState("")
-  const [perfil, setPerfil] = useState("Administrador")
 
   async function entrar() {
     if (!email || !senha) {
@@ -31,40 +27,10 @@ export default function Login({ onLogin }) {
       onLogin(resposta.data.usuario)
     } catch (error) {
       alert("E-mail ou senha inválidos")
-      
+
       setEmail("")
       setSenha("")
 
-      console.error(error)
-    }
-  }
-
-  async function registrar() {
-    if (!nome || !email || !senha || !perfil) {
-      alert("Preencha todos os campos")
-      return
-    }
-
-    try {
-      await api.post("/auth/registrar", {
-        nome,
-        email,
-        senha,
-        perfil,
-      })
-
-      alert("Usuário cadastrado com sucesso")
-
-      setModo("login")
-      setNome("")
-      setEmail("")
-      setSenha("")
-      setPerfil("Administrador")
-    } catch (error) {
-      alert(
-        error.response?.data?.message ||
-        "Erro ao cadastrar usuário"
-      )
       console.error(error)
     }
   }
@@ -74,24 +40,11 @@ export default function Login({ onLogin }) {
       <div style={card}>
         <img src={logo} alt="Nexa" style={logoStyle} />
 
-        <h1 style={title}>
-          {modo === "login"
-            ? "Acesso ao Sistema"
-            : "Cadastrar Usuário"}
-        </h1>
+        <h1 style={title}>Acesso ao Sistema</h1>
 
         <p style={subtitle}>
           Nexa Contábil Digital
         </p>
-
-        {modo === "cadastro" && (
-          <input
-            style={input}
-            placeholder="Nome"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-          />
-        )}
 
         <input
           style={input}
@@ -106,37 +59,20 @@ export default function Login({ onLogin }) {
           placeholder="Senha"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              entrar()
+            }
+          }}
         />
 
-        {modo === "cadastro" && (
-          <select
-            style={input}
-            value={perfil}
-            onChange={(e) => setPerfil(e.target.value)}
-          >
-            <option value="Administrador">Administrador</option>
-            <option value="Funcionário">Funcionário</option>
-            <option value="Cliente">Cliente</option>
-          </select>
-        )}
-
-        <button
-          style={button}
-          onClick={modo === "login" ? entrar : registrar}
-        >
-          {modo === "login" ? "Entrar" : "Cadastrar"}
+        <button style={button} onClick={entrar}>
+          Entrar
         </button>
 
-        <button
-          style={linkButton}
-          onClick={() =>
-            setModo(modo === "login" ? "cadastro" : "login")
-          }
-        >
-          {modo === "login"
-            ? "Cadastrar novo usuário"
-            : "Voltar para login"}
-        </button>
+        <p style={aviso}>
+          Acesso exclusivo para usuários autorizados pelo escritório.
+        </p>
       </div>
     </div>
   )
@@ -144,7 +80,8 @@ export default function Login({ onLogin }) {
 
 const page = {
   minHeight: "100vh",
-  background: "linear-gradient(135deg, #00112b, #00275c, #00112b)",
+  background:
+    "linear-gradient(135deg, #00112b, #00275c, #00112b)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -202,12 +139,9 @@ const button = {
   fontSize: "16px",
 }
 
-const linkButton = {
-  width: "100%",
-  marginTop: "15px",
-  background: "transparent",
-  border: "none",
-  color: "#37ff74",
-  fontWeight: "bold",
-  cursor: "pointer",
+const aviso = {
+  color: "#a9b8cc",
+  fontSize: "13px",
+  textAlign: "center",
+  marginTop: "18px",
 }

@@ -1,0 +1,7 @@
+node_modules
+dist-electron
+release
+win-unpacked
+electron
+build
+*.exe

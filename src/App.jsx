@@ -12,66 +12,79 @@ import PlanoContas from "./pages/PlanoContas"
 import EscritorioDigital from "./pages/EscritorioDigital"
 import Fiscal from "./pages/Fiscal"
 import Financeiro from "./pages/Financeiro"
+import MovimentosCliente from "./pages/MovimentosCliente"
 import PortalCliente from "./pages/PortalCliente"
+import PendenciasClientes from "./pages/PendenciasClientes"
+import PendenciasCliente from "./pages/PendenciasCliente"
 import Relatorios from "./pages/Relatorios"
+import Usuarios from "./pages/Usuarios"
 import LancamentosContabeis from "./pages/LancamentosContabeis"
 import AcessoRapidoFiscal from "./pages/AcessoRapidoFiscal"
 import DocumentosDigitais from "./pages/DocumentosDigitais"
 import CalculadoraIRPFMEI from "./pages/CalculadoraIRPFMEI"
 import Agenda from "./pages/Agenda"
 import BackupSistema from "./pages/BackupSistema"
+import DRE from "./pages/DRE"
+import MovimentosClientesEscritorio from "./pages/MovimentosClientesEscritorio"
+import Notificacoes from "./pages/Notificacoes"
+import ObrigacoesCliente from "./pages/ObrigacoesCliente"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
   const [page, setPage] = useState("Dashboard")
 
   const permissoesPorPerfil = {
-  Administrador: [
-    "Dashboard",
-    "Escritório Digital",
-    "Clientes",
-    "Serviços",
-    "Plano de Contas",
-    "Lançamentos Contábeis",
-    "Fiscal",
-    "Financeiro",
-    "Acesso Rápido Fiscal",
-    "Portal Cliente",
-    "Documentos Digitais",
-    "Relatórios",
-    "Backup Sistema",
-    "Calculadora IRPF MEI",
-    "Agenda",
-  ],
+    Administrador: [
+      "Dashboard",
+      "Notificações",
+      "Escritório Digital",
+      "Clientes",
+      "Serviços",
+      "Plano de Contas",
+      "Lançamentos Contábeis",
+      "Fiscal",
+      "Financeiro",
+      "Movimentos Clientes",
+      "Pendências Clientes",
+      "Acesso Rápido Fiscal",
+      "Documentos Digitais",
+      "Relatórios",
+      "Usuários",
+      "Backup Sistema",
+      "Calculadora IRPF MEI",
+      "Agenda",
+      "DRE Gerencial",
+    ],
 
-  Funcionário: [
-    "Dashboard",
-    "Escritório Digital",
-    "Clientes",
-    "Lançamentos Contábeis",
-    "Fiscal",
-    "Financeiro",
-    "Acesso Rápido Fiscal",
-    "Portal Cliente",
-    "Documentos Digitais",
-    "Relatórios",
-    "Calculadora IRPF MEI",
-    "Agenda",
-  ],
+    Funcionário: [
+      "Dashboard",
+      "Notificações",
+      "Escritório Digital",
+      "Clientes",
+      "Lançamentos Contábeis",
+      "Fiscal",
+      "Financeiro",
+      "Movimentos Clientes",
+      "Pendências Clientes",
+      "Acesso Rápido Fiscal",
+      "Documentos Digitais",
+      "Relatórios",
+      "Calculadora IRPF MEI",
+      "Agenda",
+    ],
 
-  Cliente: [
-    "Portal Cliente",
-    "Documentos Digitais",
-    "Fiscal",
-  ],
-}
+    Cliente: [
+      "Portal Cliente",
+      "Obrigações",
+      "Movimentos",
+      "Documentos Digitais",
+    ],
+  }
 
   useEffect(() => {
-    const usuarioSalvo = localStorage.getItem("usuario")
-
-    if (usuarioSalvo) {
-      setUsuario(JSON.parse(usuarioSalvo))
-    }
+    localStorage.removeItem("token")
+    localStorage.removeItem("usuario")
+    setUsuario(null)
   }, [])
 
   function sair() {
@@ -87,11 +100,15 @@ export default function App() {
       permissoesPorPerfil[usuario?.perfil] || []
 
     if (!paginasPermitidas.includes(page)) {
-      return <PortalCliente />
+      return <PortalCliente setPage={setPage} />
     }
+
     switch (page) {
       case "Dashboard":
         return <Dashboard />
+
+      case "Notificações":
+        return <Notificacoes />
 
       case "Escritório Digital":
         return <EscritorioDigital setPage={setPage} />
@@ -111,8 +128,20 @@ export default function App() {
       case "Financeiro":
         return <Financeiro />
 
+      case "Movimentos":
+        return <MovimentosCliente />
+
       case "Portal Cliente":
-        return <PortalCliente />
+        return <PortalCliente setPage={setPage} />
+
+      case "Obrigações":
+        return <ObrigacoesCliente />
+
+      case "Pendências Clientes":
+        return <PendenciasClientes />
+
+      case "Pendências":
+        return <PendenciasCliente />
 
       case "Lançamentos Contábeis":
         return <LancamentosContabeis />
@@ -123,17 +152,26 @@ export default function App() {
       case "Relatórios":
         return <Relatorios />
 
+      case "Usuários":
+        return <Usuarios />
+
       case "Documentos Digitais":
         return <DocumentosDigitais />
-  
+
+      case "Movimentos Clientes":
+        return <MovimentosClientesEscritorio />
+
       case "Calculadora IRPF MEI":
         return <CalculadoraIRPFMEI />
 
       case "Agenda":
         return <Agenda />
-      
+
       case "Backup Sistema":
         return <BackupSistema />
+
+      case "DRE Gerencial":
+        return <DRE />
 
       default:
         return <Dashboard />
@@ -141,7 +179,19 @@ export default function App() {
   }
 
   if (!usuario) {
-    return <Login onLogin={setUsuario} />
+    return (
+      <Login
+        onLogin={(usuarioLogado) => {
+          setUsuario(usuarioLogado)
+
+          if (usuarioLogado?.perfil === "Cliente") {
+            setPage("Portal Cliente")
+          } else {
+            setPage("Dashboard")
+          }
+        }}
+      />
+    )
   }
 
   return (
@@ -179,7 +229,7 @@ const styles = {
 
   app: {
     display: "grid",
-    gridTemplateColumns: "300px 1fr",
+    gridTemplateColumns: "260px 1fr",
     width: "100%",
     height: "100vh",
     overflow: "hidden",

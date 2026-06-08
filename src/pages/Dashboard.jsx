@@ -1,21 +1,18 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
+import {
+  FaUsers,
+  FaClipboardList,
+  FaArrowUp,
+  FaArrowDown,
+  FaWallet,
+  FaSyncAlt,
+} from "react-icons/fa"
 
 export default function Dashboard() {
-  const [dados, setDados] = useState({
-    totalClientes: 0,
-
-    totalReceber: 0,
-    totalPagar: 0,
-    saldo: 0,
-
-    obrigacoesPendentes: 0,
-    obrigacoesAtrasadas: 0,
-
-    ultimasObrigacoes: [],
-
-    resumoPorCliente: [],
-  })
+  const [clientes, setClientes] = useState([])
+  const [movimentos, setMovimentos] = useState([])
+  const [pendencias, setPendencias] = useState([])
 
   useEffect(() => {
     carregarDashboard()
@@ -23,304 +20,442 @@ export default function Dashboard() {
 
   async function carregarDashboard() {
     try {
-      const resposta = await api.get("/dashboard")
+      const [clientesResp, movimentosResp, pendenciasResp] =
+        await Promise.all([
+          api.get("/clientes"),
+          api.get("/movimentos-cliente"),
+          api.get("/solicitacoes-clientes"),
+        ])
 
-      setDados(resposta.data)
+      setClientes(Array.isArray(clientesResp.data) ? clientesResp.data : [])
+      setMovimentos(Array.isArray(movimentosResp.data) ? movimentosResp.data : [])
+      setPendencias(Array.isArray(pendenciasResp.data) ? pendenciasResp.data : [])
     } catch (error) {
       alert("Erro ao carregar dashboard")
       console.error(error)
     }
   }
 
+  function valorSeguro(valor) {
+    if (valor === null || valor === undefined || valor === "") return 0
+
+    let texto = String(valor).replace("R$", "").trim()
+
+    if (texto.includes(",")) {
+      texto = texto.replace(/\./g, "").replace(",", ".")
+    }
+
+    const numero = Number(texto)
+    return Number.isFinite(numero) ? numero : 0
+  }
+
   function formatarMoeda(valor) {
-    return Number(valor).toLocaleString("pt-BR", {
+    return valorSeguro(valor).toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
     })
   }
 
-  return (
-    <div style={box}>
-      <div style={topo}>
-        <div>
-          <h2>Dashboard Executivo</h2>
+  function formatarData(data) {
+    if (!data) return "-"
+    return new Date(data + "T00:00:00").toLocaleDateString("pt-BR")
+  }
 
-          <p style={subtitulo}>
-            Painel gerencial do escritório contábil
-          </p>
+  const resumo = useMemo(() => {
+    const receitas = movimentos
+      .filter((item) => item.tipo === "Receita")
+      .reduce((total, item) => total + valorSeguro(item.valor), 0)
+
+    const despesas = movimentos
+      .filter((item) => item.tipo === "Despesa")
+      .reduce((total, item) => total + valorSeguro(item.valor), 0)
+
+    const pendenciasAbertas = pendencias.filter(
+      (item) => item.status !== "Concluída"
+    ).length
+
+    return {
+      totalClientes: clientes.length,
+      pendenciasAbertas,
+      receitas,
+      despesas,
+      saldo: receitas - despesas,
+      totalMovimentos: movimentos.length,
+    }
+  }, [clientes, movimentos, pendencias])
+
+  const ultimasPendencias = [...pendencias]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 6)
+
+  const ultimosMovimentos = [...movimentos]
+    .sort((a, b) => new Date(b.createdAt || b.data) - new Date(a.createdAt || a.data))
+    .slice(0, 6)
+
+  return (
+    <div className="db-page">
+      <style>{`
+        .db-page {
+          padding: 30px;
+          color: white;
+        }
+
+        .db-topo {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 25px;
+        }
+
+        .db-title {
+          font-size: 34px;
+          font-weight: 900;
+          margin-bottom: 5px;
+        }
+
+        .db-subtitle {
+          opacity: .8;
+        }
+
+        .db-refresh {
+          height: 46px;
+          border: none;
+          border-radius: 14px;
+          padding: 0 18px;
+          background: linear-gradient(90deg,#17b8ff,#32f06d);
+          color: #00112b;
+          font-weight: 900;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .db-cards {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 15px;
+          margin-bottom: 25px;
+        }
+
+        .db-card {
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 20px;
+          padding: 20px;
+          display: flex;
+          gap: 14px;
+          align-items: center;
+        }
+
+        .db-icon {
+          width: 46px;
+          height: 46px;
+          border-radius: 14px;
+          background: #061f47;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+        }
+
+        .db-card span {
+          display: block;
+          opacity: .72;
+          font-size: 13px;
+          margin-bottom: 7px;
+        }
+
+        .db-card strong {
+          font-size: 19px;
+          white-space: nowrap;
+        }
+
+        .green { color: #32f06d; }
+        .red { color: #ff5c70; }
+        .blue { color: #3cbcff; }
+        .yellow { color: #ffc107; }
+
+        .db-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 25px;
+          margin-bottom: 25px;
+        }
+
+        .db-box {
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 24px;
+          padding: 24px;
+        }
+
+        .db-box-title {
+          font-size: 21px;
+          font-weight: 900;
+          margin-bottom: 18px;
+        }
+
+        .db-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .db-table th {
+          color: #6bd8ff;
+          text-align: left;
+          padding: 12px;
+          border-bottom: 1px solid rgba(255,255,255,.08);
+          font-size: 13px;
+        }
+
+        .db-table td {
+          padding: 12px;
+          border-bottom: 1px solid rgba(255,255,255,.05);
+          font-size: 14px;
+        }
+
+        .valor {
+          text-align: right;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+
+        .tipo-receita {
+          color: #32f06d;
+          font-weight: 900;
+        }
+
+        .tipo-despesa {
+          color: #ff5c70;
+          font-weight: 900;
+        }
+
+        .status {
+          padding: 6px 10px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 800;
+          display: inline-block;
+        }
+
+        .status-pendente {
+          background: rgba(255,193,7,.15);
+          color: #ffc107;
+        }
+
+        .status-analise {
+          background: rgba(60,188,255,.15);
+          color: #3cbcff;
+        }
+
+        .status-concluida {
+          background: rgba(50,240,109,.15);
+          color: #32f06d;
+        }
+
+        .db-operacional {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 15px;
+        }
+
+        .db-mini {
+          background: #061f47;
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 16px;
+          padding: 18px;
+        }
+
+        .db-mini span {
+          display: block;
+          opacity: .7;
+          margin-bottom: 8px;
+        }
+
+        .db-mini strong {
+          font-size: 18px;
+        }
+
+        .empty {
+          opacity: .7;
+          padding: 18px;
+        }
+      `}</style>
+
+      <div className="db-topo">
+        <div>
+          <div className="db-title">Dashboard Escritório</div>
+          <div className="db-subtitle">
+            Visão operacional dos clientes, movimentos e pendências
+          </div>
         </div>
 
-        <button
-          style={button}
-          onClick={carregarDashboard}
-        >
-          Atualizar Dados
+        <button className="db-refresh" onClick={carregarDashboard}>
+          <FaSyncAlt />
+          Atualizar
         </button>
       </div>
 
-      <div style={cards}>
+      <div className="db-cards">
         <Card
-          title="Clientes"
-          value={dados.totalClientes}
+          icon={<FaUsers />}
+          label="Clientes"
+          value={resumo.totalClientes}
+          color="blue"
         />
 
         <Card
-          title="A Receber"
-          value={formatarMoeda(dados.totalReceber)}
+          icon={<FaClipboardList />}
+          label="Pendências"
+          value={resumo.pendenciasAbertas}
+          color="yellow"
         />
 
         <Card
-          title="A Pagar"
-          value={formatarMoeda(dados.totalPagar)}
+          icon={<FaArrowUp />}
+          label="Receitas Clientes"
+          value={formatarMoeda(resumo.receitas)}
+          color="green"
         />
 
         <Card
-          title="Saldo Escritório"
-          value={formatarMoeda(dados.saldo)}
+          icon={<FaArrowDown />}
+          label="Despesas Clientes"
+          value={formatarMoeda(resumo.despesas)}
+          color="red"
         />
 
         <Card
-          title="Pendências"
-          value={dados.obrigacoesPendentes}
-        />
-
-        <Card
-          title="Atrasadas"
-          value={dados.obrigacoesAtrasadas}
+          icon={<FaWallet />}
+          label="Saldo Consolidado"
+          value={formatarMoeda(resumo.saldo)}
+          color={resumo.saldo >= 0 ? "green" : "red"}
         />
       </div>
 
-      <div style={grid}>
-        <div style={painel}>
-          <h3>Resultado por Empresa</h3>
+      <div className="db-grid">
+        <div className="db-box">
+          <div className="db-box-title">Últimas Pendências</div>
 
-          {dados.resumoPorCliente.length === 0 && (
-            <p>Nenhum lançamento encontrado.</p>
-          )}
+          <table className="db-table">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Categoria</th>
+                <th>Status</th>
+              </tr>
+            </thead>
 
-          {dados.resumoPorCliente.map((item, index) => (
-            <div key={index} style={empresaBox}>
-              <div style={empresaTopo}>
-                <strong style={empresaNome}>
-                  {item.cliente}
-                </strong>
+            <tbody>
+              {ultimasPendencias.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.cliente}</td>
+                  <td>{item.categoria}</td>
+                  <td>
+                    <span
+                      className={
+                        item.status === "Concluída"
+                          ? "status status-concluida"
+                          : item.status === "Em análise"
+                          ? "status status-analise"
+                          : "status status-pendente"
+                      }
+                    >
+                      {item.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
 
-                <span style={badge}>
-                  {item.lancamentos} lançamentos
-                </span>
-              </div>
-
-              <div style={linha}>
-                <span>Receitas</span>
-
-                <strong style={positivo}>
-                  {formatarMoeda(item.receitas)}
-                </strong>
-              </div>
-
-              <div style={linha}>
-                <span>Despesas</span>
-
-                <strong style={negativo}>
-                  {formatarMoeda(item.despesas)}
-                </strong>
-              </div>
-
-              <div style={linha}>
-                <span>Resultado</span>
-
-                <strong
-                  style={
-                    item.resultado >= 0
-                      ? positivo
-                      : negativo
-                  }
-                >
-                  {formatarMoeda(item.resultado)}
-                </strong>
-              </div>
-            </div>
-          ))}
+              {ultimasPendencias.length === 0 && (
+                <tr>
+                  <td colSpan="3" className="empty">
+                    Nenhuma pendência registrada.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
-        <div style={painel}>
-          <h3>Últimas Obrigações</h3>
+        <div className="db-box">
+          <div className="db-box-title">Últimos Movimentos</div>
 
-          {dados.ultimasObrigacoes.length === 0 && (
-            <p>Nenhuma obrigação pendente.</p>
-          )}
+          <table className="db-table">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Tipo</th>
+                <th style={{ textAlign: "right" }}>Valor</th>
+              </tr>
+            </thead>
 
-          {dados.ultimasObrigacoes.map((item) => (
-            <div key={item.id} style={obrigacao}>
-              <strong style={empresaNome}>
-                {item.cliente}
-              </strong>
+            <tbody>
+              {ultimosMovimentos.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.cliente}</td>
 
-              <span>
-                {item.obrigacao}
-              </span>
+                  <td
+                    className={
+                      item.tipo === "Receita"
+                        ? "tipo-receita"
+                        : "tipo-despesa"
+                    }
+                  >
+                    {item.tipo}
+                  </td>
 
-              <small>
-                Competência: {item.competencia}
-              </small>
+                  <td className="valor">
+                    {formatarMoeda(item.valor)}
+                  </td>
+                </tr>
+              ))}
 
-              <small>
-                Vencimento: {item.vencimento}
-              </small>
+              {ultimosMovimentos.length === 0 && (
+                <tr>
+                  <td colSpan="3" className="empty">
+                    Nenhum movimento registrado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-              <small
-                style={
-                  item.status === "Atrasado"
-                    ? danger
-                    : warning
-                }
-              >
-                {item.status}
-              </small>
-            </div>
-          ))}
+      <div className="db-box">
+        <div className="db-box-title">Resumo Operacional</div>
+
+        <div className="db-operacional">
+          <Mini title="Clientes ativos" value={resumo.totalClientes} color="blue" />
+          <Mini title="Pendências abertas" value={resumo.pendenciasAbertas} color="yellow" />
+          <Mini title="Movimentos cadastrados" value={resumo.totalMovimentos} color="green" />
+          <Mini title="Saldo consolidado" value={formatarMoeda(resumo.saldo)} color={resumo.saldo >= 0 ? "green" : "red"} />
         </div>
       </div>
     </div>
   )
 }
 
-function Card({ title, value }) {
+function Card({ icon, label, value, color }) {
   return (
-    <div style={card}>
-      <span style={cardTitle}>
-        {title}
-      </span>
+    <div className="db-card">
+      <div className={`db-icon ${color}`}>{icon}</div>
 
-      <strong style={cardValue}>
-        {value}
-      </strong>
+      <div>
+        <span>{label}</span>
+        <strong className={color}>{value}</strong>
+      </div>
     </div>
   )
 }
 
-const box = {
-  background: "rgba(255,255,255,0.06)",
-  borderRadius: "24px",
-  padding: "28px",
-}
-
-const topo = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: "25px",
-}
-
-const subtitulo = {
-  color: "#a9b8cc",
-  marginTop: "6px",
-}
-
-const cards = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "18px",
-  marginBottom: "30px",
-}
-
-const card = {
-  background: "#061f47",
-  border: "1px solid rgba(255,255,255,.12)",
-  borderRadius: "18px",
-  padding: "22px",
-}
-
-const cardTitle = {
-  display: "block",
-  color: "#a9b8cc",
-  marginBottom: "12px",
-}
-
-const cardValue = {
-  color: "white",
-  fontSize: "28px",
-}
-
-const grid = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "20px",
-}
-
-const painel = {
-  background: "#061f47",
-  border: "1px solid rgba(255,255,255,.12)",
-  borderRadius: "18px",
-  padding: "24px",
-  color: "white",
-}
-
-const empresaBox = {
-  background: "rgba(255,255,255,.05)",
-  borderRadius: "14px",
-  padding: "18px",
-  marginTop: "18px",
-}
-
-const empresaTopo = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: "14px",
-}
-
-const empresaNome = {
-  fontSize: "17px",
-}
-
-const badge = {
-  background: "#00a8ff",
-  color: "white",
-  padding: "6px 10px",
-  borderRadius: "999px",
-  fontSize: "12px",
-}
-
-const linha = {
-  display: "flex",
-  justifyContent: "space-between",
-  marginBottom: "12px",
-}
-
-const obrigacao = {
-  background: "rgba(255,255,255,.05)",
-  borderRadius: "14px",
-  padding: "18px",
-  marginTop: "18px",
-  display: "flex",
-  flexDirection: "column",
-  gap: "6px",
-}
-
-const positivo = {
-  color: "#37ff74",
-}
-
-const negativo = {
-  color: "#ff4d4f",
-}
-
-const warning = {
-  color: "#ffc107",
-}
-
-const danger = {
-  color: "#ff4d4f",
-}
-
-const button = {
-  padding: "14px 22px",
-  borderRadius: "12px",
-  border: "none",
-  background:
-    "linear-gradient(90deg, #00a8ff, #37ff74)",
-  color: "#00112b",
-  fontWeight: "bold",
-  cursor: "pointer",
+function Mini({ title, value, color }) {
+  return (
+    <div className="db-mini">
+      <span>{title}</span>
+      <strong className={color}>{value}</strong>
+    </div>
+  )
 }

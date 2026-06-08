@@ -13,7 +13,6 @@
     "appId": "com.nexa.erp",
     "productName": "Nexa ERP",
     "icon": "build/icon.ico",
-
     "publish": [
       {
         "provider": "github",
@@ -21,17 +20,14 @@
         "repo": "nexa-erp"
       }
     ],
-
     "directories": {
       "output": "dist-electron"
     },
-
     "files": [
       "dist/**/*",
       "electron/**/*",
       "build/icon.ico"
     ],
-
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico"
@@ -42,6 +38,7 @@
     "electron-updater": "^6.8.3",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-icons": "^5.6.0",
     "react-router-dom": "^7.15.1"
   },
   "devDependencies": {

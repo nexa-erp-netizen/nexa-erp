@@ -2,12 +2,26 @@ import { useEffect, useState } from "react"
 import api from "../services/api"
 
 export default function DocumentosDigitais() {
-  const [cliente, setCliente] = useState("")
+  const usuario = JSON.parse(localStorage.getItem("usuario"))
+  const isCliente = usuario?.perfil === "Cliente"
+
+  const [cliente, setCliente] = useState(
+    isCliente ? usuario?.clienteVinculado || "" : ""
+  )
+
+  const [origem, setOrigem] = useState(
+    isCliente ? "Cliente → Escritório" : "Escritório → Cliente"
+  )
+
   const [tipo, setTipo] = useState("")
   const [anoCalendario, setAnoCalendario] = useState("")
   const [dataEnvio, setDataEnvio] = useState("")
   const [recibo, setRecibo] = useState("")
-  const [status, setStatus] = useState("Arquivado")
+
+  const [status, setStatus] = useState(
+    isCliente ? "Entregue pelo cliente" : "Disponível para baixar"
+  )
+
   const [observacao, setObservacao] = useState("")
   const [anexos, setAnexos] = useState([])
 
@@ -15,20 +29,25 @@ export default function DocumentosDigitais() {
   const [documentos, setDocumentos] = useState([])
 
   useEffect(() => {
-    async function iniciar() {
-      await carregarDados()
-    }
-
-  iniciar()
-}, [])
+    carregarDados()
+  }, [])
 
   async function carregarDados() {
     try {
-      const clientesResposta = await api.get("/clientes")
       const documentosResposta = await api.get("/documentos-digitais")
+      const listaDocumentos = documentosResposta.data || []
 
-      setClientes(clientesResposta.data || [])
-      setDocumentos(documentosResposta.data || [])
+      if (isCliente) {
+        setDocumentos(
+          listaDocumentos.filter(
+            (item) => item.cliente === usuario?.clienteVinculado
+          )
+        )
+      } else {
+        const clientesResposta = await api.get("/clientes")
+        setClientes(clientesResposta.data || [])
+        setDocumentos(listaDocumentos)
+      }
     } catch (error) {
       alert("Erro ao carregar documentos digitais")
       console.error(error)
@@ -46,38 +65,51 @@ export default function DocumentosDigitais() {
       formData.append("arquivos", arquivo)
     })
 
-    const resposta = await api.post(
-      "/documentos-digitais/upload",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    )
+    try {
+      const resposta = await api.post(
+        "/documentos-digitais/upload",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      )
 
-    setAnexos([...anexos, ...resposta.data])
+      setAnexos([...anexos, ...resposta.data])
+    } catch (error) {
+      alert("Erro ao anexar documento")
+      console.error(error)
+    }
   }
 
   async function salvarDocumento() {
-    if (!cliente || !tipo || !anoCalendario) {
+    const clienteFinal = isCliente ? usuario?.clienteVinculado : cliente
+
+    if (!clienteFinal || !tipo || !anoCalendario) {
       alert("Preencha cliente, tipo e ano-calendário")
       return
     }
 
-    await api.post("/documentos-digitais", {
-      cliente,
-      tipo,
-      anoCalendario,
-      dataEnvio,
-      recibo,
-      status,
-      observacao,
-      anexos,
-    })
+    try {
+      await api.post("/documentos-digitais", {
+        cliente: clienteFinal,
+        origem,
+        tipo,
+        anoCalendario,
+        dataEnvio,
+        recibo,
+        status,
+        observacao,
+        anexos,
+      })
 
-    limparCampos()
-    await carregarDados()
+      limparCampos()
+      await carregarDados()
+    } catch (error) {
+      alert("Erro ao salvar documento")
+      console.error(error)
+    }
   }
 
   async function excluirDocumento(id) {
@@ -87,17 +119,23 @@ export default function DocumentosDigitais() {
 
     if (!confirmar) return
 
-    await api.delete(`/documentos-digitais/${id}`)
-    await carregarDados()
+    try {
+      await api.delete(`/documentos-digitais/${id}`)
+      await carregarDados()
+    } catch (error) {
+      alert("Erro ao excluir documento")
+      console.error(error)
+    }
   }
 
   function limparCampos() {
-    setCliente("")
+    setCliente(isCliente ? usuario?.clienteVinculado || "" : "")
+    setOrigem(isCliente ? "Cliente → Escritório" : "Escritório → Cliente")
     setTipo("")
     setAnoCalendario("")
     setDataEnvio("")
     setRecibo("")
-    setStatus("Arquivado")
+    setStatus(isCliente ? "Entregue pelo cliente" : "Disponível para baixar")
     setObservacao("")
     setAnexos([])
   }
@@ -107,19 +145,36 @@ export default function DocumentosDigitais() {
       <h2>Documentos Digitais</h2>
 
       <div style={form}>
-        <select
-          style={input}
-          value={cliente}
-          onChange={(e) => setCliente(e.target.value)}
-        >
-          <option value="">Selecione o cliente</option>
+        {isCliente ? (
+          <input style={input} value={usuario?.clienteVinculado || ""} readOnly />
+        ) : (
+          <select
+            style={input}
+            value={cliente}
+            onChange={(e) => setCliente(e.target.value)}
+          >
+            <option value="">Selecione o cliente</option>
 
-          {clientes.map((item) => (
-            <option key={item.id} value={item.nome}>
-              {item.nome}
-            </option>
-          ))}
-        </select>
+            {clientes.map((item) => (
+              <option key={item.id} value={item.nome}>
+                {item.nome}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {!isCliente && (
+          <select
+            style={input}
+            value={origem}
+            onChange={(e) => setOrigem(e.target.value)}
+          >
+            <option value="Cliente → Escritório">Cliente → Escritório</option>
+            <option value="Escritório → Cliente">Escritório → Cliente</option>
+          </select>
+        )}
+
+        {isCliente && <input style={input} value={origem} readOnly />}
 
         <select
           style={input}
@@ -139,7 +194,7 @@ export default function DocumentosDigitais() {
 
         <input
           style={input}
-          placeholder="Ano-calendário"
+          placeholder="Ano-calendário / Competência"
           value={anoCalendario}
           onChange={(e) => setAnoCalendario(e.target.value)}
         />
@@ -153,7 +208,7 @@ export default function DocumentosDigitais() {
 
         <input
           style={input}
-          placeholder="Número do recibo"
+          placeholder="Número do recibo / referência"
           value={recibo}
           onChange={(e) => setRecibo(e.target.value)}
         />
@@ -163,10 +218,17 @@ export default function DocumentosDigitais() {
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         >
-          <option value="Arquivado">Arquivado</option>
-          <option value="Entregue">Entregue</option>
-          <option value="Pendente">Pendente</option>
-          <option value="Conferir">Conferir</option>
+          <option value="Entregue pelo cliente">Entregue pelo cliente</option>
+          <option value="Recebido pelo escritório">
+            Recebido pelo escritório
+          </option>
+          <option value="Em análise">Em análise</option>
+          <option value="Aprovado">Aprovado</option>
+          <option value="Recusado">Recusado</option>
+          <option value="Disponível para baixar">
+            Disponível para baixar
+          </option>
+          <option value="Resolvido">Resolvido</option>
         </select>
 
         <textarea
@@ -179,13 +241,7 @@ export default function DocumentosDigitais() {
         <div style={uploadBox}>
           <label style={uploadLabel}>
             Anexar Documento
-
-            <input
-              type="file"
-              multiple
-              hidden
-              onChange={adicionarAnexos}
-            />
+            <input type="file" multiple hidden onChange={adicionarAnexos} />
           </label>
 
           {anexos.length > 0 && (
@@ -208,21 +264,23 @@ export default function DocumentosDigitais() {
         <table style={table}>
           <thead>
             <tr>
-              <th style={th}>Cliente</th>
+              {!isCliente && <th style={th}>Cliente</th>}
+              <th style={th}>Origem</th>
               <th style={th}>Tipo</th>
-              <th style={th}>Ano</th>
-              <th style={th}>Data Envio</th>
-              <th style={th}>Recibo</th>
+              <th style={th}>Competência</th>
+              <th style={th}>Data</th>
+              <th style={th}>Referência</th>
               <th style={th}>Status</th>
               <th style={th}>Anexos</th>
-              <th style={th}>Ações</th>
+              {!isCliente && <th style={th}>Ações</th>}
             </tr>
           </thead>
 
           <tbody>
             {documentos.map((item) => (
               <tr key={item.id}>
-                <td style={td}>{item.cliente}</td>
+                {!isCliente && <td style={td}>{item.cliente}</td>}
+                <td style={td}>{item.origem || "-"}</td>
                 <td style={td}>{item.tipo}</td>
                 <td style={td}>{item.anoCalendario}</td>
                 <td style={td}>{item.dataEnvio || "-"}</td>
@@ -235,7 +293,11 @@ export default function DocumentosDigitais() {
                       {item.anexos.map((arquivo, index) => (
                         <a
                           key={index}
-                          href={`http://localhost:3000${arquivo.caminho}`}
+                          href={
+                            arquivo.caminho?.startsWith("http")
+                              ? arquivo.caminho
+                              : `https://nexa-erp-api.onrender.com${arquivo.caminho}`
+                          }
                           target="_blank"
                           rel="noreferrer"
                           style={linkArquivo}
@@ -249,16 +311,26 @@ export default function DocumentosDigitais() {
                   )}
                 </td>
 
-                <td style={td}>
-                  <button
-                    style={deleteButton}
-                    onClick={() => excluirDocumento(item.id)}
-                  >
-                    Excluir
-                  </button>
-                </td>
+                {!isCliente && (
+                  <td style={td}>
+                    <button
+                      style={deleteButton}
+                      onClick={() => excluirDocumento(item.id)}
+                    >
+                      Excluir
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
+
+            {documentos.length === 0 && (
+              <tr>
+                <td style={td} colSpan={isCliente ? 7 : 9}>
+                  Nenhum documento encontrado.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

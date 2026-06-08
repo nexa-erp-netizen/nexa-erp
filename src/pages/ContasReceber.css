@@ -1,0 +1,114 @@
+.contas-container {
+  padding: 10px;
+  color: white;
+}
+
+.cards-financeiros {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.card-fin {
+  background: #071a3a;
+  border: 1px solid rgba(255,255,255,.08);
+  padding: 25px;
+  border-radius: 18px;
+}
+
+.card-fin span {
+  display: block;
+  color: #8fa7c7;
+  margin-bottom: 10px;
+}
+
+.card-fin strong {
+  font-size: 30px;
+}
+
+.nova-conta {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.nova-conta input,
+.nova-conta select {
+  flex: 1;
+  padding: 15px;
+  border-radius: 12px;
+  border: none;
+  background: #071a3a;
+  color: white;
+}
+
+.nova-conta button {
+  background: linear-gradient(
+    90deg,
+    #00a8ff,
+    #37ff74
+  );
+
+  border: none;
+  border-radius: 12px;
+  padding: 0 25px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.tabela-wrapper {
+  background: #071a3a;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead {
+  background: rgba(255,255,255,.05);
+}
+
+th,
+td {
+  padding: 18px;
+  text-align: left;
+}
+
+tbody tr {
+  border-top: 1px solid rgba(255,255,255,.05);
+}
+
+.badge {
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.recebido {
+  background: rgba(34,197,94,.2);
+  color: #4ade80;
+}
+
+.atrasado {
+  background: rgba(239,68,68,.2);
+  color: #f87171;
+}
+
+.pendente {
+  background: rgba(59,130,246,.2);
+  color: #60a5fa;
+}
+
+.btn-receber {
+  background: #2563eb;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  color: white;
+  cursor: pointer;
+}
