@@ -10,8 +10,28 @@ export default function MovimentosClientesEscritorio() {
   const [dataFinal, setDataFinal] = useState("")
 
   useEffect(() => {
+    definirPeriodoMesAtual()
     carregarDados()
   }, [])
+
+  function definirPeriodoMesAtual() {
+    const hoje = new Date()
+    const ano = hoje.getFullYear()
+    const mes = hoje.getMonth()
+
+    const primeiroDia = new Date(ano, mes, 1)
+    const ultimoDia = new Date(ano, mes + 1, 0)
+
+    setDataInicial(formatarDataInput(primeiroDia))
+    setDataFinal(formatarDataInput(ultimoDia))
+  }
+
+  function formatarDataInput(data) {
+    const ano = data.getFullYear()
+    const mes = String(data.getMonth() + 1).padStart(2, "0")
+    const dia = String(data.getDate()).padStart(2, "0")
+    return `${ano}-${mes}-${dia}`
+  }
 
   async function carregarDados() {
     const [movimentosResp, clientesResp] = await Promise.all([
@@ -48,18 +68,38 @@ export default function MovimentosClientesEscritorio() {
     return new Date(data + "T00:00:00").toLocaleDateString("pt-BR")
   }
 
+  const clienteSelecionado = Boolean(clienteFiltro)
+
   const movimentosFiltrados = useMemo(() => {
+    if (!clienteSelecionado) return []
+
     return movimentos.filter((item) => {
-      if (clienteFiltro && item.cliente !== clienteFiltro) return false
+      if (item.cliente !== clienteFiltro) return false
       if (tipoFiltro && item.tipo !== tipoFiltro) return false
       if (dataInicial && item.data < dataInicial) return false
       if (dataFinal && item.data > dataFinal) return false
 
       return true
     })
-  }, [movimentos, clienteFiltro, tipoFiltro, dataInicial, dataFinal])
+  }, [
+    movimentos,
+    clienteFiltro,
+    tipoFiltro,
+    dataInicial,
+    dataFinal,
+    clienteSelecionado,
+  ])
 
   const resumo = useMemo(() => {
+    if (!clienteSelecionado) {
+      return {
+        receitas: 0,
+        despesas: 0,
+        saldo: 0,
+        total: 0,
+      }
+    }
+
     const receitas = movimentosFiltrados
       .filter((item) => item.tipo === "Receita")
       .reduce((total, item) => total + valorSeguro(item.valor), 0)
@@ -74,7 +114,7 @@ export default function MovimentosClientesEscritorio() {
       saldo: receitas - despesas,
       total: movimentosFiltrados.length,
     }
-  }, [movimentosFiltrados])
+  }, [movimentosFiltrados, clienteSelecionado])
 
   return (
     <div className="me-page">
@@ -219,36 +259,27 @@ export default function MovimentosClientesEscritorio() {
           opacity: .7;
           padding: 18px;
         }
+
+        @media (max-width: 900px) {
+          .me-summary,
+          .me-filtros {
+            grid-template-columns: 1fr;
+          }
+
+          .me-page {
+            padding: 18px;
+          }
+
+          .me-card {
+            overflow-x: auto;
+          }
+        }
       `}</style>
 
       <div className="me-title">Movimentos Clientes</div>
 
       <div className="me-subtitle">
-        Acompanhamento das movimentações lançadas pelos clientes
-      </div>
-
-      <div className="me-summary">
-        <div className="me-box">
-          <span>Receitas</span>
-          <strong className="green">{formatarMoeda(resumo.receitas)}</strong>
-        </div>
-
-        <div className="me-box">
-          <span>Despesas</span>
-          <strong className="red">{formatarMoeda(resumo.despesas)}</strong>
-        </div>
-
-        <div className="me-box">
-          <span>Saldo</span>
-          <strong className={resumo.saldo >= 0 ? "green" : "red"}>
-            {formatarMoeda(resumo.saldo)}
-          </strong>
-        </div>
-
-        <div className="me-box">
-          <span>Lançamentos</span>
-          <strong className="blue">{resumo.total}</strong>
-        </div>
+        Selecione um cliente para visualizar as movimentações
       </div>
 
       <div className="me-card">
@@ -258,7 +289,7 @@ export default function MovimentosClientesEscritorio() {
             value={clienteFiltro}
             onChange={(e) => setClienteFiltro(e.target.value)}
           >
-            <option value="">Todos os clientes</option>
+            <option value="">Selecione um cliente</option>
 
             {clientes.map((cliente) => (
               <option key={cliente.id} value={cliente.nome}>
@@ -271,6 +302,7 @@ export default function MovimentosClientesEscritorio() {
             className="me-select"
             value={tipoFiltro}
             onChange={(e) => setTipoFiltro(e.target.value)}
+            disabled={!clienteSelecionado}
           >
             <option value="">Todos os tipos</option>
             <option value="Receita">Receitas</option>
@@ -282,6 +314,7 @@ export default function MovimentosClientesEscritorio() {
             type="date"
             value={dataInicial}
             onChange={(e) => setDataInicial(e.target.value)}
+            disabled={!clienteSelecionado}
           />
 
           <input
@@ -289,58 +322,86 @@ export default function MovimentosClientesEscritorio() {
             type="date"
             value={dataFinal}
             onChange={(e) => setDataFinal(e.target.value)}
+            disabled={!clienteSelecionado}
           />
         </div>
       </div>
 
-      <div className="me-card">
-        <table className="me-table">
-          <thead>
-            <tr>
-              <th>Cliente</th>
-              <th>Data</th>
-              <th>Tipo</th>
-              <th>Plano de contas</th>
-              <th>Descrição</th>
-              <th style={{ textAlign: "right" }}>Valor</th>
-            </tr>
-          </thead>
+      {clienteSelecionado && (
+        <>
+          <div className="me-summary">
+            <div className="me-box">
+              <span>Receitas</span>
+              <strong className="green">{formatarMoeda(resumo.receitas)}</strong>
+            </div>
 
-          <tbody>
-            {movimentosFiltrados.map((item) => (
-              <tr key={item.id}>
-                <td>{item.cliente}</td>
-                <td>{formatarData(item.data)}</td>
+            <div className="me-box">
+              <span>Despesas</span>
+              <strong className="red">{formatarMoeda(resumo.despesas)}</strong>
+            </div>
 
-                <td
-                  className={
-                    item.tipo === "Receita"
-                      ? "tipo-receita"
-                      : "tipo-despesa"
-                  }
-                >
-                  {item.tipo}
-                </td>
+            <div className="me-box">
+              <span>Saldo</span>
+              <strong className={resumo.saldo >= 0 ? "green" : "red"}>
+                {formatarMoeda(resumo.saldo)}
+              </strong>
+            </div>
 
-                <td>{item.planoContaNome || "-"}</td>
-                <td>{item.descricao}</td>
+            <div className="me-box">
+              <span>Lançamentos</span>
+              <strong className="blue">{resumo.total}</strong>
+            </div>
+          </div>
 
-                <td className="valor">
-                  {formatarMoeda(item.valor)}
-                </td>
-              </tr>
-            ))}
+          <div className="me-card">
+            <table className="me-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Data</th>
+                  <th>Tipo</th>
+                  <th>Plano de contas</th>
+                  <th>Descrição</th>
+                  <th style={{ textAlign: "right" }}>Valor</th>
+                </tr>
+              </thead>
 
-            {movimentosFiltrados.length === 0 && (
-              <tr>
-                <td colSpan="6" className="empty">
-                  Nenhum movimento encontrado.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              <tbody>
+                {movimentosFiltrados.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.cliente}</td>
+                    <td>{formatarData(item.data)}</td>
+
+                    <td
+                      className={
+                        item.tipo === "Receita"
+                          ? "tipo-receita"
+                          : "tipo-despesa"
+                      }
+                    >
+                      {item.tipo}
+                    </td>
+
+                    <td>{item.planoContaNome || "-"}</td>
+                    <td>{item.descricao}</td>
+
+                    <td className="valor">{formatarMoeda(item.valor)}</td>
+                  </tr>
+                ))}
+
+                {movimentosFiltrados.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="empty">
+                      Nenhum movimento encontrado para este cliente no período
+                      selecionado.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

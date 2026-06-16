@@ -143,7 +143,7 @@ export default function EscritorioDigital({ setPage }) {
         </div>
 
         <div style={card}>
-          <h3>Obrigações</h3>
+          <h3>Pendências e Guias</h3>
 
           <p>
             Agenda contábil, fiscal e trabalhista
@@ -154,7 +154,7 @@ export default function EscritorioDigital({ setPage }) {
             style={button}
             onClick={() => setPage("Fiscal")}
           >
-            Ver Obrigações
+            Ver Pendências
           </button>
         </div>
 

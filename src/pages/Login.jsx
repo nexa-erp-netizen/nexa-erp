@@ -3,76 +3,204 @@ import api from "../services/api"
 import logo from "../assets/logo.png"
 
 export default function Login({ onLogin }) {
-  const [email, setEmail] = useState("")
+  const [login, setLogin] = useState("")
   const [senha, setSenha] = useState("")
+  const [mostrarSenha, setMostrarSenha] = useState(false)
+  const [carregando, setCarregando] = useState(false)
 
   async function entrar() {
-    if (!email || !senha) {
-      alert("Preencha e-mail e senha")
+    if (!login || !senha) {
+      alert("Preencha usuário, CPF, e-mail ou CNPJ e senha")
       return
     }
 
+    if (carregando) return
+
+    setCarregando(true)
+
     try {
       const resposta = await api.post("/auth/login", {
-        email,
+        login,
+        email: login,
         senha,
       })
 
       localStorage.setItem("token", resposta.data.token)
-      localStorage.setItem(
-        "usuario",
-        JSON.stringify(resposta.data.usuario)
-      )
+      localStorage.setItem("usuario", JSON.stringify(resposta.data.usuario))
 
       onLogin(resposta.data.usuario)
     } catch (error) {
-      alert("E-mail ou senha inválidos")
-
-      setEmail("")
+      alert("Usuário ou senha inválidos")
+      setLogin("")
       setSenha("")
-
       console.error(error)
+    } finally {
+      setCarregando(false)
     }
   }
 
   return (
-    <div style={page}>
-      <div style={card}>
-        <img src={logo} alt="Nexa" style={logoStyle} />
+    <div className="login-page" style={page}>
+      <style>{`
+        .nexa-loading-bar {
+          width: 100%;
+          height: 16px;
+          background: #dbeafe;
+          border-radius: 999px;
+          overflow: hidden;
+          margin-bottom: 18px;
+          position: relative;
+        }
 
-        <h1 style={title}>Acesso ao Sistema</h1>
+        .nexa-loading-fill {
+          width: 45%;
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #00a8ff, #37ff74, #00a8ff);
+          animation: nexaLoadingMove 1.1s ease-in-out infinite;
+        }
 
-        <p style={subtitle}>
-          Nexa Contábil Digital
-        </p>
+        @keyframes nexaLoadingMove {
+          0% {
+            transform: translateX(-120%);
+          }
 
-        <input
-          style={input}
-          placeholder="E-mail"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+          100% {
+            transform: translateX(260%);
+          }
+        }
 
-        <input
-          style={input}
-          type="password"
-          placeholder="Senha"
-          value={senha}
-          onChange={(e) => setSenha(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              entrar()
-            }
-          }}
-        />
+        @media (max-width: 900px) {
+          .login-page {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-height: 100vh !important;
+            padding: 18px !important;
+            overflow-x: hidden !important;
+            box-sizing: border-box !important;
+          }
 
-        <button style={button} onClick={entrar}>
-          Entrar
-        </button>
+          .login-area {
+            width: 100% !important;
+            padding: 0 !important;
+            background: transparent !important;
+          }
 
-        <p style={aviso}>
-          Acesso exclusivo para usuários autorizados pelo escritório.
-        </p>
+          .login-card {
+            width: 100% !important;
+            max-width: 390px !important;
+            margin: 0 auto !important;
+          }
+
+          .login-card img {
+            width: 180px !important;
+            margin-bottom: 24px !important;
+          }
+
+          .login-card h1 {
+            font-size: 34px !important;
+            line-height: 1.05 !important;
+            white-space: normal !important;
+            word-break: normal !important;
+          }
+
+          .login-card input,
+          .login-card button {
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+
+          .login-hero {
+            display: none !important;
+          }
+        }
+
+        @media (max-width: 430px) {
+          .login-card h1 {
+            font-size: 30px !important;
+          }
+
+          .login-card img {
+            width: 165px !important;
+          }
+        }
+      `}</style>
+
+      {carregando && (
+        <div style={overlay}>
+          <div style={loadingBox}>
+            <div className="nexa-loading-bar">
+              <div className="nexa-loading-fill" />
+            </div>
+
+            <strong style={loadingText}>
+              Carregando o sistema Nexa...
+            </strong>
+          </div>
+        </div>
+      )}
+
+      <div className="login-area" style={loginArea}>
+        <div className="login-card" style={card}>
+          <img src={logo} alt="Nexa" style={logoStyle} />
+
+          <h1 style={title}>Acesso ao Sistema</h1>
+
+          <p style={subtitle}>Nexa Contábil Digital</p>
+
+          <input
+            style={input}
+            placeholder="Usuário, CPF, E-mail ou CNPJ"
+            value={login}
+            disabled={carregando}
+            onChange={(e) => setLogin(e.target.value)}
+          />
+
+          <div style={passwordBox}>
+            <input
+              style={passwordInput}
+              type={mostrarSenha ? "text" : "password"}
+              placeholder="Senha"
+              value={senha}
+              disabled={carregando}
+              onChange={(e) => setSenha(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") entrar()
+              }}
+            />
+
+            <button
+              type="button"
+              style={eyeButton}
+              onClick={() => setMostrarSenha(!mostrarSenha)}
+              disabled={carregando}
+              title={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+            >
+              {mostrarSenha ? "🙈" : "👁️"}
+            </button>
+          </div>
+
+          <button style={button} onClick={entrar} disabled={carregando}>
+            {carregando ? "Entrando..." : "Entrar"}
+          </button>
+
+          <p style={aviso}>
+            Acesso exclusivo para usuários autorizados pelo escritório.
+          </p>
+        </div>
+      </div>
+
+      <div className="login-hero" style={hero}>
+        <div style={heroOverlay}>
+          <h2 style={heroTitle}>
+            Seu escritório contábil conectado ao cliente todos os dias
+          </h2>
+
+          <p style={heroText}>
+            Organize guias, declarações, documentos e solicitações em um só lugar.
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -80,22 +208,24 @@ export default function Login({ onLogin }) {
 
 const page = {
   minHeight: "100vh",
-  background:
-    "linear-gradient(135deg, #00112b, #00275c, #00112b)",
+  background: "linear-gradient(135deg, #00112b, #00275c, #00112b)",
+  display: "grid",
+  gridTemplateColumns: "430px 1fr",
+  color: "white",
+  overflowX: "hidden",
+}
+
+const loginArea = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  padding: "20px",
+  padding: "28px",
+  background: "rgba(0,17,43,.92)",
 }
 
 const card = {
   width: "100%",
-  maxWidth: "430px",
-  background: "rgba(255,255,255,0.06)",
-  border: "1px solid rgba(255,255,255,.12)",
-  borderRadius: "28px",
-  padding: "36px",
-  boxShadow: "0 0 50px rgba(0,0,0,.45)",
+  maxWidth: "390px",
 }
 
 const logoStyle = {
@@ -125,6 +255,33 @@ const input = {
   color: "white",
   fontSize: "15px",
   marginBottom: "15px",
+  boxSizing: "border-box",
+}
+
+const passwordBox = {
+  position: "relative",
+  marginBottom: "15px",
+}
+
+const passwordInput = {
+  ...input,
+  marginBottom: 0,
+  paddingRight: "52px",
+}
+
+const eyeButton = {
+  position: "absolute",
+  right: "10px",
+  top: "50%",
+  transform: "translateY(-50%)",
+  width: "36px",
+  height: "36px",
+  border: "none",
+  borderRadius: "10px",
+  background: "rgba(255,255,255,.10)",
+  color: "white",
+  cursor: "pointer",
+  fontSize: "16px",
 }
 
 const button = {
@@ -144,4 +301,62 @@ const aviso = {
   fontSize: "13px",
   textAlign: "center",
   marginTop: "18px",
+  lineHeight: "22px",
+}
+
+const hero = {
+  position: "relative",
+  background:
+    "linear-gradient(135deg, rgba(0,39,92,.25), rgba(0,17,43,.85)), url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1400&q=80')",
+  backgroundSize: "cover",
+  backgroundPosition: "center",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "60px",
+}
+
+const heroOverlay = {
+  maxWidth: "620px",
+}
+
+const heroTitle = {
+  fontSize: "52px",
+  lineHeight: "1.08",
+  margin: 0,
+  fontWeight: 900,
+  textShadow: "0 10px 30px rgba(0,0,0,.45)",
+}
+
+const heroText = {
+  marginTop: "20px",
+  fontSize: "20px",
+  color: "#d9e7ff",
+  lineHeight: "30px",
+}
+
+const overlay = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,.65)",
+  zIndex: 9999,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "20px",
+}
+
+const loadingBox = {
+  width: "100%",
+  maxWidth: "500px",
+  background: "white",
+  borderRadius: "16px",
+  padding: "22px",
+  boxShadow: "0 20px 70px rgba(0,0,0,.45)",
+  textAlign: "center",
+}
+
+const loadingText = {
+  color: "#00112b",
+  fontSize: "15px",
 }

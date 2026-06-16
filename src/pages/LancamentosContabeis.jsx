@@ -6,6 +6,9 @@ export default function LancamentosContabeis() {
   const [clientes, setClientes] = useState([])
   const [servicos, setServicos] = useState([])
   const [clienteAtual, setClienteAtual] = useState(0)
+  const [clienteFiltro, setClienteFiltro] = useState("")
+  const [dataInicial, setDataInicial] = useState("")
+  const [dataFinal, setDataFinal] = useState("")
   const [editandoId, setEditandoId] = useState(null)
 
   const [form, setForm] = useState({
@@ -95,6 +98,26 @@ export default function LancamentosContabeis() {
 
     const d = new Date(data + "T00:00:00")
     return `${meses[d.getMonth()]}/${d.getFullYear()}`
+  }
+
+  function ordenarPorDataCrescente(a, b) {
+    return new Date(`${a.data || "1900-01-01"}T00:00:00`) - new Date(`${b.data || "1900-01-01"}T00:00:00`)
+  }
+
+  function ordenarPorDataDecrescente(a, b) {
+    return new Date(`${b.data || "1900-01-01"}T00:00:00`) - new Date(`${a.data || "1900-01-01"}T00:00:00`)
+  }
+
+  function dataDentroDoFiltro(data) {
+    if (!data) return false
+    if (dataInicial && data < dataInicial) return false
+    if (dataFinal && data > dataFinal) return false
+    return true
+  }
+
+  function limparFiltrosData() {
+    setDataInicial("")
+    setDataFinal("")
   }
 
   function selecionarServico(servicoId) {
@@ -287,13 +310,42 @@ export default function LancamentosContabeis() {
         grupos[cliente].graficoMensal[mes].despesas
     })
 
+    const meses = {
+      Jan: 0,
+      Fev: 1,
+      Mar: 2,
+      Abr: 3,
+      Mai: 4,
+      Jun: 5,
+      Jul: 6,
+      Ago: 7,
+      Set: 8,
+      Out: 9,
+      Nov: 10,
+      Dez: 11,
+    }
+
     return Object.values(grupos).map((grupo) => ({
       ...grupo,
-      graficoMensal: Object.values(grupo.graficoMensal),
+      lancamentos: grupo.lancamentos.sort(ordenarPorDataDecrescente),
+      graficoMensal: Object.values(grupo.graficoMensal).sort((a, b) => {
+        const [mesA, anoA] = a.mes.split("/")
+        const [mesB, anoB] = b.mes.split("/")
+
+        return new Date(Number(anoA), meses[mesA], 1) - new Date(Number(anoB), meses[mesB], 1)
+      }),
     }))
   }, [lancamentos])
 
-  const grupo = clientesAgrupados[clienteAtual]
+  const gruposFiltrados = clienteFiltro
+    ? clientesAgrupados.filter((grupo) => grupo.cliente === clienteFiltro)
+    : []
+
+  const grupo = gruposFiltrados[clienteAtual]
+
+  const lancamentosHistorico = grupo
+    ? grupo.lancamentos.filter((lancamento) => dataDentroDoFiltro(lancamento.data))
+    : []
 
   return (
     <div className="lc-page">
@@ -745,6 +797,46 @@ export default function LancamentosContabeis() {
         </div>
       </form>
 
+      <div className="lc-card">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
+          <strong style={{ color: "#c9d6e6", fontSize: "15px" }}>
+            Visualizar cliente
+          </strong>
+
+          <select
+            className="lc-select"
+            style={{ maxWidth: "320px" }}
+            value={clienteFiltro}
+            onChange={(e) => {
+              setClienteFiltro(e.target.value)
+              setClienteAtual(0)
+              limparFiltrosData()
+            }}
+          >
+            <option value="">Selecione um cliente</option>
+
+            {clientes.map((cliente) => (
+              <option key={cliente.id} value={cliente.nome}>
+                {cliente.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {!clienteFiltro && (
+        <div className="lc-card" style={{ color: "#c9d6e6" }}>
+          Selecione um cliente para visualizar o gráfico, resumo e histórico contábil.
+        </div>
+      )}
+
       {grupo && (
         <div className="lc-card">
           <div className="lc-header">
@@ -836,6 +928,45 @@ export default function LancamentosContabeis() {
             </div>
           </div>
 
+          <div className="lc-card" style={{ marginBottom: "20px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                flexWrap: "wrap",
+              }}
+            >
+              <strong style={{ color: "#c9d6e6", fontSize: "15px" }}>
+                Filtrar histórico
+              </strong>
+
+              <input
+                className="lc-input"
+                style={{ maxWidth: "210px" }}
+                type="date"
+                value={dataInicial}
+                onChange={(e) => setDataInicial(e.target.value)}
+              />
+
+              <input
+                className="lc-input"
+                style={{ maxWidth: "210px" }}
+                type="date"
+                value={dataFinal}
+                onChange={(e) => setDataFinal(e.target.value)}
+              />
+
+              <button
+                type="button"
+                className="btn-edit"
+                onClick={limparFiltrosData}
+              >
+                Limpar datas
+              </button>
+            </div>
+          </div>
+
           <table className="lc-table">
             <thead>
               <tr>
@@ -850,7 +981,7 @@ export default function LancamentosContabeis() {
             </thead>
 
             <tbody>
-              {grupo.lancamentos.map((lancamento) => (
+              {lancamentosHistorico.map((lancamento) => (
                 <tr key={lancamento.id}>
                   <td>{formatarData(lancamento.data)}</td>
                   <td>{lancamento.descricao}</td>
@@ -881,7 +1012,7 @@ export default function LancamentosContabeis() {
           </table>
 
           <div className="lc-pagination">
-            {clientesAgrupados.map((_, index) => (
+            {gruposFiltrados.map((_, index) => (
               <button
                 key={index}
                 className={`lc-page-btn ${

@@ -6,8 +6,8 @@ export default function PlanoContas() {
   const [conta, setConta] = useState("")
   const [tipo, setTipo] = useState("")
   const [natureza, setNatureza] = useState("")
+  const [formasTexto, setFormasTexto] = useState("")
   const [editandoId, setEditandoId] = useState(null)
-
   const [contas, setContas] = useState([])
 
   useEffect(() => {
@@ -24,6 +24,13 @@ export default function PlanoContas() {
     }
   }
 
+  function separarFormas(texto) {
+    return String(texto || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+
   async function salvarConta() {
     if (!codigo || !conta || !tipo || !natureza) {
       alert("Preencha todos os campos")
@@ -35,6 +42,7 @@ export default function PlanoContas() {
       conta,
       tipo,
       natureza,
+      formas: separarFormas(formasTexto),
     }
 
     try {
@@ -57,17 +65,14 @@ export default function PlanoContas() {
     setConta(item.conta)
     setTipo(item.tipo)
     setNatureza(item.natureza)
+    setFormasTexto(Array.isArray(item.formas) ? item.formas.join(", ") : "")
     setEditandoId(item.id)
   }
 
   async function excluirConta(id) {
-    const confirmar = window.confirm(
-      "Deseja realmente excluir esta conta?"
-    )
+    const confirmar = window.confirm("Deseja realmente excluir esta conta?")
 
-    if (!confirmar) {
-      return
-    }
+    if (!confirmar) return
 
     try {
       await api.delete(`/plano-contas/${id}`)
@@ -83,6 +88,7 @@ export default function PlanoContas() {
     setConta("")
     setTipo("")
     setNatureza("")
+    setFormasTexto("")
     setEditandoId(null)
   }
 
@@ -127,53 +133,80 @@ export default function PlanoContas() {
           <option value="Credora">Credora</option>
         </select>
 
+        <input
+          style={inputFull}
+          placeholder="Formas / Classe. Ex: PIX, Cartão, Dinheiro, Boleto"
+          value={formasTexto}
+          onChange={(e) => setFormasTexto(e.target.value)}
+        />
+
         <button style={button} onClick={salvarConta}>
-          {editandoId !== null
-            ? "Salvar Correção"
-            : "Salvar Conta"}
+          {editandoId !== null ? "Salvar Correção" : "Salvar Conta"}
         </button>
       </div>
 
-      <table style={table}>
-        <thead>
-          <tr>
-            <th style={th}>Código</th>
-            <th style={th}>Conta</th>
-            <th style={th}>Tipo</th>
-            <th style={th}>Natureza</th>
-            <th style={th}>Ações</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {contas.map((item) => (
-            <tr key={item.id}>
-              <td style={td}>{item.codigo}</td>
-              <td style={td}>{item.conta}</td>
-              <td style={td}>{item.tipo}</td>
-              <td style={td}>{item.natureza}</td>
-
-              <td style={td}>
-                <div style={actions}>
-                  <button
-                    style={editButton}
-                    onClick={() => editarConta(item)}
-                  >
-                    Corrigir
-                  </button>
-
-                  <button
-                    style={deleteButton}
-                    onClick={() => excluirConta(item.id)}
-                  >
-                    Excluir
-                  </button>
-                </div>
-              </td>
+      <div style={tableWrapper}>
+        <table style={table}>
+          <thead>
+            <tr>
+              <th style={th}>Código</th>
+              <th style={th}>Conta</th>
+              <th style={th}>Tipo</th>
+              <th style={th}>Natureza</th>
+              <th style={th}>Formas</th>
+              <th style={th}>Ações</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {contas.map((item) => (
+              <tr key={item.id}>
+                <td style={td}>{item.codigo}</td>
+                <td style={td}>{item.conta}</td>
+                <td style={td}>{item.tipo}</td>
+                <td style={td}>{item.natureza}</td>
+
+                <td style={td}>
+                  {Array.isArray(item.formas) && item.formas.length > 0 ? (
+                    <div style={tags}>
+                      {item.formas.map((forma) => (
+                        <span key={forma} style={tag}>
+                          {forma}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ color: "#a9b8cc" }}>Nenhuma</span>
+                  )}
+                </td>
+
+                <td style={td}>
+                  <div style={actions}>
+                    <button style={editButton} onClick={() => editarConta(item)}>
+                      Corrigir
+                    </button>
+
+                    <button
+                      style={deleteButton}
+                      onClick={() => excluirConta(item.id)}
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+
+            {contas.length === 0 && (
+              <tr>
+                <td style={td} colSpan="6">
+                  Nenhuma conta cadastrada.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -207,6 +240,11 @@ const input = {
   fontSize: "15px",
 }
 
+const inputFull = {
+  ...input,
+  gridColumn: "1 / -1",
+}
+
 const button = {
   padding: "15px",
   borderRadius: "12px",
@@ -217,24 +255,48 @@ const button = {
   cursor: "pointer",
 }
 
+const tableWrapper = {
+  width: "100%",
+  overflowX: "auto",
+}
+
 const table = {
   width: "100%",
   borderCollapse: "collapse",
+  minWidth: "760px",
 }
 
 const th = {
   textAlign: "left",
   padding: "16px",
   color: "#a9b8cc",
+  whiteSpace: "nowrap",
 }
 
 const td = {
   padding: "16px",
+  verticalAlign: "middle",
 }
 
 const actions = {
   display: "flex",
   gap: "10px",
+}
+
+const tags = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "7px",
+}
+
+const tag = {
+  background: "#061f47",
+  color: "#37ff74",
+  border: "1px solid rgba(55,255,116,.25)",
+  padding: "6px 10px",
+  borderRadius: "999px",
+  fontSize: "12px",
+  fontWeight: "bold",
 }
 
 const editButton = {

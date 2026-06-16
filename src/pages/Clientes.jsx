@@ -15,6 +15,14 @@ export default function Clientes() {
   const [endereco, setEndereco] = useState("")
   const [cidade, setCidade] = useState("")
   const [estado, setEstado] = useState("")
+  const [dataNascimento, setDataNascimento] = useState("")
+  const [tituloEleitor, setTituloEleitor] = useState("")
+  const [codigoSimplesNacional, setCodigoSimplesNacional] = useState("")
+  const [senhaGovBr, setSenhaGovBr] = useState("")
+  const [cnaePrincipal, setCnaePrincipal] = useState("")
+  const [inscricaoMunicipal, setInscricaoMunicipal] = useState("")
+  const [inscricaoEstadual, setInscricaoEstadual] = useState("")
+  const [alvara, setAlvara] = useState("")
   const [observacao, setObservacao] = useState("")
   const [anexos, setAnexos] = useState([])
 
@@ -40,10 +48,12 @@ export default function Clientes() {
   async function carregarClientes() {
     try {
       const resposta = await api.get("/clientes")
-      setClientes(resposta.data)
+      setClientes(resposta.data || [])
+      return resposta.data || []
     } catch (error) {
       alert("Erro ao carregar clientes da API")
       console.error(error)
+      return []
     }
   }
 
@@ -121,22 +131,44 @@ export default function Clientes() {
       endereco,
       cidade,
       estado,
+      dataNascimento,
+      tituloEleitor,
+      codigoSimplesNacional,
+      senhaGovBr,
+      cnaePrincipal,
+      inscricaoMunicipal,
+      inscricaoEstadual,
+      alvara,
       observacao,
       anexos,
     }
 
     try {
       if (editandoId !== null) {
-        await api.put(`/clientes/${editandoId}`, dadosCliente)
-      } else {
-        await api.post("/clientes", dadosCliente)
+        const resposta = await api.put(`/clientes/${editandoId}`, dadosCliente)
+        const listaAtualizada = await carregarClientes()
+        const clienteAtualizado =
+          resposta.data || listaAtualizada.find((item) => item.id === editandoId)
+
+        setClienteSelecionado(clienteAtualizado)
+        setEditandoId(clienteAtualizado?.id || editandoId)
+        setTela("detalhes")
+
+        alert("Cliente corrigido com sucesso")
+        return
       }
 
+      await api.post("/clientes", dadosCliente)
       await carregarClientes()
       limparCampos()
       setTela("lista")
+
+      alert("Cliente cadastrado com sucesso")
     } catch (error) {
-      alert("Erro ao salvar cliente na API")
+      alert(
+        error.response?.data?.message ||
+          "Erro ao salvar cliente na API"
+      )
       console.error(error)
     }
   }
@@ -159,6 +191,14 @@ export default function Clientes() {
     setEndereco(clienteSelecionado.endereco || "")
     setCidade(clienteSelecionado.cidade || "")
     setEstado(clienteSelecionado.estado || "")
+    setDataNascimento(clienteSelecionado.dataNascimento || "")
+    setTituloEleitor(clienteSelecionado.tituloEleitor || "")
+    setCodigoSimplesNacional(clienteSelecionado.codigoSimplesNacional || "")
+    setSenhaGovBr(clienteSelecionado.senhaGovBr || "")
+    setCnaePrincipal(clienteSelecionado.cnaePrincipal || "")
+    setInscricaoMunicipal(clienteSelecionado.inscricaoMunicipal || "")
+    setInscricaoEstadual(clienteSelecionado.inscricaoEstadual || "")
+    setAlvara(clienteSelecionado.alvara || "")
     setObservacao(clienteSelecionado.observacao || "")
     setAnexos(clienteSelecionado.anexos || [])
 
@@ -193,8 +233,27 @@ export default function Clientes() {
     setAnexos(novaLista)
   }
 
-  function abrirArquivo(caminho) {
-    window.open(`http://localhost:3000${caminho}`, "_blank")
+  async function abrirArquivo(caminho) {
+    try {
+      if (!caminho) {
+        alert("Arquivo não encontrado.")
+        return
+      }
+
+      if (caminho.startsWith("http")) {
+        window.open(caminho, "_blank")
+        return
+      }
+
+      const resposta = await api.get(
+        `/clientes/anexo-url?path=${encodeURIComponent(caminho)}`
+      )
+
+      window.open(resposta.data.url, "_blank")
+    } catch (error) {
+      alert("Erro ao abrir arquivo")
+      console.error(error)
+    }
   }
 
   function novoCliente() {
@@ -221,6 +280,14 @@ export default function Clientes() {
     setEndereco("")
     setCidade("")
     setEstado("")
+    setDataNascimento("")
+    setTituloEleitor("")
+    setCodigoSimplesNacional("")
+    setSenhaGovBr("")
+    setCnaePrincipal("")
+    setInscricaoMunicipal("")
+    setInscricaoEstadual("")
+    setAlvara("")
     setObservacao("")
     setAnexos([])
   }
@@ -359,6 +426,66 @@ export default function Clientes() {
               ))}
             </select>
 
+            <div style={dateBox}>
+              <span style={dateLabel}>Data de nascimento</span>
+
+              <input
+                style={input}
+                type="date"
+                value={dataNascimento}
+                onChange={(e) => setDataNascimento(e.target.value)}
+              />
+            </div>
+
+            <input
+              style={input}
+              placeholder="Título de Eleitor"
+              value={tituloEleitor}
+              onChange={(e) => setTituloEleitor(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="Código Simples Nacional"
+              value={codigoSimplesNacional}
+              onChange={(e) => setCodigoSimplesNacional(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="Senha Gov.br"
+              value={senhaGovBr}
+              onChange={(e) => setSenhaGovBr(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="CNAE Principal"
+              value={cnaePrincipal}
+              onChange={(e) => setCnaePrincipal(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="Inscrição Municipal"
+              value={inscricaoMunicipal}
+              onChange={(e) => setInscricaoMunicipal(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="Inscrição Estadual"
+              value={inscricaoEstadual}
+              onChange={(e) => setInscricaoEstadual(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="Alvará"
+              value={alvara}
+              onChange={(e) => setAlvara(e.target.value)}
+            />
+
             <textarea
               style={textarea}
               placeholder="Observação"
@@ -431,6 +558,15 @@ export default function Clientes() {
             <Info label="Endereço" value={clienteSelecionado.endereco} />
             <Info label="Cidade" value={clienteSelecionado.cidade} />
             <Info label="Estado" value={clienteSelecionado.estado} />
+            <Info label="Data Nascimento" value={formatarDataBR(clienteSelecionado.dataNascimento)} />
+            <Info label="CNAE Principal" value={clienteSelecionado.cnaePrincipal} />
+            <Info label="Inscrição Municipal" value={clienteSelecionado.inscricaoMunicipal} />
+            <Info label="Inscrição Estadual" value={clienteSelecionado.inscricaoEstadual} />
+            <Info label="Alvará" value={clienteSelecionado.alvara} />
+            <Info label="CNAE Principal" value={clienteSelecionado.cnaePrincipal} />
+            <Info label="Inscrição Municipal" value={clienteSelecionado.inscricaoMunicipal} />
+            <Info label="Inscrição Estadual" value={clienteSelecionado.inscricaoEstadual} />
+            <Info label="Alvará" value={clienteSelecionado.alvara} />
           </div>
 
           <div style={observacaoBox}>
@@ -481,6 +617,12 @@ export default function Clientes() {
   )
 }
 
+function formatarDataBR(data) {
+  if (!data) return ""
+
+  return new Date(data + "T00:00:00").toLocaleDateString("pt-BR")
+}
+
 function Info({ label, value }) {
   return (
     <div style={infoBox}>
@@ -516,6 +658,18 @@ const input = {
   background: "#061f47",
   color: "white",
   fontSize: "15px",
+}
+
+const dateBox = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "6px",
+}
+
+const dateLabel = {
+  color: "#a9b8cc",
+  fontSize: "13px",
+  paddingLeft: "4px",
 }
 
 const textarea = {

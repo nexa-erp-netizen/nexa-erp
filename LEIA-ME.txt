@@ -1,0 +1,23 @@
+PATCH - Área Fiscal do Cliente
+
+Arquivos alterados/criados:
+- src/App.jsx
+- src/components/Sidebar.jsx
+- src/pages/FiscalCliente.jsx
+
+O que foi adicionado:
+- Menu Fiscal no Portal Cliente.
+- Tela Área Fiscal seguindo o padrão visual Nexa.
+- Botão Voltar ao Portal aparece automaticamente pelo App.jsx, como nas outras telas do cliente.
+- Cards: Valor em aberto, Próximo vencimento, Obrigações abertas e Vencidas.
+- Situação Fiscal: EM DIA, ACOMPANHAR ou ATENÇÃO.
+- Próximos vencimentos.
+- Histórico fiscal.
+- Layout responsivo para celular web.
+
+Validação executada:
+- npm run build aprovado.
+
+Depois de substituir os arquivos, rode:
+npm run build
+vercel --prod

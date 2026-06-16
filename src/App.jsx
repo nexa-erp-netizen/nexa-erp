@@ -32,6 +32,7 @@ import ObrigacoesCliente from "./pages/ObrigacoesCliente"
 export default function App() {
   const [usuario, setUsuario] = useState(null)
   const [page, setPage] = useState("Dashboard")
+  const [isMobile, setIsMobile] = useState(false)
 
   const permissoesPorPerfil = {
     Administrador: [
@@ -75,7 +76,7 @@ export default function App() {
 
     Cliente: [
       "Portal Cliente",
-      "Obrigações",
+      "Pendências e Guias",
       "Movimentos",
       "Documentos Digitais",
     ],
@@ -87,6 +88,17 @@ export default function App() {
     setUsuario(null)
   }, [])
 
+  useEffect(() => {
+    function verificarMobile() {
+      setIsMobile(window.innerWidth <= 768)
+    }
+
+    verificarMobile()
+    window.addEventListener("resize", verificarMobile)
+
+    return () => window.removeEventListener("resize", verificarMobile)
+  }, [])
+
   function sair() {
     localStorage.removeItem("token")
     localStorage.removeItem("usuario")
@@ -96,8 +108,7 @@ export default function App() {
   }
 
   function renderPage() {
-    const paginasPermitidas =
-      permissoesPorPerfil[usuario?.perfil] || []
+    const paginasPermitidas = permissoesPorPerfil[usuario?.perfil] || []
 
     if (!paginasPermitidas.includes(page)) {
       return <PortalCliente setPage={setPage} />
@@ -105,7 +116,7 @@ export default function App() {
 
     switch (page) {
       case "Dashboard":
-        return <Dashboard />
+        return <Dashboard setPage={setPage} />
 
       case "Notificações":
         return <Notificacoes />
@@ -134,6 +145,7 @@ export default function App() {
       case "Portal Cliente":
         return <PortalCliente setPage={setPage} />
 
+      case "Pendências e Guias":
       case "Obrigações":
         return <ObrigacoesCliente />
 
@@ -174,7 +186,11 @@ export default function App() {
         return <DRE />
 
       default:
-        return <Dashboard />
+        return usuario?.perfil === "Cliente" ? (
+          <PortalCliente setPage={setPage} />
+        ) : (
+          <Dashboard />
+        )
     }
   }
 
@@ -196,19 +212,21 @@ export default function App() {
 
   return (
     <div style={styles.body}>
-      <div style={styles.app}>
-        <Sidebar
-          page={page}
-          setPage={setPage}
-          usuario={usuario}
-        />
+      <div
+        style={{
+          ...styles.app,
+          ...(isMobile ? styles.appMobile : {}),
+        }}
+      >
+        <Sidebar page={page} setPage={setPage} usuario={usuario} />
 
-        <main style={styles.main}>
-          <Header
-            title={page}
-            usuario={usuario}
-            onLogout={sair}
-          />
+        <main
+          style={{
+            ...styles.main,
+            ...(isMobile ? styles.mainMobile : {}),
+          }}
+        >
+          <Header title={page} usuario={usuario} onLogout={sair} />
 
           {renderPage()}
         </main>
@@ -220,19 +238,32 @@ export default function App() {
 const styles = {
   body: {
     minHeight: "100vh",
-    background:
-      "linear-gradient(135deg, #00112b, #00275c, #00112b)",
+    background: "linear-gradient(135deg, #00112b, #00275c, #00112b)",
     color: "white",
     fontFamily: "Arial, sans-serif",
     padding: "0",
+    width: "100%",
+    maxWidth: "100%",
+    overflowX: "hidden",
   },
 
   app: {
     display: "grid",
     gridTemplateColumns: "260px 1fr",
     width: "100%",
+    minHeight: "100vh",
     height: "100vh",
     overflow: "hidden",
+  },
+
+  appMobile: {
+    display: "block",
+    gridTemplateColumns: "none",
+    height: "auto",
+    minHeight: "100vh",
+    overflow: "visible",
+    width: "100%",
+    maxWidth: "100%",
   },
 
   main: {
@@ -242,5 +273,16 @@ const styles = {
     overflowY: "auto",
     overflowX: "hidden",
     width: "100%",
+    boxSizing: "border-box",
+  },
+
+  mainMobile: {
+    padding: "16px 10px",
+    height: "auto",
+    minHeight: "100vh",
+    overflowY: "visible",
+    overflowX: "hidden",
+    width: "100%",
+    maxWidth: "100%",
   },
 }

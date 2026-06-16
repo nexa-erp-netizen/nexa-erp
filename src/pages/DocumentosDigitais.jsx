@@ -218,16 +218,12 @@ export default function DocumentosDigitais() {
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         >
-          <option value="Entregue pelo cliente">Entregue pelo cliente</option>
-          <option value="Recebido pelo escritório">
-            Recebido pelo escritório
-          </option>
+          <option value="Recebido">Recebido</option>
           <option value="Em análise">Em análise</option>
-          <option value="Aprovado">Aprovado</option>
-          <option value="Recusado">Recusado</option>
-          <option value="Disponível para baixar">
-            Disponível para baixar
-          </option>
+          <option value="Processado">Processado</option>
+          <option value="Arquivado">Arquivado</option>
+          <option value="Entregue pelo cliente">Entregue pelo cliente</option>
+          <option value="Disponível para baixar">Disponível para baixar</option>
           <option value="Resolvido">Resolvido</option>
         </select>
 

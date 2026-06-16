@@ -3,6 +3,7 @@ import api from "../services/api"
 
 export default function Fiscal() {
   const [cliente, setCliente] = useState("")
+  const [clienteFiltro, setClienteFiltro] = useState("")
   const [obrigacao, setObrigacao] = useState("")
   const [competencia, setCompetencia] = useState("")
   const [vencimento, setVencimento] = useState("")
@@ -24,6 +25,7 @@ export default function Fiscal() {
 
     if (usuario?.perfil === "Cliente") {
       setCliente(usuario.clienteVinculado || "")
+      setClienteFiltro(usuario.clienteVinculado || "")
     }
   }, [])
 
@@ -156,7 +158,7 @@ export default function Fiscal() {
       limparCampos()
       setEditandoIndex(null)
     } catch (error) {
-      alert("Erro ao salvar obrigação")
+      alert("Erro ao salvar pendência")
       console.error(error)
     }
   }
@@ -237,9 +239,24 @@ export default function Fiscal() {
     return {}
   }
 
+  const obrigacoesVisiveis = obrigacoes.filter((item) => {
+    const status = String(item.status || "").toLowerCase()
+    const concluido = status.includes("concluído") || status.includes("concluido")
+
+    if (concluido) return false
+
+    if (usuario?.perfil === "Cliente") {
+      return item.cliente === usuario.clienteVinculado
+    }
+
+    if (!clienteFiltro) return false
+
+    return item.cliente === clienteFiltro
+  })
+
   return (
     <div style={box}>
-      <h2>Fiscal</h2>
+      <h2>Pendências e Guias</h2>
 
       {usuario?.perfil !== "Cliente" && (
         <div style={form}>
@@ -264,6 +281,7 @@ export default function Fiscal() {
           >
             <option value="">Obrigação</option>
             <option value="DAS">DAS</option>
+            <option value="Honorários Contábeis">Honorários Contábeis</option>
             <option value="DCTFWeb">DCTFWeb</option>
             <option value="SPED Fiscal">SPED Fiscal</option>
             <option value="DEFIS">DEFIS</option>
@@ -337,17 +355,35 @@ export default function Fiscal() {
           </div>
 
           <button style={button} onClick={salvarObrigacao}>
-            {editandoIndex !== null ? "Salvar Correção" : "Salvar Obrigação"}
+            {editandoIndex !== null ? "Salvar Correção" : "Salvar Pendência"}
           </button>
         </div>
       )}
 
       {usuario?.perfil === "Cliente" && (
         <div style={clienteAviso}>
-          <strong>Área Fiscal</strong>
+          <strong>Pendências e Guias</strong>
           <span>
-            Visualize guias, vencimentos e documentos enviados pelo escritório.
+            Visualize guias, honorários, vencimentos e documentos enviados pelo escritório.
           </span>
+        </div>
+      )}
+
+      {usuario?.perfil !== "Cliente" && (
+        <div style={filterBox}>
+          <strong style={{ color: "white" }}>Visualizar cliente</strong>
+          <select
+            style={filterInput}
+            value={clienteFiltro}
+            onChange={(e) => setClienteFiltro(e.target.value)}
+          >
+            <option value="">Selecione um cliente</option>
+            {clientesCadastrados.map((item) => (
+              <option key={item.id} value={item.nome}>
+                {item.nome}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -368,7 +404,7 @@ export default function Fiscal() {
           </thead>
 
           <tbody>
-            {obrigacoes.map((item, index) => (
+            {obrigacoesVisiveis.map((item, index) => (
               <tr key={item.id || index}>
                 <td style={td}>{item.cliente}</td>
                 <td style={td}>{item.obrigacao}</td>
@@ -462,10 +498,10 @@ export default function Fiscal() {
               </tr>
             ))}
 
-            {obrigacoes.length === 0 && (
+            {obrigacoesVisiveis.length === 0 && (
               <tr>
                 <td style={td} colSpan="9">
-                  Nenhuma obrigação encontrada.
+                  Selecione um cliente para visualizar pendências ativas.
                 </td>
               </tr>
             )}
@@ -586,6 +622,23 @@ const clienteAviso = {
   display: "flex",
   flexDirection: "column",
   gap: "6px",
+}
+
+const filterBox = {
+  background: "rgba(255,255,255,0.06)",
+  border: "1px solid rgba(255,255,255,.08)",
+  borderRadius: "18px",
+  padding: "18px",
+  marginBottom: "22px",
+  display: "flex",
+  alignItems: "center",
+  gap: "14px",
+  flexWrap: "wrap",
+}
+
+const filterInput = {
+  ...input,
+  minWidth: "260px",
 }
 
 const tableWrapper = {

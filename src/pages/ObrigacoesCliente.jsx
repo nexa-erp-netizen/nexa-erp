@@ -1,237 +1,358 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
+import {
+  FaCheckCircle,
+  FaDownload,
+  FaFileInvoiceDollar,
+} from "react-icons/fa"
 
 export default function ObrigacoesCliente() {
-  const [obrigacoes, setObrigacoes] = useState([])
+  const [fiscal, setFiscal] = useState([])
+  const [carregando, setCarregando] = useState(false)
 
   useEffect(() => {
-    carregarObrigacoes()
+    carregarFiscal()
   }, [])
 
-  async function carregarObrigacoes() {
+  async function carregarFiscal() {
+    setCarregando(true)
+
     try {
-      const [fiscalRes, pendenciasRes] = await Promise.all([
-        api.get("/fiscal"),
-        api.get("/solicitacoes-clientes"),
-      ])
-
-      const fiscal = (fiscalRes.data || []).map((item) => ({
-        id: `fiscal-${item.id}`,
-        idOriginal: item.id,
-        origem: "Fiscal",
-        titulo: item.descricao || item.tipo || "Obrigação fiscal",
-        vencimento: item.vencimento || item.dataVencimento || "-",
-        status: item.status || "Pendente",
-      }))
-
-      const pendencias = (pendenciasRes.data || []).map((item) => ({
-        id: `pendencia-${item.id}`,
-        idOriginal: item.id,
-        origem: "Pendência",
-        titulo: item.titulo || item.descricao || "Pendência",
-        vencimento: item.vencimento || item.prazo || "-",
-        status: item.status || "Pendente",
-      }))
-
-      setObrigacoes([...fiscal, ...pendencias])
+      const resposta = await api.get("/fiscal")
+      setFiscal(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
-      alert("Erro ao carregar obrigações")
+      console.error("ERRO PENDÊNCIAS CLIENTE:", error)
+      setFiscal([])
+    } finally {
+      setCarregando(false)
+    }
+  }
+
+  function formatarData(data) {
+    if (!data) return "-"
+    return new Date(data + "T00:00:00").toLocaleDateString("pt-BR")
+  }
+
+  function obterTitulo(item) {
+    return item.obrigacao || item.titulo || item.descricao || "Pendência"
+  }
+
+  function estaPagoOuConcluido(item) {
+    const status = String(item.status || "")
+      .trim()
+      .toLowerCase()
+
+    return (
+      status.includes("pago") ||
+      status.includes("concluído") ||
+      status.includes("concluido")
+    )
+  }
+
+  function estaVencido(item) {
+    if (!item.vencimento || estaPagoOuConcluido(item)) return false
+
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+
+    const vencimento = new Date(item.vencimento + "T00:00:00")
+
+    return vencimento < hoje
+  }
+
+  async function obterUrlAnexo(item) {
+    if (!item.anexos || item.anexos.length === 0) return ""
+
+    const arquivo = item.anexos[0]
+    const caminho = arquivo.caminho || arquivo.url || ""
+
+    if (!caminho) return ""
+
+    const resposta = await api.get(
+      `/fiscal/anexo-url?path=${encodeURIComponent(caminho)}`
+    )
+
+    return resposta.data.url
+  }
+
+  async function baixarGuia(item) {
+    try {
+      const url = await obterUrlAnexo(item)
+
+      if (!url) {
+        alert("Nenhum PDF disponível para baixar.")
+        return
+      }
+
+      window.open(url, "_blank")
+    } catch (error) {
       console.error(error)
+      alert("Erro ao baixar documento.")
     }
   }
 
   async function marcarPago(item) {
-    if (item.origem !== "Fiscal") return
-
     const confirmar = window.confirm(
-      "Confirmar que esta obrigação foi paga?"
+      "Confirmar que você já pagou esta pendência?"
     )
 
     if (!confirmar) return
 
     try {
-      await api.patch(`/fiscal/${item.idOriginal}/marcar-pago-cliente`)
-      await carregarObrigacoes()
+      await api.patch(`/fiscal/${item.id}/marcar-pago-cliente`)
+      await carregarFiscal()
     } catch (error) {
-      alert("Erro ao marcar como pago")
       console.error(error)
+      alert("Erro ao confirmar pagamento.")
     }
   }
 
-  function corStatus(status) {
-    if (status === "Pago pelo cliente" || status === "Pago") {
-      return "#37ff74"
+  function statusVisual(item) {
+    if (estaPagoOuConcluido(item)) {
+      return { label: "Pago", className: "green" }
     }
 
-    if (status === "Atrasado") {
-      return "#ff4d4f"
+    if (estaVencido(item)) {
+      return { label: "Vencido", className: "red" }
     }
 
-    if (status === "Concluído") {
-      return "#00a8ff"
-    }
-
-    return "#ffd166"
+    return { label: "Pendente", className: "yellow" }
   }
 
-  function podeMarcarPago(item) {
-    return (
-      item.origem === "Fiscal" &&
-      item.status !== "Pago pelo cliente" &&
-      item.status !== "Pago" &&
-      item.status !== "Concluído"
+  const pendencias = fiscal
+    .filter((item) => !estaPagoOuConcluido(item))
+    .slice()
+    .sort((a, b) =>
+      String(a.vencimento || "").localeCompare(String(b.vencimento || ""))
     )
-  }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h2 style={styles.titulo}>📋 Obrigações</h2>
-        <p style={styles.subtitulo}>
-          Fiscal e pendências reunidos em um único lugar.
-        </p>
-      </div>
+    <div className="fc-page">
+      <style>{`
+        .fc-page {
+          color: white;
+          padding: 10px;
+        }
 
-      <div style={styles.card}>
-        {obrigacoes.length === 0 ? (
-          <p style={styles.vazio}>Nenhuma obrigação encontrada.</p>
+        .fc-header {
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 22px;
+          padding: 18px;
+          margin-bottom: 14px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .fc-header-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 14px;
+          background: #061f47;
+          color: #3cbcff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+        }
+
+        .fc-header h2 {
+          margin: 0;
+          font-size: 26px;
+          font-weight: 900;
+          line-height: 1.1;
+        }
+
+        .fc-header p {
+          margin: 4px 0 0;
+          color: #c9d6e6;
+          line-height: 22px;
+        }
+
+        .fc-list {
+          display: grid;
+          gap: 10px;
+        }
+
+        .fc-item {
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 18px;
+          padding: 14px;
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .fc-item-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 7px;
+          font-weight: 900;
+          font-size: 16px;
+        }
+
+        .fc-meta {
+          color: #c9d6e6;
+          font-size: 14px;
+          line-height: 22px;
+        }
+
+        .fc-status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: 28px;
+          padding: 0 11px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 900;
+          margin-top: 8px;
+        }
+
+        .fc-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          justify-content: flex-end;
+          flex-wrap: wrap;
+        }
+
+        .fc-btn {
+          min-height: 40px;
+          border: none;
+          border-radius: 11px;
+          padding: 9px 13px;
+          font-size: 14px;
+          font-weight: 900;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          white-space: nowrap;
+        }
+
+        .fc-btn-blue {
+          background: #00a8ff;
+          color: white;
+        }
+
+        .fc-btn-green {
+          background: linear-gradient(90deg, #00a8ff, #37ff74);
+          color: #00112b;
+        }
+
+        .green { color: #32f06d !important; }
+        .red { color: #ff5c70 !important; }
+        .yellow { color: #ffc107 !important; }
+
+        .fc-status.green {
+          background: #37ff74;
+          color: #00112b !important;
+        }
+
+        .fc-status.red {
+          background: #ff4d4f;
+          color: white !important;
+        }
+
+        .fc-status.yellow {
+          background: #ffc107;
+          color: #00112b !important;
+        }
+
+        .fc-empty {
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 18px;
+          padding: 18px;
+          color: #c9d6e6;
+          line-height: 24px;
+        }
+
+        @media (max-width: 768px) {
+          .fc-page { padding: 0 !important; }
+          .fc-header { padding: 16px 14px !important; }
+          .fc-header h2 { font-size: 24px !important; }
+          .fc-item { grid-template-columns: 1fr !important; padding: 14px !important; }
+          .fc-actions { justify-content: stretch !important; }
+          .fc-btn { width: 100% !important; min-height: 44px !important; }
+        }
+      `}</style>
+
+      <section className="fc-header">
+        <div className="fc-header-icon">
+          <FaFileInvoiceDollar />
+        </div>
+
+        <div>
+          <h2>Pendências e Guias</h2>
+          <p>Guias, honorários e documentos pendentes enviados pelo escritório.</p>
+        </div>
+      </section>
+
+      <div className="fc-list">
+        {carregando ? (
+          <div className="fc-empty">Carregando pendências...</div>
+        ) : pendencias.length === 0 ? (
+          <div className="fc-empty">
+            Nenhuma pendência ou guia disponível no momento.
+          </div>
         ) : (
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Tipo</th>
-                <th style={styles.th}>Descrição</th>
-                <th style={styles.th}>Vencimento</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Pago</th>
-              </tr>
-            </thead>
+          pendencias.map((item, index) => {
+            const status = statusVisual(item)
 
-            <tbody>
-              {obrigacoes.map((item) => (
-                <tr key={item.id}>
-                  <td style={styles.td}>{item.origem}</td>
-                  <td style={styles.td}>{item.titulo}</td>
-                  <td style={styles.td}>{item.vencimento}</td>
+            return (
+              <div className="fc-item" key={item.id || index}>
+                <div>
+                  <div className="fc-item-title">
+                    <FaFileInvoiceDollar className="yellow" />
+                    {obterTitulo(item)}
+                  </div>
 
-                  <td style={styles.td}>
-                    <span
-                      style={{
-                        ...styles.statusBadge,
-                        background: corStatus(item.status),
-                      }}
+                  <div className="fc-meta">
+                    Competência: {item.competencia || "-"}
+                    <br />
+                    Vence: {formatarData(item.vencimento)}
+                    <br />
+                    Valor: {item.valor || "R$ 0,00"}
+                  </div>
+
+                  <span className={`fc-status ${status.className}`}>
+                    {status.label}
+                  </span>
+                </div>
+
+                <div className="fc-actions">
+                  {item.anexos?.length > 0 && (
+                    <button
+                      type="button"
+                      className="fc-btn fc-btn-blue"
+                      onClick={() => baixarGuia(item)}
                     >
-                      {item.status}
-                    </span>
-                  </td>
+                      <FaDownload />
+                      Baixar PDF
+                    </button>
+                  )}
 
-                  <td style={styles.td}>
-                    {podeMarcarPago(item) ? (
-                      <button
-                        style={styles.botaoCheck}
-                        onClick={() => marcarPago(item)}
-                        title="Marcar como pago"
-                      >
-                        ○
-                      </button>
-                    ) : item.status === "Pago pelo cliente" ||
-                      item.status === "Pago" ||
-                      item.status === "Concluído" ? (
-                      <span style={styles.checkConcluido}>✅</span>
-                    ) : (
-                      <span style={styles.semAcao}>-</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  <button
+                    type="button"
+                    className="fc-btn fc-btn-green"
+                    onClick={() => marcarPago(item)}
+                  >
+                    <FaCheckCircle />
+                    Já paguei
+                  </button>
+                </div>
+              </div>
+            )
+          })
         )}
       </div>
     </div>
   )
-}
-
-const styles = {
-  container: {
-    background: "rgba(255,255,255,0.06)",
-    borderRadius: "24px",
-    padding: "28px",
-  },
-
-  header: {
-    marginBottom: "22px",
-  },
-
-  titulo: {
-    margin: 0,
-    fontSize: "28px",
-    color: "white",
-  },
-
-  subtitulo: {
-    margin: "8px 0 0",
-    color: "#a9b8cc",
-  },
-
-  card: {
-    background: "#123d78",
-    borderRadius: "18px",
-    padding: "20px",
-    overflowX: "auto",
-  },
-
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-  },
-
-  th: {
-    textAlign: "left",
-    padding: "14px",
-    color: "#a9b8cc",
-    borderBottom: "1px solid rgba(255,255,255,.12)",
-  },
-
-  td: {
-    padding: "14px",
-    borderBottom: "1px solid rgba(255,255,255,.08)",
-    verticalAlign: "middle",
-  },
-
-  statusBadge: {
-    color: "#00112b",
-    padding: "6px 12px",
-    borderRadius: "999px",
-    fontWeight: "bold",
-    fontSize: "13px",
-    display: "inline-block",
-    minWidth: "135px",
-    textAlign: "center",
-  },
-
-  botaoCheck: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "50%",
-    border: "2px solid #37ff74",
-    background: "transparent",
-    color: "#37ff74",
-    fontWeight: "bold",
-    fontSize: "18px",
-    cursor: "pointer",
-  },
-
-  checkConcluido: {
-    fontSize: "22px",
-  },
-
-  semAcao: {
-    color: "#a9b8cc",
-    fontWeight: "bold",
-  },
-
-  vazio: {
-    color: "#a9b8cc",
-  },
 }

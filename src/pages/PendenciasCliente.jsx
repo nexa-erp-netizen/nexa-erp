@@ -46,22 +46,7 @@ export default function PendenciasCliente() {
     }
   }
 
-  async function atualizarSituacao(item, novaSituacao) {
-    try {
-      await api.put(`/solicitacoes-clientes/${item.id}`, {
-        ...item,
-        situacaoCliente: novaSituacao,
-        status: item.status === "Pendente" ? "Visualizada" : item.status,
-      })
-
-      await carregarPendencias()
-    } catch (error) {
-      console.error(error)
-      alert("Erro ao atualizar situação.")
-    }
-  }
-
-  async function enviarResposta() {
+    async function enviarResposta() {
     if (!detalhe) return
 
     if (!resposta.trim()) {
@@ -328,10 +313,10 @@ export default function PendenciasCliente() {
         }
       `}</style>
 
-      <div className="pcp-title">Pendências</div>
+      <div className="pcp-title">Solicitações</div>
 
       <div className="pcp-subtitle">
-        Acompanhe as solicitações enviadas pelo escritório
+        Comunicação entre sua empresa e o escritório
       </div>
 
       <div className="pcp-summary">
@@ -381,22 +366,6 @@ export default function PendenciasCliente() {
             >
               {item.status}
             </span>
-
-            <select
-              className="pcp-situacao"
-              value={item.situacaoCliente || "Aguardando Pagamento"}
-              onChange={(e) =>
-                atualizarSituacao(item, e.target.value)
-              }
-            >
-              <option value="Aguardando Pagamento">
-                Aguardando Pagamento
-              </option>
-
-              <option value="Pago">
-                Pago
-              </option>
-            </select>
 
             <div className="pcp-data">
               Criado em: {formatarData(item.createdAt)}

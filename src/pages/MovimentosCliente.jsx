@@ -9,12 +9,14 @@ export default function MovimentosCliente() {
     tipo: "Receita",
     planoContaId: "",
     planoContaNome: "",
+    forma: "",
     descricao: "",
     valor: "",
   })
 
   const [movimentos, setMovimentos] = useState([])
   const [planos, setPlanos] = useState([])
+  const [formasPagamento, setFormasPagamento] = useState([])
   const [linhas, setLinhas] = useState([
     linhaVazia(),
     linhaVazia(),
@@ -28,38 +30,53 @@ export default function MovimentosCliente() {
   }, [])
 
   async function carregarTudo() {
-    await Promise.all([carregarMovimentos(), carregarPlanos()])
+    await Promise.all([
+      carregarMovimentos(),
+      carregarPlanos(),
+      carregarFormasPagamento(),
+    ])
   }
 
   async function carregarMovimentos() {
-    const resposta = await api.get("/movimentos-cliente")
-    setMovimentos(Array.isArray(resposta.data) ? resposta.data : [])
+    try {
+      const resposta = await api.get("/movimentos-cliente")
+      setMovimentos(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (error) {
+      console.error("ERRO AO CARREGAR MOVIMENTOS:", error)
+      setMovimentos([])
+    }
   }
 
   async function carregarPlanos() {
     try {
       const resposta = await api.get("/plano-contas")
       setPlanos(Array.isArray(resposta.data) ? resposta.data : [])
-    } catch {
+    } catch (error) {
+      console.error("ERRO AO CARREGAR PLANO DE CONTAS:", error)
       setPlanos([])
     }
   }
 
-  function valorSeguro(valor) {
-    if (valor === null || valor === undefined || valor === "") {
-      return 0
+  async function carregarFormasPagamento() {
+    try {
+      const resposta = await api.get("/formas-pagamento")
+      setFormasPagamento(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (error) {
+      console.error("ERRO AO CARREGAR FORMAS DE PAGAMENTO:", error)
+      setFormasPagamento([])
     }
+  }
 
-    let texto = String(valor)
-      .replace("R$", "")
-      .trim()
+  function valorSeguro(valor) {
+    if (valor === null || valor === undefined || valor === "") return 0
+
+    let texto = String(valor).replace("R$", "").trim()
 
     if (texto.includes(",")) {
       texto = texto.replace(/\./g, "").replace(",", ".")
     }
 
     const numero = Number(texto)
-
     return Number.isFinite(numero) ? numero : 0
   }
 
@@ -112,6 +129,7 @@ export default function MovimentosCliente() {
         tipo: item.tipo || "Receita",
         planoContaId: item.planoContaId || "",
         planoContaNome: item.planoContaNome || "",
+        forma: item.forma || item.formaPagamento || "",
         descricao: item.descricao || "",
         valor: formatarMoeda(item.valor),
       },
@@ -145,6 +163,8 @@ export default function MovimentosCliente() {
           data: linha.data,
           planoContaId: linha.planoContaId || null,
           planoContaNome: linha.planoContaNome,
+          forma: linha.forma || "",
+          formaPagamento: linha.forma || "",
           descricao: linha.descricao,
           valor: valorSeguro(linha.valor),
           comprovante: "",
@@ -293,17 +313,16 @@ export default function MovimentosCliente() {
         .mv-grid-wrap {
           overflow-x: hidden;
           border-radius: 16px;
+          width: 100%;
+          max-width: 100%;
         }
 
         .mv-grid,
         .mv-table {
           width: 100%;
           border-collapse: collapse;
-        }
-
-        .mv-grid {
           min-width: 0;
-          table-layout: fixed;
+          table-layout: auto;
         }
 
         .mv-grid th {
@@ -323,24 +342,19 @@ export default function MovimentosCliente() {
         }
 
         .mv-grid th:nth-child(1),
-        .mv-grid td:nth-child(1) {
-          width: 145px;
-        }
+        .mv-grid td:nth-child(1) { width: 110px; }
 
         .mv-grid th:nth-child(2),
-        .mv-grid td:nth-child(2) {
-          width: 120px;
-        }
+        .mv-grid td:nth-child(2) { width: 90px; }
 
         .mv-grid th:nth-child(3),
-        .mv-grid td:nth-child(3) {
-          width: 180px;
-        }
+        .mv-grid td:nth-child(3) { width: 140px; }
 
-        .mv-grid th:nth-child(5),
-        .mv-grid td:nth-child(5) {
-          width: 135px;
-        }
+        .mv-grid th:nth-child(4),
+        .mv-grid td:nth-child(4) { width: 120px; }
+
+        .mv-grid th:nth-child(6),
+        .mv-grid td:nth-child(6) { width: 110px; }
 
         .mv-input,
         .mv-select {
@@ -370,9 +384,7 @@ export default function MovimentosCliente() {
           color: white;
         }
 
-        input[type="date"] {
-          color-scheme: dark;
-        }
+        input[type="date"] { color-scheme: dark; }
 
         .mv-edit,
         .mv-delete {
@@ -403,10 +415,6 @@ export default function MovimentosCliente() {
           gap: 8px;
         }
 
-        .mv-table {
-          table-layout: fixed;
-        }
-
         .mv-table th {
           color: #6bd8ff;
           text-align: left;
@@ -420,29 +428,22 @@ export default function MovimentosCliente() {
         }
 
         .mv-table th:nth-child(1),
-        .mv-table td:nth-child(1) {
-          width: 130px;
-        }
+        .mv-table td:nth-child(1) { width: 130px; }
 
         .mv-table th:nth-child(2),
-        .mv-table td:nth-child(2) {
-          width: 110px;
-        }
+        .mv-table td:nth-child(2) { width: 110px; }
 
         .mv-table th:nth-child(3),
-        .mv-table td:nth-child(3) {
-          width: 170px;
-        }
+        .mv-table td:nth-child(3) { width: 170px; }
 
-        .mv-table th:nth-child(5),
-        .mv-table td:nth-child(5) {
-          width: 130px;
-        }
+        .mv-table th:nth-child(4),
+        .mv-table td:nth-child(4) { width: 130px; }
 
         .mv-table th:nth-child(6),
-        .mv-table td:nth-child(6) {
-          width: 95px;
-        }
+        .mv-table td:nth-child(6) { width: 130px; }
+
+        .mv-table th:nth-child(7),
+        .mv-table td:nth-child(7) { width: 95px; }
 
         .tipo-receita {
           color: #32f06d;
@@ -458,6 +459,72 @@ export default function MovimentosCliente() {
           text-align: right;
           font-weight: 700;
           white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+          .mv-page {
+            padding: 16px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+          }
+
+          .mv-title {
+            font-size: 34px !important;
+            line-height: 1.05 !important;
+          }
+
+          .mv-subtitle { font-size: 16px !important; }
+          .mv-summary { grid-template-columns: 1fr !important; }
+          .mv-box { padding: 16px !important; }
+
+          .mv-card {
+            padding: 16px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: hidden !important;
+          }
+
+          .mv-card-header {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 14px !important;
+          }
+
+          .mv-card-title {
+            font-size: 24px !important;
+            line-height: 1.1 !important;
+          }
+
+          .mv-actions-top {
+            flex-direction: column !important;
+            width: 100% !important;
+          }
+
+          .mv-btn { width: 100% !important; }
+
+          .mv-grid-wrap {
+            overflow-x: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .mv-grid {
+            min-width: 980px !important;
+            width: 980px !important;
+            table-layout: fixed !important;
+          }
+
+          .mv-table {
+            min-width: 900px !important;
+            width: 900px !important;
+            table-layout: fixed !important;
+          }
+
+          .mv-input,
+          .mv-select { min-width: 0 !important; }
+          .valor-input { max-width: 100% !important; }
         }
       `}</style>
 
@@ -525,6 +592,7 @@ export default function MovimentosCliente() {
                 <th>Data</th>
                 <th>Tipo</th>
                 <th>Plano de contas</th>
+                <th>Forma</th>
                 <th>Descrição / Histórico</th>
                 <th>Valor</th>
               </tr>
@@ -576,6 +644,26 @@ export default function MovimentosCliente() {
                   </td>
 
                   <td>
+                    <select
+                      className="mv-select"
+                      value={linha.forma}
+                      onChange={(e) =>
+                        atualizarLinha(index, "forma", e.target.value)
+                      }
+                    >
+                      <option value="">Selecione</option>
+
+                      {formasPagamento
+                        .filter((forma) => forma.ativo !== false)
+                        .map((forma) => (
+                          <option key={forma.id} value={forma.nome}>
+                            {forma.nome}
+                          </option>
+                        ))}
+                    </select>
+                  </td>
+
+                  <td>
                     <input
                       className="mv-input"
                       placeholder="Ex: venda balcão, aluguel, energia..."
@@ -616,6 +704,7 @@ export default function MovimentosCliente() {
                 <th>Data</th>
                 <th>Tipo</th>
                 <th>Plano de contas</th>
+                <th>Forma</th>
                 <th>Descrição</th>
                 <th>Valor</th>
                 <th>Ações</th>
@@ -638,6 +727,7 @@ export default function MovimentosCliente() {
                   </td>
 
                   <td>{item.planoContaNome || "-"}</td>
+                  <td>{item.forma || item.formaPagamento || "-"}</td>
                   <td>{item.descricao}</td>
 
                   <td className="valor-coluna">
@@ -668,7 +758,7 @@ export default function MovimentosCliente() {
 
               {movimentos.length === 0 && (
                 <tr>
-                  <td colSpan="6" style={{ opacity: .7 }}>
+                  <td colSpan="7" style={{ opacity: .7 }}>
                     Nenhum lançamento cadastrado ainda.
                   </td>
                 </tr>

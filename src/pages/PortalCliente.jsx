@@ -15,6 +15,7 @@ export default function PortalCliente({ setPage }) {
 
   const [movimentos, setMovimentos] = useState([])
   const [solicitacoes, setSolicitacoes] = useState([])
+  const [guiasFiscais, setGuiasFiscais] = useState([])
 
   useEffect(() => {
     carregarDados()
@@ -23,12 +24,7 @@ export default function PortalCliente({ setPage }) {
   async function carregarDados() {
     try {
       const movimentosResposta = await api.get("/movimentos-cliente")
-
-      setMovimentos(
-        Array.isArray(movimentosResposta.data)
-          ? movimentosResposta.data
-          : []
-      )
+      setMovimentos(Array.isArray(movimentosResposta.data) ? movimentosResposta.data : [])
     } catch (error) {
       console.error("ERRO MOVIMENTOS PORTAL:", error)
       setMovimentos([])
@@ -36,33 +32,31 @@ export default function PortalCliente({ setPage }) {
 
     try {
       const solicitacoesResposta = await api.get("/solicitacoes-clientes")
-
-      setSolicitacoes(
-        Array.isArray(solicitacoesResposta.data)
-          ? solicitacoesResposta.data
-          : []
-      )
+      setSolicitacoes(Array.isArray(solicitacoesResposta.data) ? solicitacoesResposta.data : [])
     } catch (error) {
       console.error("ERRO SOLICITAÇÕES PORTAL:", error)
       setSolicitacoes([])
     }
+
+    try {
+      const fiscalResposta = await api.get("/fiscal")
+      setGuiasFiscais(Array.isArray(fiscalResposta.data) ? fiscalResposta.data : [])
+    } catch (error) {
+      console.error("ERRO GUIAS FISCAIS PORTAL:", error)
+      setGuiasFiscais([])
+    }
   }
 
   function valorSeguro(valor) {
-    if (valor === null || valor === undefined || valor === "") {
-      return 0
-    }
+    if (valor === null || valor === undefined || valor === "") return 0
 
-    let texto = String(valor)
-      .replace("R$", "")
-      .trim()
+    let texto = String(valor).replace("R$", "").trim()
 
     if (texto.includes(",")) {
       texto = texto.replace(/\./g, "").replace(",", ".")
     }
 
     const numero = Number(texto)
-
     return Number.isFinite(numero) ? numero : 0
   }
 
@@ -79,25 +73,17 @@ export default function PortalCliente({ setPage }) {
     const hoje = new Date()
     const d = new Date(data + "T00:00:00")
 
-    return (
-      d.getMonth() === hoje.getMonth() &&
-      d.getFullYear() === hoje.getFullYear()
-    )
+    return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear()
   }
 
   function abrirPendencias() {
     if (typeof setPage === "function") {
-      setPage("Pendências")
-      return
+      setPage("Pendências e Guias")
     }
-
-    console.warn("setPage não foi recebido pelo PortalCliente")
   }
 
   const resumo = useMemo(() => {
-    const movimentosMes = movimentos.filter((item) =>
-      mesAtual(item.data)
-    )
+    const movimentosMes = movimentos.filter((item) => mesAtual(item.data))
 
     const receitasMes = movimentosMes
       .filter((item) => item.tipo === "Receita")
@@ -109,15 +95,32 @@ export default function PortalCliente({ setPage }) {
 
     const saldoTotal = movimentos.reduce((total, item) => {
       const valor = valorSeguro(item.valor)
-
-      return item.tipo === "Receita"
-        ? total + valor
-        : total - valor
+      return item.tipo === "Receita" ? total + valor : total - valor
     }, 0)
 
-    const pendenciasAbertas = solicitacoes.filter(
-      (item) => item.status !== "Concluída"
-    ).length
+    const solicitacoesAbertas = solicitacoes.filter((item) => {
+  const status = String(item.status || "").toLowerCase().trim()
+
+  return (
+    status === "pendente" ||
+    status === "aberto" ||
+    status === "em aberto" ||
+    status === "aguardando cliente"
+  )
+}).length
+
+    const guiasAbertas = guiasFiscais.filter((item) => {
+  const status = String(item.status || "").toLowerCase().trim()
+
+  return (
+    status === "pendente" ||
+    status === "aberto" ||
+    status === "em aberto" ||
+    status === "aguardando pagamento"
+  )
+}).length
+
+    const pendenciasAbertas = solicitacoesAbertas + guiasAbertas
 
     return {
       receitasMes,
@@ -125,7 +128,7 @@ export default function PortalCliente({ setPage }) {
       saldoTotal,
       pendenciasAbertas,
     }
-  }, [movimentos, solicitacoes])
+  }, [movimentos, solicitacoes, guiasFiscais])
 
   return (
     <div className="pc-page">
@@ -133,18 +136,10 @@ export default function PortalCliente({ setPage }) {
         .pc-page {
           color: white;
           padding: 24px 30px;
-        }
-
-        .pc-title {
-          font-size: 34px;
-          font-weight: 900;
-          margin-bottom: 5px;
-        }
-
-        .pc-subtitle {
-          opacity: .8;
-          margin-bottom: 24px;
-          line-height: 24px;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+          box-sizing: border-box;
         }
 
         .pc-cards {
@@ -163,6 +158,7 @@ export default function PortalCliente({ setPage }) {
           align-items: center;
           gap: 15px;
           min-height: 72px;
+          min-width: 0;
         }
 
         .pc-icon {
@@ -192,25 +188,10 @@ export default function PortalCliente({ setPage }) {
           white-space: nowrap;
         }
 
-        .pc-card .green,
-        .pc-icon.green {
-          color: #32f06d !important;
-        }
-
-        .pc-card .red,
-        .pc-icon.red {
-          color: #ff5c70 !important;
-        }
-
-        .pc-card .yellow,
-        .pc-icon.yellow {
-          color: #ffc107 !important;
-        }
-
-        .pc-card .blue,
-        .pc-icon.blue {
-          color: #3cbcff !important;
-        }
+        .green { color: #32f06d !important; }
+        .red { color: #ff5c70 !important; }
+        .yellow { color: #ffc107 !important; }
+        .blue { color: #3cbcff !important; }
 
         .pc-center-box {
           background: rgba(255,255,255,.06);
@@ -218,6 +199,8 @@ export default function PortalCliente({ setPage }) {
           border-radius: 24px;
           padding: 34px 30px;
           text-align: center;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         .pc-center-box h2 {
@@ -250,65 +233,68 @@ export default function PortalCliente({ setPage }) {
           gap: 10px;
           font-size: 15px;
         }
+
+        @media (max-width: 768px) {
+          .pc-page {
+            padding: 18px 14px;
+          }
+
+          .pc-cards {
+            grid-template-columns: 1fr;
+          }
+
+          .pc-card {
+            width: 100%;
+            box-sizing: border-box;
+          }
+
+          .pc-card span,
+          .pc-card strong {
+            white-space: normal;
+          }
+
+          .pc-center-box {
+            padding: 24px 18px;
+          }
+
+          .pc-center-box h2 {
+            font-size: 22px;
+          }
+
+          .pc-center-box p {
+            font-size: 15px;
+            line-height: 24px;
+          }
+
+          .pc-pendencias-btn {
+            width: 100%;
+            justify-content: center;
+          }
+        }
       `}</style>
 
-      <div
-        style={{
-          marginBottom: "20px",
-          fontSize: "18px",
-          color: "white",
-        }}
-      >
+      <div style={{ marginBottom: "20px", fontSize: "18px", color: "white" }}>
         Olá, {nomeEmpresa} 👋
       </div>
 
       <div className="pc-cards">
-        <Card
-          icon={<FaArrowUp />}
-          label="Receitas do mês"
-          value={formatarMoeda(resumo.receitasMes)}
-          color="green"
-        />
-
-        <Card
-          icon={<FaArrowDown />}
-          label="Despesas do mês"
-          value={formatarMoeda(resumo.despesasMes)}
-          color="red"
-        />
-
-        <Card
-          icon={<FaWallet />}
-          label="Saldo atual"
-          value={formatarMoeda(resumo.saldoTotal)}
-          color={resumo.saldoTotal >= 0 ? "green" : "red"}
-        />
-
-        <Card
-          icon={<FaClipboardList />}
-          label="Pendências"
-          value={resumo.pendenciasAbertas}
-          color="yellow"
-        />
+        <Card icon={<FaArrowUp />} label="Receitas do mês" value={formatarMoeda(resumo.receitasMes)} color="green" />
+        <Card icon={<FaArrowDown />} label="Despesas do mês" value={formatarMoeda(resumo.despesasMes)} color="red" />
+        <Card icon={<FaWallet />} label="Saldo atual" value={formatarMoeda(resumo.saldoTotal)} color={resumo.saldoTotal >= 0 ? "green" : "red"} />
+        <Card icon={<FaClipboardList />} label="Pendências e Guias" value={resumo.pendenciasAbertas} color="yellow" />
       </div>
 
       <div className="pc-center-box">
         <h2>Bem-vindo ao Portal Nexa</h2>
 
         <p>
-          Você possui{" "}
-          <strong>{resumo.pendenciasAbertas}</strong>{" "}
-          pendência(s) aberta(s). Acesse a área de pendências
-          para visualizar os detalhes enviados pelo escritório.
+          Você possui <strong>{resumo.pendenciasAbertas}</strong>{" "}
+          pendência(s) aberta(s). Acesse a área de pendências para visualizar os detalhes enviados pelo escritório.
         </p>
 
-        <button
-          type="button"
-          className="pc-pendencias-btn"
-          onClick={abrirPendencias}
-        >
+        <button type="button" className="pc-pendencias-btn" onClick={abrirPendencias}>
           <FaClipboardList />
-          Ver Pendências
+          Ver Pendências e Guias
         </button>
       </div>
     </div>
@@ -318,16 +304,11 @@ export default function PortalCliente({ setPage }) {
 function Card({ icon, label, value, color }) {
   return (
     <div className="pc-card">
-      <div className={`pc-icon ${color}`}>
-        {icon}
-      </div>
+      <div className={`pc-icon ${color}`}>{icon}</div>
 
       <div>
         <span>{label}</span>
-
-        <strong className={color}>
-          {value}
-        </strong>
+        <strong className={color}>{value}</strong>
       </div>
     </div>
   )

@@ -2,13 +2,23 @@ import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
 
 export default function Relatorios() {
-  const [clienteSelecionado, setClienteSelecionado] = useState("")
+  const usuario = JSON.parse(localStorage.getItem("usuario") || "{}")
+  const clienteLogado = usuario?.perfil === "Cliente"
+  const clienteFixo = usuario?.clienteVinculado || ""
+
+  const [clienteSelecionado, setClienteSelecionado] = useState(
+    clienteLogado ? clienteFixo : ""
+  )
   const [competenciaSelecionada, setCompetenciaSelecionada] = useState("Todas")
   const [planoSelecionado, setPlanoSelecionado] = useState("Todos")
   const [clientes, setClientes] = useState([])
   const [movimentos, setMovimentos] = useState([])
 
   useEffect(() => {
+    if (clienteLogado && clienteFixo) {
+      setClienteSelecionado(clienteFixo)
+    }
+
     carregarDados()
   }, [])
 
@@ -92,7 +102,9 @@ export default function Relatorios() {
   const movimentosFiltrados = useMemo(() => {
     return movimentos.filter((item) => {
       const clienteOk =
-        !clienteSelecionado || item.cliente === clienteSelecionado
+        clienteLogado
+          ? item.cliente === clienteFixo
+          : !clienteSelecionado || item.cliente === clienteSelecionado
 
       const competenciaOk =
         competenciaSelecionada === "Todas" ||
@@ -104,7 +116,14 @@ export default function Relatorios() {
 
       return clienteOk && competenciaOk && planoOk
     })
-  }, [movimentos, clienteSelecionado, competenciaSelecionada, planoSelecionado])
+  }, [
+    movimentos,
+    clienteLogado,
+    clienteFixo,
+    clienteSelecionado,
+    competenciaSelecionada,
+    planoSelecionado,
+  ])
 
   const resumo = useMemo(() => {
     const receitas = movimentosFiltrados
@@ -164,7 +183,9 @@ export default function Relatorios() {
     1
   )
 
-  const nomeCliente = clienteSelecionado || "Todas as empresas"
+  const nomeCliente = clienteLogado
+    ? clienteFixo
+    : clienteSelecionado || "Todas as empresas"
 
   return (
     <div style={box}>
@@ -210,19 +231,21 @@ export default function Relatorios() {
           </div>
 
           <div style={filtros}>
-            <select
-              style={select}
-              value={clienteSelecionado}
-              onChange={(e) => setClienteSelecionado(e.target.value)}
-            >
-              <option value="">Todas as empresas</option>
+            {!clienteLogado && (
+              <select
+                style={select}
+                value={clienteSelecionado}
+                onChange={(e) => setClienteSelecionado(e.target.value)}
+              >
+                <option value="">Todas as empresas</option>
 
-              {clientes.map((item) => (
-                <option key={item.id} value={item.nome}>
-                  {item.nome}
-                </option>
-              ))}
-            </select>
+                {clientes.map((item) => (
+                  <option key={item.id} value={item.nome}>
+                    {item.nome}
+                  </option>
+                ))}
+              </select>
+            )}
 
             <select
               style={select}

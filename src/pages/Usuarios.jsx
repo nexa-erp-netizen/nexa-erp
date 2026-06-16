@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
 
 export default function Usuarios() {
@@ -17,6 +17,12 @@ export default function Usuarios() {
     carregarClientes()
   }, [])
 
+  const clienteSelecionado = useMemo(() => {
+    return clientes.find(
+      (cliente) => cliente.nome === clienteVinculado
+    )
+  }, [clientes, clienteVinculado])
+
   async function carregarUsuarios() {
     try {
       const resposta = await api.get("/usuarios")
@@ -34,6 +40,34 @@ export default function Usuarios() {
     } catch (error) {
       alert("Erro ao carregar clientes")
       console.error(error)
+    }
+  }
+
+  function obterEmailCliente(cliente) {
+    return (
+      cliente?.email ||
+      cliente?.emailCliente ||
+      cliente?.emailResponsavel ||
+      cliente?.responsavelEmail ||
+      ""
+    )
+  }
+
+  function selecionarClienteVinculado(valor) {
+    setClienteVinculado(valor)
+
+    const cliente = clientes.find(
+      (item) => item.nome === valor
+    )
+
+    if (!cliente || editandoId) return
+
+    setNome(cliente.nome || "")
+
+    const emailCliente = obterEmailCliente(cliente)
+
+    if (emailCliente) {
+      setEmail(emailCliente)
     }
   }
 
@@ -165,7 +199,7 @@ export default function Usuarios() {
             style={input}
             value={clienteVinculado}
             onChange={(e) =>
-              setClienteVinculado(e.target.value)
+              selecionarClienteVinculado(e.target.value)
             }
           >
             <option value="">Cliente vinculado</option>
@@ -188,6 +222,18 @@ export default function Usuarios() {
           </button>
         )}
       </div>
+
+      {perfil === "Cliente" && clienteSelecionado && (
+        <div style={clienteInfo}>
+          <strong>Cliente selecionado:</strong>{" "}
+          {clienteSelecionado.nome}
+          <br />
+          <span>
+            E-mail cadastrado:{" "}
+            {obterEmailCliente(clienteSelecionado) || "não informado"}
+          </span>
+        </div>
+      )}
 
       <table style={table}>
         <thead>
@@ -258,7 +304,7 @@ const form = {
   gridTemplateColumns:
     "repeat(auto-fit, minmax(220px, 1fr))",
   gap: "15px",
-  marginBottom: "30px",
+  marginBottom: "20px",
 }
 
 const input = {
@@ -268,6 +314,16 @@ const input = {
   background: "#061f47",
   color: "white",
   fontSize: "15px",
+}
+
+const clienteInfo = {
+  background: "rgba(0,168,255,.12)",
+  border: "1px solid rgba(0,168,255,.28)",
+  borderRadius: "14px",
+  padding: "14px",
+  marginBottom: "24px",
+  color: "#d9e7ff",
+  lineHeight: "24px",
 }
 
 const button = {

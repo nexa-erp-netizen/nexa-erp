@@ -13,7 +13,7 @@ export default function DRE() {
 
   async function carregarMovimentos() {
     try {
-      const resposta = await api.get("/movimentos-cliente")
+      const resposta = await api.get("/lancamentos-contabeis")
       setMovimentos(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
       alert("Erro ao carregar DRE")
@@ -93,7 +93,7 @@ export default function DRE() {
   const movimentosFiltrados = useMemo(() => {
     return movimentos.filter((item) => {
       const empresaOk =
-        empresaSelecionada === "Todas" ||
+        empresaSelecionada === "" ||
         item.cliente === empresaSelecionada
 
       const competenciaOk =
@@ -106,11 +106,11 @@ export default function DRE() {
 
   const dados = useMemo(() => {
     const receitasLista = movimentosFiltrados.filter(
-      (item) => item.tipo === "Receita"
+      (item) => String(item.tipo || "").toLowerCase() === "receita"
     )
 
     const despesasLista = movimentosFiltrados.filter(
-      (item) => item.tipo === "Despesa"
+      (item) => String(item.tipo || "").toLowerCase() === "despesa"
     )
 
     const receitas = receitasLista.reduce(
