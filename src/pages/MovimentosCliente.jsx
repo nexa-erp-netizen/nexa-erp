@@ -423,8 +423,9 @@ export default function MovimentosCliente() {
         }
 
         .mv-table td {
-          padding: 12px;
+          padding: 8px 12px;
           border-bottom: 1px solid rgba(255,255,255,.05);
+          line-height: 18px;
         }
 
         .mv-table th:nth-child(1),
@@ -462,6 +463,18 @@ export default function MovimentosCliente() {
         }
 
         @media (max-width: 768px) {
+
+          .mv-table td {
+            padding: 6px 8px !important;
+            line-height: 16px !important;
+            font-size: 13px !important;
+          }
+
+          .mv-table th {
+            padding: 8px !important;
+            font-size: 12px !important;
+          }
+
           .mv-page {
             padding: 16px !important;
             width: 100% !important;

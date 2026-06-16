@@ -61,13 +61,8 @@ export default function Login({ onLogin }) {
         }
 
         @keyframes nexaLoadingMove {
-          0% {
-            transform: translateX(-120%);
-          }
-
-          100% {
-            transform: translateX(260%);
-          }
+          0% { transform: translateX(-120%); }
+          100% { transform: translateX(260%); }
         }
 
         @media (max-width: 900px) {
@@ -75,7 +70,7 @@ export default function Login({ onLogin }) {
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            min-height: 100vh !important;
+            min-height: 100dvh !important;
             padding: 18px !important;
             overflow-x: hidden !important;
             box-sizing: border-box !important;
@@ -83,6 +78,7 @@ export default function Login({ onLogin }) {
 
           .login-area {
             width: 100% !important;
+            min-height: auto !important;
             padding: 0 !important;
             background: transparent !important;
           }
@@ -93,8 +89,11 @@ export default function Login({ onLogin }) {
             margin: 0 auto !important;
           }
 
-          .login-card img {
-            width: 180px !important;
+          .login-logo {
+            width: 185px !important;
+            height: auto !important;
+            object-fit: contain !important;
+            image-rendering: auto !important;
             margin-bottom: 24px !important;
           }
 
@@ -107,8 +106,22 @@ export default function Login({ onLogin }) {
 
           .login-card input,
           .login-card button {
-            width: 100% !important;
             box-sizing: border-box !important;
+          }
+
+          .login-password-input {
+            width: 100% !important;
+            padding-right: 58px !important;
+          }
+
+          .login-eye-button {
+            width: 42px !important;
+            min-width: 42px !important;
+            max-width: 42px !important;
+            height: 42px !important;
+            right: 8px !important;
+            padding: 0 !important;
+            flex: none !important;
           }
 
           .login-hero {
@@ -121,8 +134,8 @@ export default function Login({ onLogin }) {
             font-size: 30px !important;
           }
 
-          .login-card img {
-            width: 165px !important;
+          .login-logo {
+            width: 170px !important;
           }
         }
       `}</style>
@@ -134,16 +147,14 @@ export default function Login({ onLogin }) {
               <div className="nexa-loading-fill" />
             </div>
 
-            <strong style={loadingText}>
-              Carregando o sistema Nexa...
-            </strong>
+            <strong style={loadingText}>Carregando o sistema Nexa...</strong>
           </div>
         </div>
       )}
 
       <div className="login-area" style={loginArea}>
         <div className="login-card" style={card}>
-          <img src={logo} alt="Nexa" style={logoStyle} />
+          <img className="login-logo" src={logo} alt="Nexa" style={logoStyle} />
 
           <h1 style={title}>Acesso ao Sistema</h1>
 
@@ -159,6 +170,7 @@ export default function Login({ onLogin }) {
 
           <div style={passwordBox}>
             <input
+              className="login-password-input"
               style={passwordInput}
               type={mostrarSenha ? "text" : "password"}
               placeholder="Senha"
@@ -171,6 +183,7 @@ export default function Login({ onLogin }) {
             />
 
             <button
+              className="login-eye-button"
               type="button"
               style={eyeButton}
               onClick={() => setMostrarSenha(!mostrarSenha)}
@@ -185,21 +198,15 @@ export default function Login({ onLogin }) {
             {carregando ? "Entrando..." : "Entrar"}
           </button>
 
-          <p style={aviso}>
-            Acesso exclusivo para usuários autorizados pelo escritório.
-          </p>
+          <p style={aviso}>Acesso exclusivo para usuários autorizados pelo escritório.</p>
         </div>
       </div>
 
       <div className="login-hero" style={hero}>
         <div style={heroOverlay}>
-          <h2 style={heroTitle}>
-            Seu escritório contábil conectado ao cliente todos os dias
-          </h2>
+          <h2 style={heroTitle}>Seu escritório contábil conectado ao cliente todos os dias</h2>
 
-          <p style={heroText}>
-            Organize guias, declarações, documentos e solicitações em um só lugar.
-          </p>
+          <p style={heroText}>Organize guias, declarações, documentos e solicitações em um só lugar.</p>
         </div>
       </div>
     </div>
@@ -230,6 +237,8 @@ const card = {
 
 const logoStyle = {
   width: "210px",
+  height: "auto",
+  objectFit: "contain",
   display: "block",
   margin: "0 auto 30px",
 }
@@ -261,27 +270,34 @@ const input = {
 const passwordBox = {
   position: "relative",
   marginBottom: "15px",
+  width: "100%",
 }
 
 const passwordInput = {
   ...input,
   marginBottom: 0,
-  paddingRight: "52px",
+  paddingRight: "60px",
 }
 
 const eyeButton = {
   position: "absolute",
-  right: "10px",
+  right: "8px",
   top: "50%",
   transform: "translateY(-50%)",
-  width: "36px",
-  height: "36px",
+  width: "42px",
+  height: "42px",
+  minWidth: "42px",
+  maxWidth: "42px",
   border: "none",
   borderRadius: "10px",
   background: "rgba(255,255,255,.10)",
   color: "white",
   cursor: "pointer",
   fontSize: "16px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
 }
 
 const button = {

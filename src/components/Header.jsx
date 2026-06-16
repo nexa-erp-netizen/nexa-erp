@@ -3,19 +3,43 @@ export default function Header({
   usuario,
   onLogout,
 }) {
+  const mobile =
+    typeof window !== "undefined" &&
+    window.innerWidth <= 768
+
   return (
-    <header style={styles.header}>
+    <header
+      style={{
+        ...styles.header,
+        ...(mobile ? styles.headerMobile : {}),
+      }}
+    >
       <div>
-        <h1 style={styles.title}>
+        <h1
+          style={{
+            ...styles.title,
+            ...(mobile ? styles.titleMobile : {}),
+          }}
+        >
           {title}
         </h1>
 
-        <p style={styles.subtitle}>
+        <p
+          style={{
+            ...styles.subtitle,
+            ...(mobile ? styles.subtitleMobile : {}),
+          }}
+        >
           Sistema ERP Contábil Inteligente
         </p>
       </div>
 
-      <div style={styles.userBox}>
+      <div
+        style={{
+          ...styles.userBox,
+          ...(mobile ? styles.userBoxMobile : {}),
+        }}
+      >
         <div>
           <strong style={styles.userName}>
             {usuario?.perfil}
@@ -45,15 +69,32 @@ const styles = {
     marginBottom: "35px",
   },
 
+  headerMobile: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: "15px",
+  },
+
   title: {
     fontSize: "42px",
     margin: 0,
+  },
+
+  titleMobile: {
+    fontSize: "24px",
+    lineHeight: "30px",
+    wordBreak: "break-word",
   },
 
   subtitle: {
     color: "#a9b8cc",
     fontSize: "18px",
     marginTop: "8px",
+  },
+
+  subtitleMobile: {
+    fontSize: "14px",
+    lineHeight: "20px",
   },
 
   userBox: {
@@ -63,6 +104,12 @@ const styles = {
     background: "#06234d",
     padding: "12px 16px",
     borderRadius: "15px",
+  },
+
+  userBoxMobile: {
+    width: "100%",
+    justifyContent: "space-between",
+    boxSizing: "border-box",
   },
 
   userName: {

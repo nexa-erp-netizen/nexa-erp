@@ -11,7 +11,7 @@ export default function Fiscal() {
   const [valor, setValor] = useState("")
   const [observacao, setObservacao] = useState("")
   const [anexos, setAnexos] = useState([])
-  const [editandoIndex, setEditandoIndex] = useState(null)
+  const [editandoId, setEditandoId] = useState(null)
   const [arquivoAberto, setArquivoAberto] = useState(null)
 
   const [clientesCadastrados, setClientesCadastrados] = useState([])
@@ -62,13 +62,8 @@ export default function Fiscal() {
   function formatarCompetencia(valorDigitado) {
     let valor = String(valorDigitado).replace(/\D/g, "")
 
-    if (valor.length > 6) {
-      valor = valor.slice(0, 6)
-    }
-
-    if (valor.length >= 3) {
-      valor = valor.slice(0, 2) + "/" + valor.slice(2)
-    }
+    if (valor.length > 6) valor = valor.slice(0, 6)
+    if (valor.length >= 3) valor = valor.slice(0, 2) + "/" + valor.slice(2)
 
     return valor
   }
@@ -105,15 +100,13 @@ export default function Fiscal() {
   }
 
   async function adicionarAnexos(e) {
-    const arquivos = Array.from(e.target.files)
+    const arquivos = Array.from(e.target.files || [])
+    e.target.value = ""
 
     if (arquivos.length === 0) return
 
     const formData = new FormData()
-
-    arquivos.forEach((arquivo) => {
-      formData.append("arquivos", arquivo)
-    })
+    arquivos.forEach((arquivo) => formData.append("arquivos", arquivo))
 
     try {
       const resposta = await api.post("/fiscal/upload", formData, {
@@ -122,11 +115,15 @@ export default function Fiscal() {
         },
       })
 
-      setAnexos([...anexos, ...resposta.data])
+      setAnexos((anteriores) => [...anteriores, ...resposta.data])
     } catch (error) {
       alert("Erro ao enviar arquivo fiscal")
       console.error(error)
     }
+  }
+
+  function removerAnexo(index) {
+    setAnexos((anteriores) => anteriores.filter((_, i) => i !== index))
   }
 
   async function salvarObrigacao() {
@@ -147,34 +144,32 @@ export default function Fiscal() {
     }
 
     try {
-      if (editandoIndex !== null) {
-        const itemEditando = obrigacoes[editandoIndex]
-        await api.put(`/fiscal/${itemEditando.id}`, novaObrigacao)
+      if (editandoId !== null) {
+        await api.put(`/fiscal/${editandoId}`, novaObrigacao)
       } else {
         await api.post("/fiscal", novaObrigacao)
       }
 
       await carregarObrigacoes()
       limparCampos()
-      setEditandoIndex(null)
     } catch (error) {
       alert("Erro ao salvar pendência")
       console.error(error)
     }
   }
 
-  function editarObrigacao(index) {
-    const item = obrigacoes[index]
+  function editarObrigacao(item) {
+    setCliente(item.cliente || "")
+    setObrigacao(item.obrigacao || "")
+    setCompetencia(item.competencia || "")
+    setVencimento(item.vencimento || "")
+    setStatus(item.status || "")
+    setValor(item.valor || "")
+    setObservacao(item.observacao || "")
+    setAnexos(Array.isArray(item.anexos) ? item.anexos : [])
+    setEditandoId(item.id)
 
-    setCliente(item.cliente)
-    setObrigacao(item.obrigacao)
-    setCompetencia(item.competencia)
-    setVencimento(item.vencimento)
-    setStatus(item.status)
-    setValor(item.valor)
-    setObservacao(item.observacao)
-    setAnexos(item.anexos || [])
-    setEditandoIndex(index)
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   async function concluirObrigacao(item) {
@@ -193,18 +188,23 @@ export default function Fiscal() {
     }
   }
 
-  async function excluirObrigacao(index) {
+  async function excluirObrigacao(item) {
     const confirmar = window.confirm("Deseja realmente excluir esta obrigação?")
 
     if (!confirmar) return
 
     try {
-      const item = obrigacoes[index]
+      if (!item?.id) {
+        alert("Não foi possível excluir: ID da obrigação não encontrado.")
+        return
+      }
+
       await api.delete(`/fiscal/${item.id}`)
       await carregarObrigacoes()
+      alert("Obrigação excluída com sucesso")
     } catch (error) {
-      alert("Erro ao excluir obrigação")
-      console.error(error)
+      console.error("ERRO AO EXCLUIR OBRIGAÇÃO:", error)
+      alert(error?.response?.data?.message || "Erro ao excluir obrigação")
     }
   }
 
@@ -217,31 +217,20 @@ export default function Fiscal() {
     setValor("")
     setObservacao("")
     setAnexos([])
+    setEditandoId(null)
   }
 
   function corStatusFiscal(statusFiscal) {
-    if (statusFiscal === "Concluído") {
-      return badgeBlue
-    }
-
-    if (statusFiscal === "Pago pelo cliente" || statusFiscal === "Pago") {
-      return badgeSuccess
-    }
-
-    if (statusFiscal === "Atrasado") {
-      return badgeDanger
-    }
-
-    if (statusFiscal === "Pendente" || statusFiscal === "Em andamento") {
-      return badgeWarning
-    }
-
+    if (statusFiscal === "Concluído") return badgeBlue
+    if (statusFiscal === "Pago pelo cliente" || statusFiscal === "Pago") return badgeSuccess
+    if (statusFiscal === "Atrasado") return badgeDanger
+    if (statusFiscal === "Pendente" || statusFiscal === "Em andamento") return badgeWarning
     return {}
   }
 
   const obrigacoesVisiveis = obrigacoes.filter((item) => {
-    const status = String(item.status || "").toLowerCase()
-    const concluido = status.includes("concluído") || status.includes("concluido")
+    const statusAtual = String(item.status || "").toLowerCase()
+    const concluido = statusAtual.includes("concluído") || statusAtual.includes("concluido")
 
     if (concluido) return false
 
@@ -260,25 +249,14 @@ export default function Fiscal() {
 
       {usuario?.perfil !== "Cliente" && (
         <div style={form}>
-          <select
-            style={input}
-            value={cliente}
-            onChange={(e) => setCliente(e.target.value)}
-          >
+          <select style={input} value={cliente} onChange={(e) => setCliente(e.target.value)}>
             <option value="">Selecione o cliente</option>
-
             {clientesCadastrados.map((item) => (
-              <option key={item.id} value={item.nome}>
-                {item.nome}
-              </option>
+              <option key={item.id} value={item.nome}>{item.nome}</option>
             ))}
           </select>
 
-          <select
-            style={input}
-            value={obrigacao}
-            onChange={(e) => setObrigacao(e.target.value)}
-          >
+          <select style={input} value={obrigacao} onChange={(e) => setObrigacao(e.target.value)}>
             <option value="">Obrigação</option>
             <option value="DAS">DAS</option>
             <option value="Honorários Contábeis">Honorários Contábeis</option>
@@ -295,18 +273,9 @@ export default function Fiscal() {
             onChange={(e) => setCompetencia(formatarCompetencia(e.target.value))}
           />
 
-          <input
-            type="date"
-            style={input}
-            value={vencimento}
-            onChange={(e) => setVencimento(e.target.value)}
-          />
+          <input type="date" style={input} value={vencimento} onChange={(e) => setVencimento(e.target.value)} />
 
-          <select
-            style={input}
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
+          <select style={input} value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Status</option>
             <option value="Pendente">Pendente</option>
             <option value="Em andamento">Em andamento</option>
@@ -317,71 +286,57 @@ export default function Fiscal() {
             <option value="Atrasado">Atrasado</option>
           </select>
 
-          <input
-            style={input}
-            placeholder="R$ 0,00"
-            value={valor}
-            onChange={(e) => setValor(formatarValor(e.target.value))}
-          />
+          <input style={input} placeholder="R$ 0,00" value={valor} onChange={(e) => setValor(formatarValor(e.target.value))} />
 
-          <textarea
-            style={textarea}
-            placeholder="Observação"
-            value={observacao}
-            onChange={(e) => setObservacao(e.target.value)}
-          />
+          <textarea style={textarea} placeholder="Observação" value={observacao} onChange={(e) => setObservacao(e.target.value)} />
 
           <div style={uploadBox}>
             <label style={uploadLabel}>
               Anexar Guia / Documento
-
-              <input
-                type="file"
-                multiple
-                style={{ display: "none" }}
-                onChange={adicionarAnexos}
-              />
+              <input type="file" multiple style={{ display: "none" }} onChange={adicionarAnexos} />
             </label>
 
             {anexos.length > 0 && (
               <div style={arquivosLista}>
                 {anexos.map((arquivo, index) => (
-                  <div key={index} style={arquivoItem}>
-                    📎 {arquivo.nome}
+                  <div key={`${arquivo.caminho || arquivo.nome || "arquivo"}-${index}`} style={arquivoItem}>
+                    <span>📎 {arquivo.nome || "Arquivo anexado"}</span>
+
+                    <button type="button" style={botaoExcluirAnexo} onClick={() => removerAnexo(index)}>
+                      Excluir anexo
+                    </button>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <button style={button} onClick={salvarObrigacao}>
-            {editandoIndex !== null ? "Salvar Correção" : "Salvar Pendência"}
+          <button type="button" style={button} onClick={salvarObrigacao}>
+            {editandoId !== null ? "Salvar Correção" : "Salvar Pendência"}
           </button>
+
+          {editandoId !== null && (
+            <button type="button" style={buttonSecondary} onClick={limparCampos}>
+              Cancelar Correção
+            </button>
+          )}
         </div>
       )}
 
       {usuario?.perfil === "Cliente" && (
         <div style={clienteAviso}>
           <strong>Pendências e Guias</strong>
-          <span>
-            Visualize guias, honorários, vencimentos e documentos enviados pelo escritório.
-          </span>
+          <span>Visualize guias, honorários, vencimentos e documentos enviados pelo escritório.</span>
         </div>
       )}
 
       {usuario?.perfil !== "Cliente" && (
         <div style={filterBox}>
           <strong style={{ color: "white" }}>Visualizar cliente</strong>
-          <select
-            style={filterInput}
-            value={clienteFiltro}
-            onChange={(e) => setClienteFiltro(e.target.value)}
-          >
+          <select style={filterInput} value={clienteFiltro} onChange={(e) => setClienteFiltro(e.target.value)}>
             <option value="">Selecione um cliente</option>
             {clientesCadastrados.map((item) => (
-              <option key={item.id} value={item.nome}>
-                {item.nome}
-              </option>
+              <option key={item.id} value={item.nome}>{item.nome}</option>
             ))}
           </select>
         </div>
@@ -404,17 +359,15 @@ export default function Fiscal() {
           </thead>
 
           <tbody>
-            {obrigacoesVisiveis.map((item, index) => (
-              <tr key={item.id || index}>
+            {obrigacoesVisiveis.map((item) => (
+              <tr key={item.id}>
                 <td style={td}>{item.cliente}</td>
                 <td style={td}>{item.obrigacao}</td>
                 <td style={td}>{item.competencia}</td>
                 <td style={td}>{item.vencimento}</td>
 
                 <td style={td}>
-                  <span style={{ ...badge, ...corStatusFiscal(item.status) }}>
-                    {item.status}
-                  </span>
+                  <span style={{ ...badge, ...corStatusFiscal(item.status) }}>{item.status}</span>
                 </td>
 
                 <td style={td}>{item.valor || "Não informado"}</td>
@@ -424,85 +377,63 @@ export default function Fiscal() {
                     style={{
                       ...badge,
                       ...(item.alertaFiscal === "Vencido" ? badgeDanger : {}),
-                      ...(item.alertaFiscal === "Vencendo" ||
-                      item.alertaFiscal === "Vence hoje"
-                        ? badgeWarning
-                        : {}),
-                      ...(item.alertaFiscal === "Regularizado"
-                        ? badgeSuccess
-                        : {}),
+                      ...(item.alertaFiscal === "Vencendo" || item.alertaFiscal === "Vence hoje" ? badgeWarning : {}),
+                      ...(item.alertaFiscal === "Regularizado" ? badgeSuccess : {}),
                     }}
                   >
                     {item.alertaFiscal || "Em dia"}
                   </span>
                 </td>
 
+                <td style={td}>{item.diasParaVencer !== null && item.diasParaVencer !== undefined ? item.diasParaVencer : "-"}</td>
+
                 <td style={td}>
-                  {item.diasParaVencer !== null &&
-                  item.diasParaVencer !== undefined
-                    ? item.diasParaVencer
-                    : "-"}
+                  <select
+                    style={actionSelect}
+                    defaultValue=""
+                    onChange={async (e) => {
+                      const acao = e.target.value
+                      e.target.value = ""
+
+                      if (acao === "visualizar") abrirAnexo(item)
+
+                      if (acao === "baixar") {
+                        const url = await obterUrlAnexo(item)
+                        if (url) window.open(url, "_blank")
+                      }
+
+                      if (acao === "concluir") concluirObrigacao(item)
+                      if (acao === "editar") editarObrigacao(item)
+                      if (acao === "excluir") excluirObrigacao(item)
+                    }}
+                  >
+                    <option value="">Ações</option>
+
+                    {item.anexos?.length > 0 && (
+                      <>
+                        <option value="visualizar">Visualizar</option>
+                        <option value="baixar">Baixar</option>
+                      </>
+                    )}
+
+                    {usuario?.perfil !== "Cliente" && item.status !== "Concluído" && (
+                      <option value="concluir">Concluir</option>
+                    )}
+
+                    {usuario?.perfil !== "Cliente" && (
+                      <>
+                        <option value="editar">Editar</option>
+                        <option value="excluir">Excluir</option>
+                      </>
+                    )}
+                  </select>
                 </td>
-
-                <td style={td}>
-  <select
-    style={actionSelect}
-    defaultValue=""
-    onChange={async (e) => {
-      const acao = e.target.value
-      e.target.value = ""
-
-      if (acao === "visualizar") {
-        abrirAnexo(item)
-      }
-
-      if (acao === "baixar") {
-        const url = await obterUrlAnexo(item)
-        window.open(url, "_blank")
-      }
-
-      if (acao === "concluir") {
-        concluirObrigacao(item)
-      }
-
-      if (acao === "editar") {
-        editarObrigacao(index)
-      }
-
-      if (acao === "excluir") {
-        excluirObrigacao(index)
-      }
-    }}
-  >
-    <option value="">Ações</option>
-
-    {item.anexos?.length > 0 && (
-      <>
-        <option value="visualizar">Visualizar</option>
-        <option value="baixar">Baixar</option>
-      </>
-    )}
-
-    {usuario?.perfil !== "Cliente" && item.status !== "Concluído" && (
-      <option value="concluir">Concluir</option>
-    )}
-
-    {usuario?.perfil !== "Cliente" && (
-      <>
-        <option value="editar">Editar</option>
-        <option value="excluir">Excluir</option>
-      </>
-    )}
-  </select>
-</td>
               </tr>
             ))}
 
             {obrigacoesVisiveis.length === 0 && (
               <tr>
-                <td style={td} colSpan="9">
-                  Selecione um cliente para visualizar pendências ativas.
-                </td>
+                <td style={td} colSpan="9">Selecione um cliente para visualizar pendências ativas.</td>
               </tr>
             )}
           </tbody>
@@ -514,17 +445,10 @@ export default function Fiscal() {
           <div style={modalPdf}>
             <div style={modalHeader}>
               <strong>Visualizar Documento</strong>
-
-              <button style={modalClose} onClick={() => setArquivoAberto(null)}>
-                Fechar
-              </button>
+              <button style={modalClose} onClick={() => setArquivoAberto(null)}>Fechar</button>
             </div>
 
-            <iframe
-              src={arquivoAberto}
-              title="Documento Fiscal"
-              style={iframePdf}
-            />
+            <iframe src={arquivoAberto} title="Documento Fiscal" style={iframePdf} />
           </div>
         </div>
       )}
@@ -591,6 +515,20 @@ const arquivoItem = {
   background: "#061f47",
   padding: "12px",
   borderRadius: "10px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "10px",
+}
+
+const botaoExcluirAnexo = {
+  background: "#ff4d4f",
+  border: "none",
+  color: "white",
+  padding: "7px 12px",
+  borderRadius: "8px",
+  cursor: "pointer",
+  fontWeight: "bold",
 }
 
 const actionSelect = {
@@ -611,6 +549,12 @@ const button = {
   color: "#00112b",
   fontWeight: "bold",
   cursor: "pointer",
+}
+
+const buttonSecondary = {
+  ...button,
+  background: "#ff4d4f",
+  color: "white",
 }
 
 const clienteAviso = {
@@ -664,48 +608,6 @@ const td = {
   verticalAlign: "middle",
 }
 
-const actions = {
-  display: "flex",
-  gap: "8px",
-  alignItems: "center",
-}
-
-const iconButton = {
-  width: "38px",
-  height: "38px",
-  borderRadius: "10px",
-  border: "none",
-  color: "white",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  textDecoration: "none",
-  fontSize: "18px",
-}
-
-const iconButtonBlue = {
-  ...iconButton,
-  background: "#00a8ff",
-}
-
-const iconButtonGreen = {
-  ...iconButton,
-  background: "#37ff74",
-  color: "#00112b",
-}
-
-const iconButtonYellow = {
-  ...iconButton,
-  background: "#ffc107",
-  color: "#00112b",
-}
-
-const iconButtonRed = {
-  ...iconButton,
-  background: "#ff4d4f",
-}
-
 const badge = {
   display: "inline-block",
   padding: "7px 10px",
@@ -717,25 +619,10 @@ const badge = {
   whiteSpace: "nowrap",
 }
 
-const badgeBlue = {
-  background: "#00a8ff",
-  color: "white",
-}
-
-const badgeDanger = {
-  background: "#ff4d4f",
-  color: "white",
-}
-
-const badgeWarning = {
-  background: "#ffc107",
-  color: "#00112b",
-}
-
-const badgeSuccess = {
-  background: "#37ff74",
-  color: "#00112b",
-}
+const badgeBlue = { background: "#00a8ff", color: "white" }
+const badgeDanger = { background: "#ff4d4f", color: "white" }
+const badgeWarning = { background: "#ffc107", color: "#00112b" }
+const badgeSuccess = { background: "#37ff74", color: "#00112b" }
 
 const modalBg = {
   position: "fixed",
