@@ -7,8 +7,8 @@ export default function LancamentosContabeis() {
   const [servicos, setServicos] = useState([])
   const [clienteAtual, setClienteAtual] = useState(0)
   const [clienteFiltro, setClienteFiltro] = useState("")
-  const [competenciaInicial, setCompetenciaInicial] = useState("")
-  const [competenciaFinal, setCompetenciaFinal] = useState("")
+  const competenciaAtual = new Date().toISOString().slice(0, 7)
+  const [competenciaFiltro, setCompetenciaFiltro] = useState(competenciaAtual)
   const [editandoId, setEditandoId] = useState(null)
 
   const [form, setForm] = useState({
@@ -131,15 +131,12 @@ export default function LancamentosContabeis() {
     const competencia = obterCompetenciaValor(data)
 
     if (!competencia) return false
-    if (competenciaInicial && competencia < competenciaInicial) return false
-    if (competenciaFinal && competencia > competenciaFinal) return false
 
-    return true
+    return competencia === competenciaFiltro
   }
 
   function limparFiltrosCompetencia() {
-    setCompetenciaInicial("")
-    setCompetenciaFinal("")
+    setCompetenciaFiltro(competenciaAtual)
   }
 
 
@@ -345,25 +342,40 @@ export default function LancamentosContabeis() {
         grupos[cliente].graficoMensal[mes].despesas
     })
 
-    const resultado = Object.values(grupos).map((grupo) => ({
-  ...grupo,
-  graficoMensal: Object.values(grupo.graficoMensal),
-}))
+    const meses = {
+      Jan: 0,
+      Fev: 1,
+      Mar: 2,
+      Abr: 3,
+      Mai: 4,
+      Jun: 5,
+      Jul: 6,
+      Ago: 7,
+      Set: 8,
+      Out: 9,
+      Nov: 10,
+      Dez: 11,
+    }
 
-return clienteFiltro
-  ? resultado.filter(
-      (grupo) => grupo.cliente === clienteFiltro
-    )
-  : resultado
+    return Object.values(grupos).map((grupo) => ({
+      ...grupo,
+      lancamentos: grupo.lancamentos.sort((a, b) => {
+        return new Date(`${b.data || "1900-01-01"}T00:00:00`) - new Date(`${a.data || "1900-01-01"}T00:00:00`)
+      }),
+      graficoMensal: Object.values(grupo.graficoMensal).sort((a, b) => {
+        const [mesA, anoA] = a.mes.split("/")
+        const [mesB, anoB] = b.mes.split("/")
+
+        return new Date(Number(anoA), meses[mesA], 1) - new Date(Number(anoB), meses[mesB], 1)
+      }),
+    }))
   }, [lancamentos])
 
   const gruposFiltrados = clienteFiltro
-  ? clientesAgrupados.filter(
-      (grupo) => grupo.cliente === clienteFiltro
-    )
-  : clientesAgrupados
+    ? clientesAgrupados.filter((grupo) => grupo.cliente === clienteFiltro)
+    : []
 
-const grupo = gruposFiltrados[clienteAtual]
+  const grupo = gruposFiltrados[clienteAtual]
 
   return (
     <div className="lc-page">
@@ -451,7 +463,8 @@ const grupo = gruposFiltrados[clienteAtual]
           color: white;
         }
 
-        input[type="date"] {
+        input[type="date"],
+        input[type="month"] {
           color-scheme: dark;
         }
 
@@ -842,10 +855,11 @@ const grupo = gruposFiltrados[clienteAtual]
       onChange={(e) => {
         setClienteFiltro(e.target.value)
         setClienteAtual(0)
+        limparFiltrosCompetencia()
       }}
     >
       <option value="">
-        Todos os clientes
+        Selecione um cliente
       </option>
 
       {clientes.map((cliente) => (
@@ -859,6 +873,12 @@ const grupo = gruposFiltrados[clienteAtual]
     </select>
   </div>
 </div>
+
+      {!clienteFiltro && (
+        <div className="lc-card" style={{ color: "#c9d6e6" }}>
+          Selecione um cliente para visualizar o gráfico, resumo e histórico contábil.
+        </div>
+      )}
 
       {grupo && (
         <div className="lc-card">
@@ -965,27 +985,15 @@ const grupo = gruposFiltrados[clienteAtual]
               </strong>
 
               <label style={{ color: "#c9d6e6", fontSize: "13px" }}>
-                Competência inicial
+                Competência
               </label>
 
               <input
                 className="lc-input"
                 style={{ maxWidth: "190px" }}
                 type="month"
-                value={competenciaInicial}
-                onChange={(e) => setCompetenciaInicial(e.target.value)}
-              />
-
-              <label style={{ color: "#c9d6e6", fontSize: "13px" }}>
-                Competência final
-              </label>
-
-              <input
-                className="lc-input"
-                style={{ maxWidth: "190px" }}
-                type="month"
-                value={competenciaFinal}
-                onChange={(e) => setCompetenciaFinal(e.target.value)}
+                value={competenciaFiltro}
+                onChange={(e) => setCompetenciaFiltro(e.target.value)}
               />
 
               <button
@@ -993,7 +1001,7 @@ const grupo = gruposFiltrados[clienteAtual]
                 className="btn-edit"
                 onClick={limparFiltrosCompetencia}
               >
-                Limpar competências
+                Mês atual
               </button>
             </div>
           </div>
