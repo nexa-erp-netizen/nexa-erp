@@ -7,8 +7,8 @@ export default function LancamentosContabeis() {
   const [servicos, setServicos] = useState([])
   const [clienteAtual, setClienteAtual] = useState(0)
   const [clienteFiltro, setClienteFiltro] = useState("")
-  const [dataInicial, setDataInicial] = useState("")
-  const [dataFinal, setDataFinal] = useState("")
+  const [competenciaInicial, setCompetenciaInicial] = useState("")
+  const [competenciaFinal, setCompetenciaFinal] = useState("")
   const [editandoId, setEditandoId] = useState(null)
 
   const [form, setForm] = useState({
@@ -64,15 +64,34 @@ export default function LancamentosContabeis() {
   function valorSeguro(valor) {
     if (typeof valor === "number") return valor
 
-    const limpo = String(valor || "0")
+    if (valor === null || valor === undefined || valor === "") {
+      return 0
+    }
+
+    let texto = String(valor)
       .replace("R$", "")
-      .replace(/\./g, "")
-      .replace(",", ".")
+      .replace(/\s/g, "")
       .trim()
 
-    const numero = Number(limpo)
+    if (texto.includes(",")) {
+      texto = texto.replace(/\./g, "").replace(",", ".")
+    } else {
+      texto = texto.replace(/[^0-9.-]/g, "")
+    }
+
+    const numero = Number(texto)
 
     return Number.isFinite(numero) ? numero : 0
+  }
+
+  function formatarCampoMoeda(valor) {
+    const apenasNumeros = String(valor || "").replace(/\D/g, "")
+    const numero = Number(apenasNumeros || 0) / 100
+
+    return numero.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    })
   }
 
   function formatarMoeda(valor) {
@@ -88,6 +107,42 @@ export default function LancamentosContabeis() {
     return d.toLocaleDateString("pt-BR")
   }
 
+  function obterCompetenciaValor(data) {
+    if (!data) return ""
+
+    const d = new Date(data + "T00:00:00")
+    const ano = d.getFullYear()
+    const mes = String(d.getMonth() + 1).padStart(2, "0")
+
+    return `${ano}-${mes}`
+  }
+
+  function obterCompetenciaBR(data) {
+    const competencia = obterCompetenciaValor(data)
+
+    if (!competencia) return "-"
+
+    const [ano, mes] = competencia.split("-")
+
+    return `${mes}/${ano}`
+  }
+
+  function competenciaDentroDoFiltro(data) {
+    const competencia = obterCompetenciaValor(data)
+
+    if (!competencia) return false
+    if (competenciaInicial && competencia < competenciaInicial) return false
+    if (competenciaFinal && competencia > competenciaFinal) return false
+
+    return true
+  }
+
+  function limparFiltrosCompetencia() {
+    setCompetenciaInicial("")
+    setCompetenciaFinal("")
+  }
+
+
   function nomeMes(data) {
     if (!data) return "Sem data"
 
@@ -98,26 +153,6 @@ export default function LancamentosContabeis() {
 
     const d = new Date(data + "T00:00:00")
     return `${meses[d.getMonth()]}/${d.getFullYear()}`
-  }
-
-  function ordenarPorDataCrescente(a, b) {
-    return new Date(`${a.data || "1900-01-01"}T00:00:00`) - new Date(`${b.data || "1900-01-01"}T00:00:00`)
-  }
-
-  function ordenarPorDataDecrescente(a, b) {
-    return new Date(`${b.data || "1900-01-01"}T00:00:00`) - new Date(`${a.data || "1900-01-01"}T00:00:00`)
-  }
-
-  function dataDentroDoFiltro(data) {
-    if (!data) return false
-    if (dataInicial && data < dataInicial) return false
-    if (dataFinal && data > dataFinal) return false
-    return true
-  }
-
-  function limparFiltrosData() {
-    setDataInicial("")
-    setDataFinal("")
   }
 
   function selecionarServico(servicoId) {
@@ -156,7 +191,7 @@ export default function LancamentosContabeis() {
       ...form,
       servicoId,
       descricao: nomeServico,
-      valor: valorServico,
+      valor: formatarMoeda(valorServico),
       categoria: "Serviços Contábeis",
       tipo: "despesa",
       origem: "servico",
@@ -238,7 +273,7 @@ export default function LancamentosContabeis() {
       servicoId: lancamento.servicoId || "",
       descricao: lancamento.descricao || "",
       tipo: String(lancamento.tipo || "despesa").toLowerCase(),
-      valor: lancamento.valor || "",
+      valor: formatarMoeda(lancamento.valor || 0),
       data: lancamento.data || "",
       categoria: lancamento.categoria || "",
       origem: lancamento.origem || "manual",
@@ -310,42 +345,25 @@ export default function LancamentosContabeis() {
         grupos[cliente].graficoMensal[mes].despesas
     })
 
-    const meses = {
-      Jan: 0,
-      Fev: 1,
-      Mar: 2,
-      Abr: 3,
-      Mai: 4,
-      Jun: 5,
-      Jul: 6,
-      Ago: 7,
-      Set: 8,
-      Out: 9,
-      Nov: 10,
-      Dez: 11,
-    }
+    const resultado = Object.values(grupos).map((grupo) => ({
+  ...grupo,
+  graficoMensal: Object.values(grupo.graficoMensal),
+}))
 
-    return Object.values(grupos).map((grupo) => ({
-      ...grupo,
-      lancamentos: grupo.lancamentos.sort(ordenarPorDataDecrescente),
-      graficoMensal: Object.values(grupo.graficoMensal).sort((a, b) => {
-        const [mesA, anoA] = a.mes.split("/")
-        const [mesB, anoB] = b.mes.split("/")
-
-        return new Date(Number(anoA), meses[mesA], 1) - new Date(Number(anoB), meses[mesB], 1)
-      }),
-    }))
+return clienteFiltro
+  ? resultado.filter(
+      (grupo) => grupo.cliente === clienteFiltro
+    )
+  : resultado
   }, [lancamentos])
 
   const gruposFiltrados = clienteFiltro
-    ? clientesAgrupados.filter((grupo) => grupo.cliente === clienteFiltro)
-    : []
+  ? clientesAgrupados.filter(
+      (grupo) => grupo.cliente === clienteFiltro
+    )
+  : clientesAgrupados
 
-  const grupo = gruposFiltrados[clienteAtual]
-
-  const lancamentosHistorico = grupo
-    ? grupo.lancamentos.filter((lancamento) => dataDentroDoFiltro(lancamento.data))
-    : []
+const grupo = gruposFiltrados[clienteAtual]
 
   return (
     <div className="lc-page">
@@ -747,12 +765,12 @@ export default function LancamentosContabeis() {
 
           <input
             className="lc-input"
-            placeholder="Valor"
+            placeholder="R$ 0,00"
             value={form.valor}
             onChange={(e) =>
               setForm({
                 ...form,
-                valor: e.target.value,
+                valor: formatarCampoMoeda(e.target.value),
               })
             }
           />
@@ -798,44 +816,49 @@ export default function LancamentosContabeis() {
       </form>
 
       <div className="lc-card">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            flexWrap: "wrap",
-          }}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      flexWrap: "wrap",
+    }}
+  >
+    <strong
+      style={{
+        color: "#c9d6e6",
+        fontSize: "15px",
+      }}
+    >
+      Visualizar cliente
+    </strong>
+
+    <select
+      className="lc-select"
+      style={{
+        maxWidth: "320px",
+      }}
+      value={clienteFiltro}
+      onChange={(e) => {
+        setClienteFiltro(e.target.value)
+        setClienteAtual(0)
+      }}
+    >
+      <option value="">
+        Todos os clientes
+      </option>
+
+      {clientes.map((cliente) => (
+        <option
+          key={cliente.id}
+          value={cliente.nome}
         >
-          <strong style={{ color: "#c9d6e6", fontSize: "15px" }}>
-            Visualizar cliente
-          </strong>
-
-          <select
-            className="lc-select"
-            style={{ maxWidth: "320px" }}
-            value={clienteFiltro}
-            onChange={(e) => {
-              setClienteFiltro(e.target.value)
-              setClienteAtual(0)
-              limparFiltrosData()
-            }}
-          >
-            <option value="">Selecione um cliente</option>
-
-            {clientes.map((cliente) => (
-              <option key={cliente.id} value={cliente.nome}>
-                {cliente.nome}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {!clienteFiltro && (
-        <div className="lc-card" style={{ color: "#c9d6e6" }}>
-          Selecione um cliente para visualizar o gráfico, resumo e histórico contábil.
-        </div>
-      )}
+          {cliente.nome}
+        </option>
+      ))}
+    </select>
+  </div>
+</div>
 
       {grupo && (
         <div className="lc-card">
@@ -941,28 +964,36 @@ export default function LancamentosContabeis() {
                 Filtrar histórico
               </strong>
 
-              <input
-                className="lc-input"
-                style={{ maxWidth: "210px" }}
-                type="date"
-                value={dataInicial}
-                onChange={(e) => setDataInicial(e.target.value)}
-              />
+              <label style={{ color: "#c9d6e6", fontSize: "13px" }}>
+                Competência inicial
+              </label>
 
               <input
                 className="lc-input"
-                style={{ maxWidth: "210px" }}
-                type="date"
-                value={dataFinal}
-                onChange={(e) => setDataFinal(e.target.value)}
+                style={{ maxWidth: "190px" }}
+                type="month"
+                value={competenciaInicial}
+                onChange={(e) => setCompetenciaInicial(e.target.value)}
+              />
+
+              <label style={{ color: "#c9d6e6", fontSize: "13px" }}>
+                Competência final
+              </label>
+
+              <input
+                className="lc-input"
+                style={{ maxWidth: "190px" }}
+                type="month"
+                value={competenciaFinal}
+                onChange={(e) => setCompetenciaFinal(e.target.value)}
               />
 
               <button
                 type="button"
                 className="btn-edit"
-                onClick={limparFiltrosData}
+                onClick={limparFiltrosCompetencia}
               >
-                Limpar datas
+                Limpar competências
               </button>
             </div>
           </div>
@@ -970,7 +1001,7 @@ export default function LancamentosContabeis() {
           <table className="lc-table">
             <thead>
               <tr>
-                <th>Data</th>
+                <th>Competência</th>
                 <th>Descrição</th>
                 <th>Categoria</th>
                 <th>Tipo</th>
@@ -981,9 +1012,11 @@ export default function LancamentosContabeis() {
             </thead>
 
             <tbody>
-              {lancamentosHistorico.map((lancamento) => (
+              {grupo.lancamentos
+                .filter((lancamento) => competenciaDentroDoFiltro(lancamento.data))
+                .map((lancamento) => (
                 <tr key={lancamento.id}>
-                  <td>{formatarData(lancamento.data)}</td>
+                  <td>{obterCompetenciaBR(lancamento.data)}</td>
                   <td>{lancamento.descricao}</td>
                   <td>{lancamento.categoria || "-"}</td>
                   <td>{lancamento.tipo}</td>
