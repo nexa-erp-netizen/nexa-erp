@@ -14,6 +14,12 @@ export default function AcessoRapidoFiscal() {
       copiarCnpj: true,
     },
     {
+      titulo: "DASN-SIMEI",
+      descricao: "Declaração anual do MEI.",
+      link: "https://www8.receita.fazenda.gov.br/SimplesNacional/Aplicacoes/ATSPO/dasnsimei.app/Identificacao",
+      copiarCnpj: true,
+    }, 
+    {
       titulo: "Simples Nacional",
       descricao: "Acessar portal do Simples Nacional.",
       link: "https://www8.receita.fazenda.gov.br/SimplesNacional/",
