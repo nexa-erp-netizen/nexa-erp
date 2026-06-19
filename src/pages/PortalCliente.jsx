@@ -16,10 +16,20 @@ export default function PortalCliente({ setPage }) {
   const [movimentos, setMovimentos] = useState([])
   const [solicitacoes, setSolicitacoes] = useState([])
   const [guiasFiscais, setGuiasFiscais] = useState([])
+  const [mostrarValores, setMostrarValores] = useState(() => {
+    return localStorage.getItem("nexaMostrarValoresCliente") === "true"
+  })
 
   useEffect(() => {
     carregarDados()
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem(
+      "nexaMostrarValoresCliente",
+      mostrarValores ? "true" : "false"
+    )
+  }, [mostrarValores])
 
   async function carregarDados() {
     try {
@@ -67,6 +77,10 @@ export default function PortalCliente({ setPage }) {
     })
   }
 
+  function exibirMoeda(valor) {
+    return mostrarValores ? formatarMoeda(valor) : "••••••••"
+  }
+
   function mesAtual(data) {
     if (!data) return false
 
@@ -99,26 +113,26 @@ export default function PortalCliente({ setPage }) {
     }, 0)
 
     const solicitacoesAbertas = solicitacoes.filter((item) => {
-  const status = String(item.status || "").toLowerCase().trim()
+      const status = String(item.status || "").toLowerCase().trim()
 
-  return (
-    status === "pendente" ||
-    status === "aberto" ||
-    status === "em aberto" ||
-    status === "aguardando cliente"
-  )
-}).length
+      return (
+        status === "pendente" ||
+        status === "aberto" ||
+        status === "em aberto" ||
+        status === "aguardando cliente"
+      )
+    }).length
 
     const guiasAbertas = guiasFiscais.filter((item) => {
-  const status = String(item.status || "").toLowerCase().trim()
+      const status = String(item.status || "").toLowerCase().trim()
 
-  return (
-    status === "pendente" ||
-    status === "aberto" ||
-    status === "em aberto" ||
-    status === "aguardando pagamento"
-  )
-}).length
+      return (
+        status === "pendente" ||
+        status === "aberto" ||
+        status === "em aberto" ||
+        status === "aguardando pagamento"
+      )
+    }).length
 
     const pendenciasAbertas = solicitacoesAbertas + guiasAbertas
 
@@ -140,6 +154,30 @@ export default function PortalCliente({ setPage }) {
           max-width: 100%;
           overflow-x: hidden;
           box-sizing: border-box;
+        }
+
+        .pc-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          margin-bottom: 20px;
+        }
+
+        .pc-hello {
+          font-size: 18px;
+          color: white;
+        }
+
+        .pc-eye-btn {
+          border: 1px solid rgba(255,255,255,.15);
+          border-radius: 14px;
+          padding: 12px 16px;
+          background: #061f47;
+          color: white;
+          font-weight: 900;
+          cursor: pointer;
+          white-space: nowrap;
         }
 
         .pc-cards {
@@ -239,6 +277,15 @@ export default function PortalCliente({ setPage }) {
             padding: 18px 14px;
           }
 
+          .pc-top {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .pc-eye-btn {
+            width: 100%;
+          }
+
           .pc-cards {
             grid-template-columns: 1fr;
           }
@@ -273,14 +320,24 @@ export default function PortalCliente({ setPage }) {
         }
       `}</style>
 
-      <div style={{ marginBottom: "20px", fontSize: "18px", color: "white" }}>
-        Olá, {nomeEmpresa} 👋
+      <div className="pc-top">
+        <div className="pc-hello">
+          Olá, {nomeEmpresa} 👋
+        </div>
+
+        <button
+          type="button"
+          className="pc-eye-btn"
+          onClick={() => setMostrarValores(!mostrarValores)}
+        >
+          {mostrarValores ? "🙈 Ocultar valores" : "👁️ Mostrar valores"}
+        </button>
       </div>
 
       <div className="pc-cards">
-        <Card icon={<FaArrowUp />} label="Receitas do mês" value={formatarMoeda(resumo.receitasMes)} color="green" />
-        <Card icon={<FaArrowDown />} label="Despesas do mês" value={formatarMoeda(resumo.despesasMes)} color="red" />
-        <Card icon={<FaWallet />} label="Saldo atual" value={formatarMoeda(resumo.saldoTotal)} color={resumo.saldoTotal >= 0 ? "green" : "red"} />
+        <Card icon={<FaArrowUp />} label="Receitas do mês" value={exibirMoeda(resumo.receitasMes)} color="green" />
+        <Card icon={<FaArrowDown />} label="Despesas do mês" value={exibirMoeda(resumo.despesasMes)} color="red" />
+        <Card icon={<FaWallet />} label="Saldo atual" value={exibirMoeda(resumo.saldoTotal)} color={resumo.saldoTotal >= 0 ? "green" : "red"} />
         <Card icon={<FaClipboardList />} label="Pendências e Guias" value={resumo.pendenciasAbertas} color="yellow" />
       </div>
 

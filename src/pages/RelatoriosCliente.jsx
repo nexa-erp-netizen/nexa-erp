@@ -15,6 +15,7 @@ export default function RelatoriosCliente({ setPage }) {
   const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
 
   const [movimentos, setMovimentos] = useState([])
+  const [lancamentosContabeis, setLancamentosContabeis] = useState([])
   const [carregando, setCarregando] = useState(false)
   const [dataInicial, setDataInicial] = useState(formatarDataInput(primeiroDiaMes))
   const [dataFinal, setDataFinal] = useState(formatarDataInput(hoje))
@@ -27,8 +28,13 @@ export default function RelatoriosCliente({ setPage }) {
     setCarregando(true)
 
     try {
-      const resposta = await api.get("/movimentos-cliente")
-      setMovimentos(Array.isArray(resposta.data) ? resposta.data : [])
+      const [movimentosResp, lancamentosResp] = await Promise.all([
+        api.get("/movimentos-cliente"),
+        api.get("/lancamentos-contabeis"),
+      ])
+
+      setMovimentos(Array.isArray(movimentosResp.data) ? movimentosResp.data : [])
+      setLancamentosContabeis(Array.isArray(lancamentosResp.data) ? lancamentosResp.data : [])
     } catch (error) {
       console.error("ERRO RELATÓRIO CLIENTE:", error)
       setMovimentos([])
@@ -63,6 +69,35 @@ export default function RelatoriosCliente({ setPage }) {
     return new Date(data + "T00:00:00").toLocaleDateString("pt-BR")
   }
 
+  function normalizarTipo(tipo) {
+    const texto = String(tipo || "").toLowerCase()
+
+    if (
+      texto === "receita" ||
+      texto === "crédito" ||
+      texto === "credito" ||
+      texto === "entrada"
+    ) {
+      return "Receita"
+    }
+
+    return "Despesa"
+  }
+
+  function lancamentoAutomaticoDeMovimento(item) {
+    return String(item.observacao || "").startsWith("movimento-cliente:")
+  }
+
+  function normalizarMovimento(item, origem) {
+    return {
+      ...item,
+      id: `${origem}-${item.id}`,
+      tipo: normalizarTipo(item.tipo),
+      planoContaNome: item.planoContaNome || item.planoConta || item.categoria,
+      origemRelatorio: origem,
+    }
+  }
+
   function dentroPeriodo(data) {
     if (!data) return false
 
@@ -76,8 +111,20 @@ export default function RelatoriosCliente({ setPage }) {
     return true
   }
 
+  const registrosRelatorio = useMemo(() => {
+    const movimentosNormalizados = movimentos.map((item) =>
+      normalizarMovimento(item, "movimento")
+    )
+
+    const lancamentosManuais = lancamentosContabeis
+      .filter((item) => !lancamentoAutomaticoDeMovimento(item))
+      .map((item) => normalizarMovimento(item, "lancamento-contabil"))
+
+    return [...movimentosNormalizados, ...lancamentosManuais]
+  }, [movimentos, lancamentosContabeis])
+
   const resumo = useMemo(() => {
-    const movimentosPeriodo = movimentos
+    const movimentosPeriodo = registrosRelatorio
       .filter((item) => dentroPeriodo(item.data))
       .sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")))
 
@@ -91,7 +138,7 @@ export default function RelatoriosCliente({ setPage }) {
 
     const saldoPeriodo = receitas - despesas
 
-    const saldoAnterior = movimentos
+    const saldoAnterior = registrosRelatorio
       .filter((item) => {
         if (!item.data || !dataInicial) return false
         return new Date(item.data + "T00:00:00") < new Date(dataInicial + "T00:00:00")
@@ -137,7 +184,7 @@ export default function RelatoriosCliente({ setPage }) {
       saldoAnterior,
       meses: Object.values(meses).sort((a, b) => a.chave.localeCompare(b.chave)),
     }
-  }, [movimentos, dataInicial, dataFinal])
+  }, [registrosRelatorio, dataInicial, dataFinal])
 
   const maiorValorGrafico = Math.max(resumo.receitas, resumo.despesas, 1)
   const maiorValorMensal = Math.max(

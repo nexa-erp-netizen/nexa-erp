@@ -13,6 +13,7 @@ export default function Relatorios() {
   const [planoSelecionado, setPlanoSelecionado] = useState("Todos")
   const [clientes, setClientes] = useState([])
   const [movimentos, setMovimentos] = useState([])
+  const [lancamentosContabeis, setLancamentosContabeis] = useState([])
 
   useEffect(() => {
     if (clienteLogado && clienteFixo) {
@@ -24,13 +25,15 @@ export default function Relatorios() {
 
   async function carregarDados() {
     try {
-      const [clientesResp, movimentosResp] = await Promise.all([
+      const [clientesResp, movimentosResp, lancamentosResp] = await Promise.all([
         api.get("/clientes"),
         api.get("/movimentos-cliente"),
+        api.get("/lancamentos-contabeis"),
       ])
 
       setClientes(Array.isArray(clientesResp.data) ? clientesResp.data : [])
       setMovimentos(Array.isArray(movimentosResp.data) ? movimentosResp.data : [])
+      setLancamentosContabeis(Array.isArray(lancamentosResp.data) ? lancamentosResp.data : [])
     } catch (error) {
       alert("Erro ao carregar relatório")
       console.error(error)
@@ -69,38 +72,79 @@ export default function Relatorios() {
     return `${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
   }
 
+  function normalizarTipo(tipo) {
+    const texto = String(tipo || "").toLowerCase()
+
+    if (
+      texto === "receita" ||
+      texto === "crédito" ||
+      texto === "credito" ||
+      texto === "entrada"
+    ) {
+      return "Receita"
+    }
+
+    return "Despesa"
+  }
+
   function obterPlano(item) {
-    return item.planoContaNome || item.planoConta || "Sem plano de contas"
+    return item.planoContaNome || item.planoConta || item.categoria || "Sem plano de contas"
+  }
+
+  function lancamentoAutomaticoDeMovimento(item) {
+    return String(item.observacao || "").startsWith("movimento-cliente:")
+  }
+
+  function normalizarMovimento(item, origem) {
+    return {
+      ...item,
+      id: `${origem}-${item.id}`,
+      tipo: normalizarTipo(item.tipo),
+      planoContaNome: item.planoContaNome || item.planoConta || item.categoria,
+      origemRelatorio: origem,
+    }
   }
 
   function imprimirPDF() {
     window.print()
   }
 
+  const registrosRelatorio = useMemo(() => {
+    const movimentosNormalizados = movimentos.map((item) =>
+      normalizarMovimento(item, "movimento")
+    )
+
+    const lancamentosManuais = lancamentosContabeis
+      .filter((item) => !lancamentoAutomaticoDeMovimento(item))
+      .map((item) => normalizarMovimento(item, "lancamento-contabil"))
+
+    return [...movimentosNormalizados, ...lancamentosManuais]
+  }, [movimentos, lancamentosContabeis])
+
   const competencias = useMemo(() => {
     return [
       "Todas",
       ...new Set(
-        movimentos
+        registrosRelatorio
           .filter((item) => item.data)
           .map((item) => obterCompetencia(item.data))
       ),
     ]
-  }, [movimentos])
+  }, [registrosRelatorio])
 
   const planos = useMemo(() => {
     return [
       "Todos",
       ...new Set(
-        movimentos
+        registrosRelatorio
           .map((item) => obterPlano(item))
           .filter(Boolean)
       ),
     ]
-  }, [movimentos])
+  }, [registrosRelatorio])
 
   const movimentosFiltrados = useMemo(() => {
-    return movimentos.filter((item) => {
+    return registrosRelatorio.filter((item) => {
       const clienteOk =
         clienteLogado
           ? item.cliente === clienteFixo
@@ -117,7 +161,7 @@ export default function Relatorios() {
       return clienteOk && competenciaOk && planoOk
     })
   }, [
-    movimentos,
+    registrosRelatorio,
     clienteLogado,
     clienteFixo,
     clienteSelecionado,

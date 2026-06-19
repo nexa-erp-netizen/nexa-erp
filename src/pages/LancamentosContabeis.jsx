@@ -5,6 +5,7 @@ export default function LancamentosContabeis() {
   const [lancamentos, setLancamentos] = useState([])
   const [clientes, setClientes] = useState([])
   const [servicos, setServicos] = useState([])
+  const [planoContas, setPlanoContas] = useState([])
   const [clienteAtual, setClienteAtual] = useState(0)
   const [clienteFiltro, setClienteFiltro] = useState("")
   const competenciaAtual = new Date().toISOString().slice(0, 7)
@@ -19,6 +20,7 @@ export default function LancamentosContabeis() {
     valor: "",
     data: "",
     categoria: "",
+    planoConta: "",
     origem: "manual",
   })
 
@@ -31,6 +33,7 @@ export default function LancamentosContabeis() {
       carregarLancamentos(),
       carregarClientes(),
       carregarServicos(),
+      carregarPlanoContas(),
     ])
   }
 
@@ -59,6 +62,48 @@ export default function LancamentosContabeis() {
     } catch (erro) {
       console.error("Erro ao carregar serviços:", erro)
     }
+  }
+
+  async function carregarPlanoContas() {
+    try {
+      const resposta = await api.get("/plano-contas")
+      setPlanoContas(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (erro) {
+      console.error("Erro ao carregar plano de contas:", erro)
+    }
+  }
+
+  function naturezaCompativel(conta, tipoLancamento) {
+    const natureza = String(conta?.natureza || "").toLowerCase()
+    const nomeConta = String(conta?.conta || "").toLowerCase()
+
+    if (tipoLancamento === "receita") {
+      return (
+        natureza.includes("credora") ||
+        nomeConta.includes("receita") ||
+        nomeConta.includes("faturamento")
+      )
+    }
+
+    return (
+      natureza.includes("devedora") ||
+      nomeConta.includes("despesa") ||
+      nomeConta.includes("custo") ||
+      nomeConta.includes("imposto") ||
+      nomeConta.includes("taxa")
+    )
+  }
+
+  function selecionarPlanoConta(valor) {
+    const conta = planoContas.find(
+      (item) => String(item.conta || item.nome || item.descricao || "") === String(valor)
+    )
+
+    setForm({
+      ...form,
+      planoConta: valor,
+      categoria: valor,
+    })
   }
 
   function valorSeguro(valor) {
@@ -127,6 +172,21 @@ export default function LancamentosContabeis() {
     return `${mes}/${ano}`
   }
 
+  function tipoNormalizado(tipo) {
+    const texto = String(tipo || "").toLowerCase()
+
+    if (
+      texto === "receita" ||
+      texto === "crédito" ||
+      texto === "credito" ||
+      texto === "entrada"
+    ) {
+      return "receita"
+    }
+
+    return "despesa"
+  }
+
   function competenciaDentroDoFiltro(data) {
     const competencia = obterCompetenciaValor(data)
 
@@ -190,6 +250,7 @@ export default function LancamentosContabeis() {
       descricao: nomeServico,
       valor: formatarMoeda(valorServico),
       categoria: "Serviços Contábeis",
+      planoConta: "Serviços Contábeis",
       tipo: "despesa",
       origem: "servico",
     })
@@ -211,7 +272,8 @@ export default function LancamentosContabeis() {
       tipo: form.tipo,
       valor: valorNumerico,
       data: form.data,
-      categoria: form.categoria,
+      categoria: form.planoConta || form.categoria,
+      planoConta: form.planoConta || form.categoria,
       origem: form.origem,
       servicoId: form.servicoId || null,
     }
@@ -258,6 +320,7 @@ export default function LancamentosContabeis() {
       valor: "",
       data: "",
       categoria: "",
+      planoConta: "",
       origem: "manual",
     })
   }
@@ -272,7 +335,8 @@ export default function LancamentosContabeis() {
       tipo: String(lancamento.tipo || "despesa").toLowerCase(),
       valor: formatarMoeda(lancamento.valor || 0),
       data: lancamento.data || "",
-      categoria: lancamento.categoria || "",
+      categoria: lancamento.planoConta || lancamento.categoria || "",
+      planoConta: lancamento.planoConta || lancamento.categoria || "",
       origem: lancamento.origem || "manual",
     })
 
@@ -311,7 +375,7 @@ export default function LancamentosContabeis() {
       }
 
       const valor = valorSeguro(lancamento.valor)
-      const tipo = String(lancamento.tipo || "").toLowerCase()
+      const tipo = tipoNormalizado(lancamento.tipo)
       const mes = nomeMes(lancamento.data)
 
       grupos[cliente].lancamentos.push(lancamento)
@@ -376,6 +440,14 @@ export default function LancamentosContabeis() {
     : []
 
   const grupo = gruposFiltrados[clienteAtual]
+
+  const planosContasFiltrados = useMemo(() => {
+    const filtrados = planoContas.filter((conta) =>
+      naturezaCompativel(conta, form.tipo)
+    )
+
+    return filtrados.length > 0 ? filtrados : planoContas
+  }, [planoContas, form.tipo])
 
   return (
     <div className="lc-page">
@@ -800,17 +872,26 @@ export default function LancamentosContabeis() {
             }
           />
 
-          <input
-            className="lc-input"
-            placeholder="Categoria"
-            value={form.categoria}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                categoria: e.target.value,
-              })
-            }
-          />
+          <select
+            className="lc-select"
+            value={form.planoConta}
+            onChange={(e) => selecionarPlanoConta(e.target.value)}
+          >
+            <option value="">Selecione o plano de contas</option>
+
+            {planosContasFiltrados.map((conta) => (
+              <option key={conta.id} value={conta.conta}>
+                {conta.codigo ? `${conta.codigo} - ` : ""}{conta.conta}
+              </option>
+            ))}
+
+            {form.planoConta &&
+              !planosContasFiltrados.some((conta) => conta.conta === form.planoConta) && (
+                <option value={form.planoConta}>
+                  {form.planoConta}
+                </option>
+              )}
+          </select>
 
           <button className="lc-button">
             {editandoId ? "Atualizar Lançamento" : "Salvar Lançamento"}
@@ -1011,7 +1092,7 @@ export default function LancamentosContabeis() {
               <tr>
                 <th>Competência</th>
                 <th>Descrição</th>
-                <th>Categoria</th>
+                <th>Plano de Contas</th>
                 <th>Tipo</th>
                 <th>Valor</th>
                 <th>Origem</th>
@@ -1026,8 +1107,13 @@ export default function LancamentosContabeis() {
                 <tr key={lancamento.id}>
                   <td>{obterCompetenciaBR(lancamento.data)}</td>
                   <td>{lancamento.descricao}</td>
-                  <td>{lancamento.categoria || "-"}</td>
-                  <td>{lancamento.tipo}</td>
+                  <td>{lancamento.planoConta || lancamento.categoria || "-"}</td>
+                  <td
+                    className={tipoNormalizado(lancamento.tipo) === "receita" ? "green" : "red"}
+                    style={{ fontWeight: 800 }}
+                  >
+                    {tipoNormalizado(lancamento.tipo) === "receita" ? "Receita" : "Despesa"}
+                  </td>
                   <td>{formatarMoeda(lancamento.valor)}</td>
                   <td>{lancamento.origem || "manual"}</td>
                   <td>

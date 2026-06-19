@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
-import { FaTrash, FaEdit } from "react-icons/fa"
+import {
+  FaTrash,
+  FaEdit,
+  FaReceipt,
+  FaUpload,
+} from "react-icons/fa"
 
 export default function MovimentosCliente() {
   const linhaVazia = () => ({
@@ -17,6 +22,10 @@ export default function MovimentosCliente() {
   const [movimentos, setMovimentos] = useState([])
   const [planos, setPlanos] = useState([])
   const [formasPagamento, setFormasPagamento] = useState([])
+  const [fiscal, setFiscal] = useState([])
+  const [competencia, setCompetencia] = useState(
+    new Date().toISOString().slice(0, 7)
+  )
   const [linhas, setLinhas] = useState([
     linhaVazia(),
     linhaVazia(),
@@ -34,6 +43,7 @@ export default function MovimentosCliente() {
       carregarMovimentos(),
       carregarPlanos(),
       carregarFormasPagamento(),
+      carregarFiscal(),
     ])
   }
 
@@ -67,6 +77,16 @@ export default function MovimentosCliente() {
     }
   }
 
+  async function carregarFiscal() {
+    try {
+      const resposta = await api.get("/fiscal")
+      setFiscal(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (error) {
+      console.error("ERRO AO CARREGAR FISCAL:", error)
+      setFiscal([])
+    }
+  }
+
   function valorSeguro(valor) {
     if (valor === null || valor === undefined || valor === "") return 0
 
@@ -90,6 +110,10 @@ export default function MovimentosCliente() {
   function formatarData(data) {
     if (!data) return "-"
     return new Date(data + "T00:00:00").toLocaleDateString("pt-BR")
+  }
+
+  function competenciaAtual() {
+    setCompetencia(new Date().toISOString().slice(0, 7))
   }
 
   function atualizarLinha(index, campo, valor) {
@@ -207,12 +231,146 @@ export default function MovimentosCliente() {
     await carregarMovimentos()
   }
 
+  function obterFiscalIdDoMovimento(item) {
+    const observacao = String(item.observacao || "")
+
+    if (!observacao.startsWith("fiscal:")) return ""
+
+    return observacao.replace("fiscal:", "").trim()
+  }
+
+  function obterFiscalDoMovimento(item) {
+    const fiscalId = obterFiscalIdDoMovimento(item)
+
+    if (!fiscalId) return null
+
+    return fiscal.find((registro) => String(registro.id) === String(fiscalId))
+  }
+
+  function obterReciboDoMovimento(item) {
+    const registroFiscal = obterFiscalDoMovimento(item)
+
+    if (!registroFiscal || !Array.isArray(registroFiscal.anexos)) {
+      return null
+    }
+
+    return (
+      registroFiscal.anexos.find((arquivo) => arquivo.tipo === "recibo") ||
+      null
+    )
+  }
+
+  async function visualizarRecibo(item) {
+    try {
+      const recibo = obterReciboDoMovimento(item)
+
+      if (!recibo) {
+        alert("Nenhum recibo enviado para este lançamento.")
+        return
+      }
+
+      const caminho = recibo.caminho || recibo.url || ""
+
+      if (!caminho) {
+        alert("Recibo sem caminho de arquivo.")
+        return
+      }
+
+      const resposta = await api.get(
+        `/fiscal/anexo-url?path=${encodeURIComponent(caminho)}`
+      )
+
+      if (!resposta.data?.url) {
+        alert("Não foi possível gerar o link do recibo.")
+        return
+      }
+
+      window.open(resposta.data.url, "_blank")
+    } catch (error) {
+      console.error("ERRO AO ABRIR RECIBO:", error)
+      alert("Erro ao abrir recibo.")
+    }
+  }
+
+  async function corrigirRecibo(item) {
+    const fiscalId = obterFiscalIdDoMovimento(item)
+
+    if (!fiscalId) {
+      alert("Este lançamento não possui guia vinculada.")
+      return
+    }
+
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = ".pdf,.png,.jpg,.jpeg"
+
+    input.onchange = async (event) => {
+      const arquivo = event.target.files?.[0]
+
+      if (!arquivo) return
+
+      const confirmar = window.confirm(
+        "Deseja substituir/corrigir o recibo desta guia?"
+      )
+
+      if (!confirmar) return
+
+      const formData = new FormData()
+      formData.append("arquivos", arquivo)
+
+      try {
+        await api.post(`/fiscal/${fiscalId}/anexar-recibo`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        })
+
+        await carregarFiscal()
+        alert("Recibo atualizado com sucesso.")
+      } catch (error) {
+        console.error("ERRO AO CORRIGIR RECIBO:", error)
+        alert("Erro ao corrigir recibo.")
+      }
+    }
+
+    input.click()
+  }
+
+  const movimentosFiltrados = useMemo(() => {
+    if (!competencia) return movimentos
+
+    return movimentos.filter((item) => {
+      if (!item.data) return false
+      return String(item.data).slice(0, 7) === competencia
+    })
+  }, [movimentos, competencia])
+
+  const saldoAnterior = useMemo(() => {
+    if (!competencia) return 0
+
+    return movimentos
+      .filter((item) => {
+        if (!item.data) return false
+
+        const compMov = String(item.data).slice(0, 7)
+
+        return compMov < competencia
+      })
+      .reduce((total, item) => {
+        const valor = valorSeguro(item.valor)
+
+        return item.tipo === "Receita"
+          ? total + valor
+          : total - valor
+      }, 0)
+  }, [movimentos, competencia])
+
   const resumo = useMemo(() => {
-    const receitas = movimentos
+    const receitas = movimentosFiltrados
       .filter((m) => m.tipo === "Receita")
       .reduce((t, m) => t + valorSeguro(m.valor), 0)
 
-    const despesas = movimentos
+    const despesas = movimentosFiltrados
       .filter((m) => m.tipo === "Despesa")
       .reduce((t, m) => t + valorSeguro(m.valor), 0)
 
@@ -220,9 +378,9 @@ export default function MovimentosCliente() {
       receitas,
       despesas,
       saldo: receitas - despesas,
-      total: movimentos.length,
+      total: movimentosFiltrados.length,
     }
-  }, [movimentos])
+  }, [movimentosFiltrados])
 
   return (
     <div className="mv-page">
@@ -279,6 +437,7 @@ export default function MovimentosCliente() {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 18px;
+          gap: 14px;
         }
 
         .mv-card-title {
@@ -308,6 +467,25 @@ export default function MovimentosCliente() {
         .mv-btn-save {
           background: linear-gradient(90deg,#17b8ff,#32f06d);
           color: #00112b;
+        }
+
+        .mv-filter-box {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-top: 14px;
+          margin-bottom: 4px;
+        }
+
+        .mv-filter-label {
+          color: #9edfff;
+          font-weight: 900;
+          font-size: 14px;
+        }
+
+        .mv-filter-input {
+          max-width: 210px;
         }
 
         .mv-grid-wrap {
@@ -384,19 +562,23 @@ export default function MovimentosCliente() {
           color: white;
         }
 
-        input[type="date"] { color-scheme: dark; }
+        input[type="date"],
+        input[type="month"] { color-scheme: dark; }
 
         .mv-edit,
-        .mv-delete {
-          width: 38px;
-          height: 38px;
+        .mv-delete,
+        .mv-receipt,
+        .mv-upload {
+          width: 34px;
+          height: 34px;
+          min-width: 34px;
           display: flex;
           align-items: center;
           justify-content: center;
           border: none;
-          border-radius: 10px;
+          border-radius: 9px;
           cursor: pointer;
-          font-size: 15px;
+          font-size: 14px;
           font-weight: 800;
         }
 
@@ -410,22 +592,37 @@ export default function MovimentosCliente() {
           color: white;
         }
 
+        .mv-receipt {
+          background: #ffc107;
+          color: #00112b;
+        }
+
+        .mv-upload {
+          background: #32f06d;
+          color: #00112b;
+        }
+
         .mv-row-actions {
           display: flex;
-          gap: 8px;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: nowrap;
         }
 
         .mv-table th {
           color: #6bd8ff;
           text-align: left;
-          padding: 12px;
+          padding: 10px;
           border-bottom: 1px solid rgba(255,255,255,.08);
+          font-size: 14px;
         }
 
         .mv-table td {
-          padding: 8px 12px;
+          padding: 7px 10px;
           border-bottom: 1px solid rgba(255,255,255,.05);
-          line-height: 18px;
+          line-height: 17px;
+          font-size: 14px;
+          vertical-align: middle;
         }
 
         .mv-table th:nth-child(1),
@@ -444,7 +641,7 @@ export default function MovimentosCliente() {
         .mv-table td:nth-child(6) { width: 130px; }
 
         .mv-table th:nth-child(7),
-        .mv-table td:nth-child(7) { width: 95px; }
+        .mv-table td:nth-child(7) { width: 170px; }
 
         .tipo-receita {
           color: #32f06d;
@@ -463,7 +660,6 @@ export default function MovimentosCliente() {
         }
 
         @media (max-width: 768px) {
-
           .mv-table td {
             padding: 6px 8px !important;
             line-height: 16px !important;
@@ -509,12 +705,18 @@ export default function MovimentosCliente() {
             line-height: 1.1 !important;
           }
 
-          .mv-actions-top {
+          .mv-actions-top,
+          .mv-filter-box {
             flex-direction: column !important;
+            align-items: stretch !important;
             width: 100% !important;
           }
 
-          .mv-btn { width: 100% !important; }
+          .mv-btn,
+          .mv-filter-input {
+            width: 100% !important;
+            max-width: 100% !important;
+          }
 
           .mv-grid-wrap {
             overflow-x: auto !important;
@@ -530,8 +732,8 @@ export default function MovimentosCliente() {
           }
 
           .mv-table {
-            min-width: 900px !important;
-            width: 900px !important;
+            min-width: 920px !important;
+            width: 920px !important;
             table-layout: fixed !important;
           }
 
@@ -570,8 +772,10 @@ export default function MovimentosCliente() {
         </div>
 
         <div className="mv-box">
-          <span>Lançamentos</span>
-          <strong>{resumo.total}</strong>
+          <span>Saldo Anterior</span>
+          <strong className={saldoAnterior >= 0 ? "green" : "red"}>
+            {formatarMoeda(saldoAnterior)}
+          </strong>
         </div>
       </div>
 
@@ -707,7 +911,28 @@ export default function MovimentosCliente() {
 
       <div className="mv-card">
         <div className="mv-card-header">
-          <div className="mv-card-title">Lançamentos Salvos</div>
+          <div>
+            <div className="mv-card-title">Lançamentos Salvos</div>
+
+            <div className="mv-filter-box">
+              <span className="mv-filter-label">Competência</span>
+
+              <input
+                className="mv-input mv-filter-input"
+                type="month"
+                value={competencia}
+                onChange={(e) => setCompetencia(e.target.value)}
+              />
+
+              <button
+                type="button"
+                className="mv-btn mv-btn-add"
+                onClick={competenciaAtual}
+              >
+                Mês atual
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="mv-grid-wrap">
@@ -725,7 +950,7 @@ export default function MovimentosCliente() {
             </thead>
 
             <tbody>
-              {movimentos.map((item) => (
+              {movimentosFiltrados.map((item) => (
                 <tr key={item.id}>
                   <td>{formatarData(item.data)}</td>
 
@@ -749,6 +974,26 @@ export default function MovimentosCliente() {
 
                   <td>
                     <div className="mv-row-actions">
+                      {item.observacao?.startsWith("fiscal:") && (
+                        <>
+                          <button
+                            className="mv-receipt"
+                            onClick={() => visualizarRecibo(item)}
+                            title="Ver recibo"
+                          >
+                            <FaReceipt />
+                          </button>
+
+                          <button
+                            className="mv-upload"
+                            onClick={() => corrigirRecibo(item)}
+                            title="Corrigir recibo"
+                          >
+                            <FaUpload />
+                          </button>
+                        </>
+                      )}
+
                       <button
                         className="mv-edit"
                         onClick={() => corrigirMovimento(item)}
@@ -769,10 +1014,10 @@ export default function MovimentosCliente() {
                 </tr>
               ))}
 
-              {movimentos.length === 0 && (
+              {movimentosFiltrados.length === 0 && (
                 <tr>
                   <td colSpan="7" style={{ opacity: .7 }}>
-                    Nenhum lançamento cadastrado ainda.
+                    Nenhum lançamento encontrado nesta competência.
                   </td>
                 </tr>
               )}

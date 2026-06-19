@@ -94,10 +94,6 @@ export default function PlanoContas() {
 
   return (
     <div style={box}>
-      <div style={topo}>
-        <h2>Plano de Contas</h2>
-      </div>
-
       <div style={form}>
         <input
           style={input}

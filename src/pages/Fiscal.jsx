@@ -245,8 +245,6 @@ export default function Fiscal() {
 
   return (
     <div style={box}>
-      <h2>Pendências e Guias</h2>
-
       {usuario?.perfil !== "Cliente" && (
         <div style={form}>
           <select style={input} value={cliente} onChange={(e) => setCliente(e.target.value)}>

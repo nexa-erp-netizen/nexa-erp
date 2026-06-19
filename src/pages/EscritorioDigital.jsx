@@ -110,12 +110,6 @@ export default function EscritorioDigital({ setPage }) {
   }
   return (
     <div style={box}>
-      <h2>Escritório Digital</h2>
-
-      <p style={subtitle}>
-        Sistema ERP Contábil Inteligente
-      </p>
-
       <div style={gridCards}>
         <div style={card}>
           <h3>Documentos Digitais</h3>

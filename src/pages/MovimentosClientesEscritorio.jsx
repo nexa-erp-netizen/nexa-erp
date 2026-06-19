@@ -276,12 +276,6 @@ export default function MovimentosClientesEscritorio() {
         }
       `}</style>
 
-      <div className="me-title">Movimentos Clientes</div>
-
-      <div className="me-subtitle">
-        Selecione um cliente para visualizar as movimentações
-      </div>
-
       <div className="me-card">
         <div className="me-filtros">
           <select

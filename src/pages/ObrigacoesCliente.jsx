@@ -283,18 +283,6 @@ export default function ObrigacoesCliente() {
           .fc-btn { width: 100% !important; min-height: 44px !important; }
         }
       `}</style>
-
-      <section className="fc-header">
-        <div className="fc-header-icon">
-          <FaFileInvoiceDollar />
-        </div>
-
-        <div>
-          <h2>Pendências e Guias</h2>
-          <p>Guias, honorários e documentos pendentes enviados pelo escritório.</p>
-        </div>
-      </section>
-
       <div className="fc-list">
         {carregando ? (
           <div className="fc-empty">Carregando pendências...</div>

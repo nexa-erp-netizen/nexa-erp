@@ -142,8 +142,6 @@ export default function DocumentosDigitais() {
 
   return (
     <div style={box}>
-      <h2>Documentos Digitais</h2>
-
       <div style={form}>
         {isCliente ? (
           <input style={input} value={usuario?.clienteVinculado || ""} readOnly />

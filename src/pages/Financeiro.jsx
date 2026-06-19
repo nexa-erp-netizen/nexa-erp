@@ -1,32 +1,32 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
 
+const LINHAS_INICIAIS = 3
+
+function linhaVazia() {
+  return {
+    data: new Date().toISOString().slice(0, 10),
+    tipo: "Receber",
+    centroCusto: "",
+    formaPagamento: "",
+    descricao: "",
+    cliente: "",
+    valor: "",
+    status: "Recebido",
+  }
+}
+
 export default function Financeiro() {
-  const [descricao, setDescricao] = useState("")
-  const [cliente, setCliente] = useState("")
-  const [tipo, setTipo] = useState("")
-  const [centroCusto, setCentroCusto] = useState("")
-  const [formaPagamento, setFormaPagamento] = useState("")
-  const [valor, setValor] = useState("")
-  const [vencimento, setVencimento] = useState("")
-  const [status, setStatus] = useState("")
-  const [dataRecebimento, setDataRecebimento] = useState("")
-  const [anexos, setAnexos] = useState([])
-  const [editandoId, setEditandoId] = useState(null)
-  const [recorrenteMensal, setRecorrenteMensal] = useState(false)
-  const [diaVencimento, setDiaVencimento] = useState(10)
-  const [quantidadeMeses, setQuantidadeMeses] = useState(12)
   const [lancamentos, setLancamentos] = useState([])
   const [clientesCadastrados, setClientesCadastrados] = useState([])
   const [servicos, setServicos] = useState([])
+  const [competencia, setCompetencia] = useState(new Date().toISOString().slice(0, 7))
+  const [linhas, setLinhas] = useState(Array.from({ length: LINHAS_INICIAIS }, () => linhaVazia()))
+  const [editandoId, setEditandoId] = useState(null)
+  const [carregando, setCarregando] = useState(false)
 
-  const formasPagamento = [
-    "PIX",
-    "Boleto",
-    "Cartão",
-    "Dinheiro",
-    "Transferência",
-  ]
+  const formasPagamento = ["PIX", "Boleto", "Cartão", "Dinheiro", "Transferência"]
+  const centrosCustoPadrao = ["Honorários", "Serviços Avulsos", "Abertura MEI", "Certificado Digital", "Aluguel", "Internet", "Energia", "Sistema", "Marketing", "Contabilidade", "Impostos", "Material de Escritório", "Outros"]
 
   useEffect(() => {
     carregarLancamentos()
@@ -37,7 +37,7 @@ export default function Financeiro() {
   async function carregarLancamentos() {
     try {
       const resposta = await api.get("/financeiro")
-      setLancamentos(resposta.data)
+      setLancamentos(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
       alert("Erro ao carregar financeiro")
       console.error(error)
@@ -47,169 +47,179 @@ export default function Financeiro() {
   async function carregarClientes() {
     try {
       const resposta = await api.get("/clientes")
-      setClientesCadastrados(resposta.data)
+      setClientesCadastrados(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
-      alert("Erro ao carregar clientes")
-      console.error(error)
+      console.error("Erro ao carregar clientes", error)
     }
   }
 
   async function carregarServicos() {
     try {
       const resposta = await api.get("/servicos")
-      setServicos(resposta.data)
+      setServicos(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
-      alert("Erro ao carregar serviços")
-      console.error(error)
+      console.error("Erro ao carregar serviços", error)
     }
   }
 
   function valorNumerico(valorFormatado) {
-    return Number(
-      String(valorFormatado || 0)
-        .replace("R$", "")
-        .replace(/\./g, "")
-        .replace(",", ".")
-        .trim()
-    )
+    return Number(String(valorFormatado || 0).replace("R$", "").replace(/\./g, "").replace(",", ".").trim()) || 0
   }
 
   function formatarMoeda(valor) {
-    return Number(valor || 0).toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    })
+    return Number(valor || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+  }
+
+  function formatarData(data) {
+    if (!data) return "-"
+    const [ano, mes, dia] = String(data).slice(0, 10).split("-")
+    return ano && mes && dia ? `${dia}/${mes}/${ano}` : data
+  }
+
+  function dataDoLancamento(item) {
+    return item.vencimento || item.dataRecebimento || item.createdAt || item.updatedAt || ""
+  }
+
+  function competenciaDoLancamento(item) {
+    const data = dataDoLancamento(item)
+    return data ? String(data).slice(0, 7) : ""
+  }
+
+  function ehReceita(item) {
+    const tipo = String(item.tipo || "").toLowerCase()
+    return tipo.includes("receber") || tipo.includes("receita") || tipo.includes("crédito") || tipo.includes("credito")
+  }
+
+  function ehDespesa(item) {
+    const tipo = String(item.tipo || "").toLowerCase()
+    return tipo.includes("pagar") || tipo.includes("despesa") || tipo.includes("débito") || tipo.includes("debito")
   }
 
   function statusAutomatico(item) {
-    if (item.status === "Pago" || item.status === "Recebido") {
-      return item.status
-    }
-
-    if (item.vencimento && new Date(item.vencimento) < new Date()) {
-      return "Atrasado"
-    }
-
+    if (item.status === "Pago" || item.status === "Recebido") return item.status
+    if (item.vencimento && new Date(item.vencimento) < new Date()) return "Atrasado"
     return item.status || "Pendente"
   }
 
-  function selecionarServico(nomeServico) {
-    const servicoSelecionado = servicos.find(
-      (servico) => servico.nome === nomeServico
-    )
+  function origemDoLancamento(item) {
+    if (item.origem) return item.origem
+    if (item.cliente && !["Cliente Avulso / Fornecedor", "Cliente Avulso", "Fornecedor"].includes(item.cliente)) return "Cliente"
+    return ehDespesa(item) ? "Despesa Escritório" : "Avulso"
+  }
 
-    setDescricao(nomeServico)
+  const lancamentosComStatus = useMemo(() => lancamentos.map((item) => ({ ...item, statusCalculado: statusAutomatico(item), valorNumber: valorNumerico(item.valor) })), [lancamentos])
+  const lancamentosCompetencia = useMemo(() => lancamentosComStatus.filter((item) => !competencia || competenciaDoLancamento(item) === competencia), [lancamentosComStatus, competencia])
+  const lancamentosAnteriores = useMemo(() => lancamentosComStatus.filter((item) => {
+    const comp = competenciaDoLancamento(item)
+    return competencia && comp && comp < competencia
+  }), [lancamentosComStatus, competencia])
 
-    if (servicoSelecionado) {
-      setValor(servicoSelecionado.valor || "")
-      setCentroCusto(servicoSelecionado.categoria || "")
+  function calcularSaldo(lista) {
+    return lista.reduce((total, item) => ehReceita(item) ? total + item.valorNumber : ehDespesa(item) ? total - item.valorNumber : total, 0)
+  }
+
+  const totalReceitas = lancamentosCompetencia.filter(ehReceita).reduce((total, item) => total + item.valorNumber, 0)
+  const totalDespesas = lancamentosCompetencia.filter(ehDespesa).reduce((total, item) => total + item.valorNumber, 0)
+  const saldoAnterior = calcularSaldo(lancamentosAnteriores)
+  const saldoAtual = saldoAnterior + totalReceitas - totalDespesas
+
+  const evolucao = useMemo(() => {
+    const hoje = new Date()
+    const meses = []
+    for (let i = 5; i >= 0; i--) {
+      const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)
+      const chave = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`
+      const itensMes = lancamentosComStatus.filter((item) => competenciaDoLancamento(item) === chave)
+      const receitas = itensMes.filter(ehReceita).reduce((total, item) => total + item.valorNumber, 0)
+      const despesas = itensMes.filter(ehDespesa).reduce((total, item) => total + item.valorNumber, 0)
+      meses.push({ chave, label: data.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""), receitas, despesas, saldo: receitas - despesas })
+    }
+    return meses
+  }, [lancamentosComStatus])
+
+  function atualizarLinha(index, campo, valor) {
+    setLinhas((atuais) => atuais.map((linha, i) => {
+      if (i !== index) return linha
+      const atualizada = { ...linha, [campo]: valor }
+      if (campo === "tipo") atualizada.status = valor === "Pagar" ? "Pago" : "Recebido"
+      return atualizada
+    }))
+  }
+
+  function selecionarServico(index, nomeServico) {
+    const servicoSelecionado = servicos.find((servico) => servico.nome === nomeServico)
+    if (!servicoSelecionado) return
+    setLinhas((atuais) => atuais.map((linha, i) => i === index ? { ...linha, descricao: nomeServico, valor: servicoSelecionado.valor || linha.valor, centroCusto: servicoSelecionado.categoria || linha.centroCusto } : linha))
+  }
+
+  function adicionarLinha() {
+    setLinhas((atuais) => [...atuais, linhaVazia()])
+  }
+
+  function limparLinhas() {
+    setLinhas(Array.from({ length: LINHAS_INICIAIS }, () => linhaVazia()))
+    setEditandoId(null)
+  }
+
+  function montarPayload(linha) {
+    const clienteFinal = linha.cliente?.trim() || (linha.tipo === "Pagar" ? "Fornecedor" : "Cliente Avulso")
+    return {
+      descricao: linha.descricao,
+      cliente: clienteFinal,
+      tipo: linha.tipo,
+      centroCusto: linha.centroCusto,
+      formaPagamento: linha.formaPagamento,
+      valor: linha.valor,
+      vencimento: linha.data,
+      status: linha.status,
+      dataRecebimento: linha.status === "Pago" || linha.status === "Recebido" ? linha.data : "",
+      anexos: [],
+      origem: linha.tipo === "Pagar" ? "Despesa Escritório" : "Avulso",
     }
   }
 
-  async function uploadArquivos(files) {
-    try {
-      const formData = new FormData()
-
-      for (let file of files) {
-        formData.append("arquivos", file)
-      }
-
-      const resposta = await api.post("/financeiro/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      })
-
-      setAnexos(resposta.data)
-    } catch (error) {
-      alert("Erro ao enviar anexos")
-      console.error(error)
-    }
-  }
-
-  async function salvarLancamento() {
-    if (
-      !descricao ||
-      !cliente ||
-      !tipo ||
-      !centroCusto ||
-      !formaPagamento ||
-      !valor ||
-      !vencimento ||
-      !status
-    ) {
-      alert("Preencha todos os campos")
+  async function salvarLancamentos() {
+    const preenchidas = linhas.filter((linha) => linha.data || linha.descricao || linha.valor || linha.centroCusto || linha.cliente)
+    const validas = preenchidas.filter((linha) => linha.data && linha.tipo && linha.descricao && linha.centroCusto && linha.formaPagamento && linha.valor && linha.status)
+    if (!validas.length || validas.length !== preenchidas.length) {
+      alert("Preencha data, tipo, centro de custo, forma, descrição, valor e status em cada linha usada.")
       return
     }
-
-    const novoLancamento = {
-     descricao,
-     cliente,
-     tipo,
-     centroCusto,
-     formaPagamento,
-     valor,
-     vencimento,
-     status,
-     dataRecebimento,
-     anexos,
-
-     recorrenteMensal,
-     diaVencimento,
-     quantidadeMeses,
-   }
-
+    setCarregando(true)
     try {
-      if (editandoId !== null) {
-        await api.put(`/financeiro/${editandoId}`, novoLancamento)
+      if (editandoId) {
+        await api.put(`/financeiro/${editandoId}`, montarPayload(validas[0]))
       } else {
-        await api.post("/financeiro", novoLancamento)
+        for (const linha of validas) await api.post("/financeiro", montarPayload(linha))
       }
-
       await carregarLancamentos()
-      limparCampos()
+      limparLinhas()
     } catch (error) {
-      alert("Erro ao salvar lançamento financeiro")
+      alert("Erro ao salvar lançamentos financeiros")
       console.error(error)
+    } finally {
+      setCarregando(false)
     }
   }
 
   function editarLancamento(item) {
-    setDescricao(item.descricao)
-    setCliente(item.cliente)
-    setTipo(item.tipo)
-    setCentroCusto(item.centroCusto || "")
-    setFormaPagamento(item.formaPagamento || "")
-    setValor(item.valor)
-    setVencimento(item.vencimento)
-    setStatus(item.status)
-    setDataRecebimento(item.dataRecebimento || "")
-    setAnexos(item.anexos || [])
     setEditandoId(item.id)
+    setLinhas([{ data: String(dataDoLancamento(item) || new Date().toISOString()).slice(0, 10), tipo: ehDespesa(item) ? "Pagar" : "Receber", centroCusto: item.centroCusto || "", formaPagamento: item.formaPagamento || "", descricao: item.descricao || "", cliente: item.cliente || "", valor: item.valor || "", status: item.status || (ehDespesa(item) ? "Pago" : "Recebido") }])
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
-  async function marcarComoRecebido(item) {
+  async function marcarComoPago(item) {
     try {
-      await api.put(`/financeiro/${item.id}`, {
-        ...item,
-        status: item.tipo === "Pagar" ? "Pago" : "Recebido",
-        dataRecebimento: new Date().toISOString().slice(0, 10),
-      })
-
+      await api.put(`/financeiro/${item.id}`, { ...item, status: ehDespesa(item) ? "Pago" : "Recebido", dataRecebimento: new Date().toISOString().slice(0, 10) })
       await carregarLancamentos()
     } catch (error) {
-      alert("Erro ao marcar como recebido")
+      alert("Erro ao confirmar lançamento")
       console.error(error)
     }
   }
 
   async function excluirLancamento(id) {
-    const confirmar = window.confirm(
-      "Deseja realmente excluir este lançamento?"
-    )
-
-    if (!confirmar) return
-
+    if (!window.confirm("Deseja realmente excluir este lançamento?")) return
     try {
       await api.delete(`/financeiro/${id}`)
       await carregarLancamentos()
@@ -219,540 +229,182 @@ export default function Financeiro() {
     }
   }
 
-  function limparCampos() {
-    setDescricao("")
-    setCliente("")
-    setTipo("")
-    setCentroCusto("")
-    setFormaPagamento("")
-    setValor("")
-    setVencimento("")
-    setStatus("")
-    setDataRecebimento("")
-    setAnexos([])
-    setEditandoId(null)
+  function mudarCompetencia(direcao) {
+    const [ano, mes] = competencia.split("-").map(Number)
+    const data = new Date(ano, mes - 1 + direcao, 1)
+    setCompetencia(`${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`)
   }
-
-  const lancamentosComStatus = lancamentos.map((item) => ({
-    ...item,
-    statusCalculado: statusAutomatico(item),
-  }))
-
-  const recebidos = lancamentosComStatus
-    .filter(
-      (item) =>
-        item.tipo === "Receber" &&
-        (item.statusCalculado === "Pago" ||
-          item.statusCalculado === "Recebido")
-    )
-    .reduce((total, item) => total + valorNumerico(item.valor), 0)
-
-  const aReceber = lancamentosComStatus
-    .filter(
-      (item) =>
-        item.tipo === "Receber" &&
-        item.statusCalculado !== "Pago" &&
-        item.statusCalculado !== "Recebido"
-    )
-    .reduce((total, item) => total + valorNumerico(item.valor), 0)
-
-  const aPagar = lancamentosComStatus
-    .filter(
-      (item) =>
-        item.tipo === "Pagar" &&
-        item.statusCalculado !== "Pago" &&
-        item.statusCalculado !== "Recebido"
-    )
-    .reduce((total, item) => total + valorNumerico(item.valor), 0)
-
-  const inadimplentes = lancamentosComStatus.filter(
-    (item) => item.statusCalculado === "Atrasado"
-  ).length
-
-  const saldo = recebidos + aReceber - aPagar
-  const totalMovimentado = recebidos + aReceber + aPagar
-
-  const percentualRecebido =
-    totalMovimentado > 0 ? (recebidos / totalMovimentado) * 100 : 0
-
-  const percentualReceber =
-    totalMovimentado > 0 ? (aReceber / totalMovimentado) * 100 : 0
-
-  const percentualPagar =
-    totalMovimentado > 0 ? (aPagar / totalMovimentado) * 100 : 0
 
   return (
     <div style={box}>
-      <h2>Financeiro</h2>
+      <div style={topo}>
+        <div>
+          <h2 style={tituloInterno}>Movimentação do Escritório</h2>
+          <p style={subtituloInterno}>Controle de receitas, despesas, avulsos e recebimentos automáticos.</p>
+        </div>
+        <div style={filtroCompetencia}>
+          <button style={botaoSecundario} onClick={() => mudarCompetencia(-1)}>← Anterior</button>
+          <input type="month" style={inputCompetencia} value={competencia} onChange={(e) => setCompetencia(e.target.value)} />
+          <button style={botaoSecundario} onClick={() => mudarCompetencia(1)}>Próximo →</button>
+        </div>
+      </div>
 
       <div style={cards}>
-        <Card title="A Receber" value={formatarMoeda(aReceber)} />
-        <Card title="Recebido" value={formatarMoeda(recebidos)} />
-        <Card title="A Pagar" value={formatarMoeda(aPagar)} />
-        <Card title="Inadimplentes" value={inadimplentes} />
-        <Card title="Saldo Previsto" value={formatarMoeda(saldo)} />
+        <Card title="Total de Crédito" value={formatarMoeda(totalReceitas)} cor="#37ff74" />
+        <Card title="Total de Débito" value={formatarMoeda(totalDespesas)} cor="#ff5d73" />
+        <Card title="Saldo Atual" value={formatarMoeda(saldoAtual)} cor={saldoAtual >= 0 ? "#37ff74" : "#ff5d73"} />
+        <Card title="Saldo Anterior" value={formatarMoeda(saldoAnterior)} cor={saldoAnterior >= 0 ? "#37ff74" : "#ff5d73"} />
       </div>
 
       <div style={graficoBox}>
-        <h3>Resumo Financeiro</h3>
-
-        <Barra
-          label="Recebido"
-          valor={formatarMoeda(recebidos)}
-          largura={percentualRecebido}
-        />
-
-        <Barra
-          label="A Receber"
-          valor={formatarMoeda(aReceber)}
-          largura={percentualReceber}
-        />
-
-        <Barra
-          label="A Pagar"
-          valor={formatarMoeda(aPagar)}
-          largura={percentualPagar}
-        />
+        <div style={graficoTopo}>
+          <h3>Evolução Financeira</h3>
+          <div style={legenda}>
+            <span><b style={{ background: "#37ff74" }} /> Crédito</span>
+            <span><b style={{ background: "#ff5d73" }} /> Débito</span>
+            <span><b style={{ background: "#4cc9ff" }} /> Saldo</span>
+          </div>
+        </div>
+        <GraficoLinha dados={evolucao} formatarMoeda={formatarMoeda} />
       </div>
 
-      <div style={form}>
-        <select
-          style={input}
-          value={descricao}
-          onChange={(e) => selecionarServico(e.target.value)}
-        >
-          <option value="">Selecionar Serviço</option>
-
-          {servicos.map((servico) => (
-            <option key={servico.id} value={servico.nome}>
-              {servico.nome}
-            </option>
-          ))}
-        </select>
-
-        <select
-          style={input}
-          value={cliente}
-          onChange={(e) => setCliente(e.target.value)}
-        >
-          <option value="">Cliente / Fornecedor</option>
-
-          {clientesCadastrados.map((item) => (
-            <option key={item.id} value={item.nome}>
-              {item.nome}
-            </option>
-          ))}
-        </select>
-
-        <select
-          style={input}
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value)}
-        >
-          <option value="">Tipo</option>
-          <option value="Receber">Conta a Receber</option>
-          <option value="Pagar">Conta a Pagar</option>
-        </select>
-
-        <input
-          style={input}
-          placeholder="Centro de Custo"
-          value={centroCusto}
-          readOnly
-        />
-
-        <select
-          style={input}
-          value={formaPagamento}
-          onChange={(e) => setFormaPagamento(e.target.value)}
-        >
-          <option value="">Forma de Pagamento</option>
-
-          {formasPagamento.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-
-        <input
-          style={input}
-          placeholder="R$ 0,00"
-          value={valor}
-          readOnly
-        />
-
-        <input
-          type="date"
-          style={input}
-          value={vencimento}
-          onChange={(e) => setVencimento(e.target.value)}
-        />
-
-        <select
-          style={input}
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-        >
-          <option value="">Status</option>
-          <option value="Pendente">Pendente</option>
-          <option value="Pago">Pago</option>
-          <option value="Recebido">Recebido</option>
-          <option value="Atrasado">Atrasado</option>
-        </select>
-
-        <label style={checkboxContainer}>
-          <input
-            type="checkbox"
-            checked={recorrenteMensal}
-            onChange={(e) =>
-              setRecorrenteMensal(e.target.checked)
-            }
-          />
-          Honorário Recorrente Mensal
-        </label>
-
-        {recorrenteMensal && (
-          <>
-            <div style={campoComLabel}>
-              <span>Dia do vencimento mensal</span>
-
-              <input
-                style={input}
-                type="number"
-                min="1"
-                max="31"
-                value={diaVencimento}
-                onChange={(e) =>
-                  setDiaVencimento(e.target.value)
-                }
-             />
-            </div>
-
-            <div style={campoComLabel}>
-              <span>Quantidade de meses</span>
-
-              <input
-                style={input}
-                type="number"
-                min="1"
-                max="60"
-                value={quantidadeMeses}
-                onChange={(e) =>
-                  setQuantidadeMeses(e.target.value)
-               }
-             />
-            </div>
-          </>
-        )}
-
-        <div style={campoComLabel}>
-          <span>Data do recebimento</span>
-
-          <input
-            type="date"
-            style={input}
-            value={dataRecebimento}
-            onChange={(e) =>
-              setDataRecebimento(e.target.value)
-            } 
-          />
+      <div style={formBox}>
+        <div style={formHeader}>
+          <h3>{editandoId ? "Corrigir Lançamento" : "Lançamentos em Massa"}</h3>
+          <div style={acoesTopo}>
+            <button style={botaoEscuro} onClick={adicionarLinha}>+ Adicionar linha</button>
+            {editandoId && <button style={botaoSecundario} onClick={limparLinhas}>Cancelar edição</button>}
+            <button style={button} onClick={salvarLancamentos} disabled={carregando}>{carregando ? "Salvando..." : editandoId ? "Salvar Correção" : "Salvar Lançamentos"}</button>
+          </div>
         </div>
 
-        <input
-          type="file"
-          multiple
-          style={input}
-          onChange={(e) => uploadArquivos(e.target.files)}
-        />
+        <div style={tabelaMassaWrapper}>
+          <table style={tabelaMassa}>
+            <thead>
+              <tr>
+                <th style={thMassa}>Data</th><th style={thMassa}>Tipo</th><th style={thMassa}>Plano/Centro</th><th style={thMassa}>Forma</th><th style={thMassa}>Descrição / Histórico</th><th style={thMassa}>Cliente / Fornecedor</th><th style={thMassa}>Status</th><th style={thMassa}>Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((linha, index) => (
+                <tr key={index}>
+                  <td style={tdMassa}><input type="date" style={inputTabela} value={linha.data} onChange={(e) => atualizarLinha(index, "data", e.target.value)} /></td>
+                  <td style={tdMassa}><select style={inputTabela} value={linha.tipo} onChange={(e) => atualizarLinha(index, "tipo", e.target.value)}><option value="Receber">Receita</option><option value="Pagar">Despesa</option></select></td>
+                  <td style={tdMassa}><input style={inputTabela} list="centros-custo-financeiro" placeholder="Selecione ou digite" value={linha.centroCusto} onChange={(e) => atualizarLinha(index, "centroCusto", e.target.value)} /></td>
+                  <td style={tdMassa}><select style={inputTabela} value={linha.formaPagamento} onChange={(e) => atualizarLinha(index, "formaPagamento", e.target.value)}><option value="">Selecione</option>{formasPagamento.map((item) => <option key={item} value={item}>{item}</option>)}</select></td>
+                  <td style={tdMassa}><input style={inputTabela} list="servicos-financeiro" placeholder="Ex: honorários, abertura MEI, internet..." value={linha.descricao} onChange={(e) => { atualizarLinha(index, "descricao", e.target.value); selecionarServico(index, e.target.value) }} /></td>
+                  <td style={tdMassa}><input style={inputTabela} list="clientes-financeiro" placeholder="Opcional" value={linha.cliente} onChange={(e) => atualizarLinha(index, "cliente", e.target.value)} /></td>
+                  <td style={tdMassa}><select style={inputTabela} value={linha.status} onChange={(e) => atualizarLinha(index, "status", e.target.value)}><option value="Recebido">Recebido</option><option value="Pago">Pago</option><option value="Pendente">Pendente</option><option value="Atrasado">Atrasado</option></select></td>
+                  <td style={tdMassa}><input style={{ ...inputTabela, textAlign: "right" }} placeholder="0,00" value={linha.valor} onChange={(e) => atualizarLinha(index, "valor", e.target.value)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-        {anexos.length > 0 && (
-          <div style={anexosBox}>
-            {anexos.map((item, index) => (
-              <div key={index}>📎 {item.nome}</div>
-            ))}
-          </div>
-        )}
-
-        <button style={button} onClick={salvarLancamento}>
-          {editandoId !== null ? "Salvar Correção" : "Salvar Lançamento"}
-        </button>
+        <datalist id="centros-custo-financeiro">{centrosCustoPadrao.map((item) => <option key={item} value={item} />)}</datalist>
+        <datalist id="clientes-financeiro">{clientesCadastrados.map((item) => <option key={item.id} value={item.nome} />)}</datalist>
+        <datalist id="servicos-financeiro">{servicos.map((item) => <option key={item.id} value={item.nome} />)}</datalist>
       </div>
 
-      <table style={table}>
-        <thead>
-          <tr>
-            <th style={th}>Descrição</th>
-            <th style={th}>Cliente</th>
-            <th style={th}>Valor</th>
-            <th style={th}>Status</th>
-            <th style={th}>Ações</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {lancamentosComStatus.map((item) => (
-            <tr key={item.id}>
-              <td style={td}>{item.descricao}</td>
-              <td style={td}>{item.cliente}</td>
-              <td style={td}>{item.valor}</td>
-
-              <td style={td}>
-                <span style={badgeStatus(item.statusCalculado)}>
-                  {item.statusCalculado}
-                </span>
-              </td>
-
-              <td style={td}>
-                <div style={actions}>
-                  {item.statusCalculado !== "Recebido" &&
-                    item.statusCalculado !== "Pago" && (
-                      <button
-                        style={receiveButton}
-                        onClick={() => marcarComoRecebido(item)}
-                      >
-                        Receber
-                      </button>
-                    )}
-
-                  <button
-                    style={editButton}
-                    onClick={() => editarLancamento(item)}
-                  >
-                    Corrigir
-                  </button>
-
-                  <button
-                    style={deleteButton}
-                    onClick={() => excluirLancamento(item.id)}
-                  >
-                    Excluir
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-         </tbody>
-      </table>
+      <div style={historicoBox}>
+        <h3>Histórico Financeiro</h3>
+        <div style={tabelaHistoricoWrapper}>
+          <table style={table}>
+            <thead>
+              <tr><th style={th}>Data</th><th style={th}>Tipo</th><th style={th}>Plano/Centro</th><th style={th}>Descrição</th><th style={th}>Cliente / Fornecedor</th><th style={th}>Forma</th><th style={th}>Origem</th><th style={th}>Valor</th><th style={th}>Status</th><th style={th}>Ações</th></tr>
+            </thead>
+            <tbody>
+              {lancamentosCompetencia.length === 0 && <tr><td style={tdVazio} colSpan="10">Nenhum lançamento nesta competência.</td></tr>}
+              {lancamentosCompetencia.map((item) => (
+                <tr key={item.id}>
+                  <td style={td}>{formatarData(dataDoLancamento(item))}</td>
+                  <td style={td}><span style={tipoBadge(ehReceita(item) ? "Receita" : "Despesa")}>{ehReceita(item) ? "Receita" : "Despesa"}</span></td>
+                  <td style={td}>{item.centroCusto || "-"}</td>
+                  <td style={td}>{item.descricao}</td>
+                  <td style={td}>{item.cliente || "-"}</td>
+                  <td style={td}>{item.formaPagamento || "-"}</td>
+                  <td style={td}>{origemDoLancamento(item)}</td>
+                  <td style={tdValor(ehReceita(item))}>{formatarMoeda(item.valorNumber)}</td>
+                  <td style={td}><span style={badgeStatus(item.statusCalculado)}>{item.statusCalculado}</span></td>
+                  <td style={td}><div style={actions}>{item.statusCalculado !== "Recebido" && item.statusCalculado !== "Pago" && <button style={receiveButton} onClick={() => marcarComoPago(item)}>Confirmar</button>}<button style={editButton} onClick={() => editarLancamento(item)}>Corrigir</button><button style={deleteButton} onClick={() => excluirLancamento(item.id)}>Excluir</button></div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
 
-function Card({ title, value }) {
-  return (
-    <div style={card}>
-      <span style={cardTitle}>{title}</span>
-      <strong style={cardValue}>{value}</strong>
-    </div>
-  )
+function Card({ title, value, cor }) {
+  return <div style={card}><span style={cardTitle}>{title}</span><strong style={{ ...cardValue, color: cor || "white" }}>{value}</strong></div>
 }
 
-function Barra({ label, valor, largura }) {
-  return (
-    <div style={{ marginBottom: "14px" }}>
-      <div style={barraTopo}>
-        <span>{label}</span>
-        <strong>{valor}</strong>
-      </div>
-
-      <div style={barraFundo}>
-        <div
-          style={{
-            ...barraPreenchida,
-            width: largura + "%",
-          }}
-        />
-      </div>
-    </div>
-  )
+function GraficoLinha({ dados, formatarMoeda }) {
+  const largura = 820
+  const altura = 260
+  const padding = 34
+  const maximo = Math.max(1, ...dados.flatMap((item) => [Math.abs(item.receitas), Math.abs(item.despesas), Math.abs(item.saldo)]))
+  function ponto(valor, index) {
+    const x = padding + (index * (largura - padding * 2)) / Math.max(dados.length - 1, 1)
+    const y = altura - padding - (Math.abs(valor) / maximo) * (altura - padding * 2)
+    return { x, y }
+  }
+  function linha(campo) { return dados.map((item, index) => { const { x, y } = ponto(item[campo], index); return `${x},${y}` }).join(" ") }
+  return <div style={graficoScroll}><svg width={largura} height={altura} style={svgGrafico}><polyline points={linha("receitas")} fill="none" stroke="#37ff74" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /><polyline points={linha("despesas")} fill="none" stroke="#ff5d73" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /><polyline points={linha("saldo")} fill="none" stroke="#4cc9ff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />{dados.map((item, index) => { const pReceita = ponto(item.receitas, index); const pDespesa = ponto(item.despesas, index); const pSaldo = ponto(item.saldo, index); return <g key={item.chave}><circle cx={pReceita.x} cy={pReceita.y} r="5" fill="#37ff74" /><circle cx={pDespesa.x} cy={pDespesa.y} r="5" fill="#ff5d73" /><circle cx={pSaldo.x} cy={pSaldo.y} r="5" fill="#4cc9ff" /><text x={pSaldo.x} y={altura - 8} textAnchor="middle" fill="#ffffff" fontSize="13" fontWeight="700">{item.label}</text><title>{`${item.chave}\nCrédito: ${formatarMoeda(item.receitas)}\nDébito: ${formatarMoeda(item.despesas)}\nSaldo: ${formatarMoeda(item.saldo)}`}</title></g> })}</svg></div>
 }
 
 function badgeStatus(status) {
-  const base = {
-    padding: "7px 12px",
-    borderRadius: "999px",
-    fontWeight: "bold",
-    fontSize: "13px",
-    display: "inline-block",
-  }
-
-  if (status === "Recebido" || status === "Pago") {
-    return {
-      ...base,
-      background: "rgba(55,255,116,.16)",
-      color: "#37ff74",
-    }
-  }
-
-  if (status === "Atrasado") {
-    return {
-      ...base,
-      background: "rgba(255,77,79,.18)",
-      color: "#ff7072",
-    }
-  }
-
-  return {
-    ...base,
-    background: "rgba(0,168,255,.18)",
-    color: "#00a8ff",
-  }
+  const base = { padding: "7px 12px", borderRadius: "999px", fontWeight: "bold", fontSize: "13px", display: "inline-block" }
+  if (status === "Recebido" || status === "Pago") return { ...base, background: "rgba(55,255,116,.16)", color: "#37ff74" }
+  if (status === "Atrasado") return { ...base, background: "rgba(255,77,79,.18)", color: "#ff7072" }
+  return { ...base, background: "rgba(0,168,255,.18)", color: "#00a8ff" }
 }
 
-const box = {
-  background: "rgba(255,255,255,0.06)",
-  borderRadius: "24px",
-  padding: "28px",
-  overflowX: "auto",
+function tipoBadge(tipo) {
+  const receita = tipo === "Receita"
+  return { padding: "7px 12px", borderRadius: "999px", fontWeight: "bold", fontSize: "13px", display: "inline-block", background: receita ? "rgba(55,255,116,.14)" : "rgba(255,77,79,.16)", color: receita ? "#37ff74" : "#ff7072" }
 }
 
-const cards = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "15px",
-  marginBottom: "25px",
+function tdValor(receita) {
+  return { ...td, color: receita ? "#37ff74" : "#ff7072", fontWeight: "bold", textAlign: "right" }
 }
 
-const card = {
-  background: "#061f47",
-  border: "1px solid rgba(255,255,255,.12)",
-  borderRadius: "16px",
-  padding: "20px",
-}
-
-const cardTitle = {
-  display: "block",
-  color: "#a9b8cc",
-  marginBottom: "10px",
-}
-
-const cardValue = {
-  color: "white",
-  fontSize: "24px",
-}
-
-const graficoBox = {
-  background: "#061f47",
-  border: "1px solid rgba(255,255,255,.12)",
-  borderRadius: "18px",
-  padding: "22px",
-  marginBottom: "28px",
-}
-
-const barraTopo = {
-  display: "flex",
-  justifyContent: "space-between",
-  marginBottom: "8px",
-}
-
-const barraFundo = {
-  height: "14px",
-  background: "rgba(255,255,255,.12)",
-  borderRadius: "999px",
-  overflow: "hidden",
-}
-
-const barraPreenchida = {
-  height: "100%",
-  background: "linear-gradient(90deg, #00a8ff, #37ff74)",
-}
-
-const form = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "15px",
-  marginBottom: "30px",
-}
-
-const input = {
-  padding: "15px",
-  borderRadius: "12px",
-  border: "1px solid rgba(255,255,255,.15)",
-  background: "#061f47",
-  color: "white",
-  fontSize: "15px",
-}
-
-const anexosBox = {
-  color: "#37ff74",
-  fontWeight: "bold",
-}
-
-const button = {
-  padding: "15px",
-  borderRadius: "12px",
-  border: "none",
-  background: "linear-gradient(90deg, #00a8ff, #37ff74)",
-  color: "#00112b",
-  fontWeight: "bold",
-  cursor: "pointer",
-}
-
-const table = {
-  width: "100%",
-  minWidth: "1200px",
-  borderCollapse: "collapse",
-}
-
-const th = {
-  textAlign: "left",
-  padding: "16px",
-  color: "#a9b8cc",
-}
-
-const td = {
-  padding: "16px",
-}
-
-const actions = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-}
-
-const receiveButton = {
-  padding: "10px 14px",
-  borderRadius: "10px",
-  border: "none",
-  background: "#37ff74",
-  color: "#00112b",
-  fontWeight: "bold",
-  cursor: "pointer",
-}
-
-const editButton = {
-  padding: "10px 14px",
-  borderRadius: "10px",
-  border: "none",
-  background: "#00a8ff",
-  color: "white",
-  fontWeight: "bold",
-  cursor: "pointer",
-}
-
-const deleteButton = {
-  padding: "10px 14px",
-  borderRadius: "10px",
-  border: "none",
-  background: "#ff4d4f",
-  color: "white",
-  fontWeight: "bold",
-  cursor: "pointer",
-}
-
-const checkboxContainer = {
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-  color: "white",
-  fontWeight: "bold",
-}
-
-const campoComLabel = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "6px",
-  color: "#a9b8cc",
-  fontSize: "13px",
-  fontWeight: "bold",
-}
+const box = { background: "rgba(255,255,255,0.06)", borderRadius: "24px", padding: "28px", overflowX: "hidden" }
+const topo = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px", flexWrap: "wrap", marginBottom: "24px" }
+const tituloInterno = { margin: 0, fontSize: "32px", color: "white" }
+const subtituloInterno = { margin: "6px 0 0", color: "#c4d4ea" }
+const filtroCompetencia = { display: "flex", gap: "10px", flexWrap: "wrap" }
+const inputCompetencia = { padding: "13px", borderRadius: "12px", border: "1px solid rgba(255,255,255,.2)", background: "#061f47", color: "white", fontSize: "15px" }
+const cards = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "15px", marginBottom: "25px" }
+const card = { background: "#061f47", border: "1px solid rgba(255,255,255,.12)", borderRadius: "16px", padding: "20px" }
+const cardTitle = { display: "block", color: "#a9b8cc", marginBottom: "10px" }
+const cardValue = { fontSize: "24px" }
+const graficoBox = { background: "#061f47", border: "1px solid rgba(255,255,255,.12)", borderRadius: "18px", padding: "22px", marginBottom: "28px" }
+const graficoTopo = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap" }
+const legenda = { display: "flex", gap: "16px", color: "white", fontWeight: "bold", flexWrap: "wrap" }
+const graficoScroll = { width: "100%", overflowX: "auto" }
+const svgGrafico = { minWidth: "760px", marginTop: "10px" }
+const formBox = { background: "#061f47", border: "1px solid rgba(255,255,255,.12)", borderRadius: "18px", padding: "22px", marginBottom: "28px" }
+const formHeader = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }
+const acoesTopo = { display: "flex", gap: "12px", flexWrap: "wrap" }
+const tabelaMassaWrapper = { overflowX: "auto" }
+const tabelaMassa = { width: "100%", minWidth: "1250px", borderCollapse: "collapse" }
+const thMassa = { textAlign: "left", padding: "12px", background: "#051b3d", color: "#4cc9ff" }
+const tdMassa = { padding: "8px" }
+const inputTabela = { width: "100%", boxSizing: "border-box", padding: "13px", borderRadius: "10px", border: "1px solid rgba(255,255,255,.14)", background: "#092b5d", color: "white", fontSize: "14px" }
+const historicoBox = { background: "#061f47", border: "1px solid rgba(255,255,255,.12)", borderRadius: "18px", padding: "22px" }
+const tabelaHistoricoWrapper = { overflowX: "auto" }
+const table = { width: "100%", minWidth: "1300px", borderCollapse: "collapse" }
+const th = { textAlign: "left", padding: "16px", color: "#a9b8cc", borderBottom: "1px solid rgba(255,255,255,.12)" }
+const td = { padding: "16px", borderBottom: "1px solid rgba(255,255,255,.06)" }
+const tdVazio = { ...td, textAlign: "center", color: "#a9b8cc" }
+const actions = { display: "flex", gap: "10px", flexWrap: "wrap" }
+const button = { padding: "13px 18px", borderRadius: "12px", border: "none", background: "linear-gradient(90deg, #00a8ff, #37ff74)", color: "#00112b", fontWeight: "bold", cursor: "pointer" }
+const botaoEscuro = { padding: "13px 18px", borderRadius: "12px", border: "1px solid rgba(255,255,255,.15)", background: "#061f47", color: "white", fontWeight: "bold", cursor: "pointer" }
+const botaoSecundario = { padding: "13px 18px", borderRadius: "12px", border: "1px solid rgba(255,255,255,.2)", background: "rgba(255,255,255,.08)", color: "white", fontWeight: "bold", cursor: "pointer" }
+const receiveButton = { padding: "10px 14px", borderRadius: "10px", border: "none", background: "#37ff74", color: "#00112b", fontWeight: "bold", cursor: "pointer" }
+const editButton = { padding: "10px 14px", borderRadius: "10px", border: "none", background: "#00a8ff", color: "white", fontWeight: "bold", cursor: "pointer" }
+const deleteButton = { padding: "10px 14px", borderRadius: "10px", border: "none", background: "#ff4d4f", color: "white", fontWeight: "bold", cursor: "pointer" }
