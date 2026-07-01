@@ -3,16 +3,16 @@ import api from "../services/api"
 
 const LINHAS_INICIAIS = 3
 
-function linhaVazia() {
+function linhaVazia(tipo = "Receber") {
   return {
     data: new Date().toISOString().slice(0, 10),
-    tipo: "Receber",
+    tipo,
     centroCusto: "",
     formaPagamento: "",
     descricao: "",
     cliente: "",
     valor: "",
-    status: "Recebido",
+    status: tipo === "Pagar" ? "Pago" : "Recebido",
   }
 }
 
@@ -21,12 +21,27 @@ export default function Financeiro() {
   const [clientesCadastrados, setClientesCadastrados] = useState([])
   const [servicos, setServicos] = useState([])
   const [competencia, setCompetencia] = useState(new Date().toISOString().slice(0, 7))
-  const [linhas, setLinhas] = useState(Array.from({ length: LINHAS_INICIAIS }, () => linhaVazia()))
+  const [modoLancamento, setModoLancamento] = useState("Receber")
+  const [linhas, setLinhas] = useState(Array.from({ length: LINHAS_INICIAIS }, () => linhaVazia("Receber")))
   const [editandoId, setEditandoId] = useState(null)
   const [carregando, setCarregando] = useState(false)
 
   const formasPagamento = ["PIX", "Boleto", "Cartão", "Dinheiro", "Transferência"]
-  const centrosCustoPadrao = ["Honorários", "Serviços Avulsos", "Abertura MEI", "Certificado Digital", "Aluguel", "Internet", "Energia", "Sistema", "Marketing", "Contabilidade", "Impostos", "Material de Escritório", "Outros"]
+  const centrosCustoPadrao = [
+    "Honorários",
+    "Serviços Avulsos",
+    "Abertura MEI",
+    "Certificado Digital",
+    "Aluguel",
+    "Internet",
+    "Energia",
+    "Sistema",
+    "Marketing",
+    "Contabilidade",
+    "Impostos",
+    "Material de Escritório",
+    "Outros",
+  ]
 
   useEffect(() => {
     carregarLancamentos()
@@ -103,19 +118,30 @@ export default function Financeiro() {
 
   function origemDoLancamento(item) {
     if (item.origem) return item.origem
-    if (item.cliente && !["Cliente Avulso / Fornecedor", "Cliente Avulso", "Fornecedor"].includes(item.cliente)) return "Cliente"
+    if (item.cliente && !["Cliente Avulso / Fornecedor", "Cliente Avulso", "Fornecedor", "Escritório"].includes(item.cliente)) return "Cliente"
     return ehDespesa(item) ? "Despesa Escritório" : "Avulso"
   }
 
-  const lancamentosComStatus = useMemo(() => lancamentos.map((item) => ({ ...item, statusCalculado: statusAutomatico(item), valorNumber: valorNumerico(item.valor) })), [lancamentos])
-  const lancamentosCompetencia = useMemo(() => lancamentosComStatus.filter((item) => !competencia || competenciaDoLancamento(item) === competencia), [lancamentosComStatus, competencia])
-  const lancamentosAnteriores = useMemo(() => lancamentosComStatus.filter((item) => {
-    const comp = competenciaDoLancamento(item)
-    return competencia && comp && comp < competencia
-  }), [lancamentosComStatus, competencia])
+  const lancamentosComStatus = useMemo(
+    () => lancamentos.map((item) => ({ ...item, statusCalculado: statusAutomatico(item), valorNumber: valorNumerico(item.valor) })),
+    [lancamentos]
+  )
+
+  const lancamentosCompetencia = useMemo(
+    () => lancamentosComStatus.filter((item) => !competencia || competenciaDoLancamento(item) === competencia),
+    [lancamentosComStatus, competencia]
+  )
+
+  const lancamentosAnteriores = useMemo(
+    () => lancamentosComStatus.filter((item) => {
+      const comp = competenciaDoLancamento(item)
+      return competencia && comp && comp < competencia
+    }),
+    [lancamentosComStatus, competencia]
+  )
 
   function calcularSaldo(lista) {
-    return lista.reduce((total, item) => ehReceita(item) ? total + item.valorNumber : ehDespesa(item) ? total - item.valorNumber : total, 0)
+    return lista.reduce((total, item) => (ehReceita(item) ? total + item.valorNumber : ehDespesa(item) ? total - item.valorNumber : total), 0)
   }
 
   const totalReceitas = lancamentosCompetencia.filter(ehReceita).reduce((total, item) => total + item.valorNumber, 0)
@@ -126,50 +152,77 @@ export default function Financeiro() {
   const evolucao = useMemo(() => {
     const hoje = new Date()
     const meses = []
+
     for (let i = 5; i >= 0; i--) {
       const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)
       const chave = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`
       const itensMes = lancamentosComStatus.filter((item) => competenciaDoLancamento(item) === chave)
       const receitas = itensMes.filter(ehReceita).reduce((total, item) => total + item.valorNumber, 0)
       const despesas = itensMes.filter(ehDespesa).reduce((total, item) => total + item.valorNumber, 0)
-      meses.push({ chave, label: data.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""), receitas, despesas, saldo: receitas - despesas })
+
+      meses.push({
+        chave,
+        label: data.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
+        receitas,
+        despesas,
+        saldo: receitas - despesas,
+      })
     }
+
     return meses
   }, [lancamentosComStatus])
 
+  function escolherModo(tipo) {
+    setModoLancamento(tipo)
+    setEditandoId(null)
+    setLinhas(Array.from({ length: LINHAS_INICIAIS }, () => linhaVazia(tipo)))
+  }
+
   function atualizarLinha(index, campo, valor) {
-    setLinhas((atuais) => atuais.map((linha, i) => {
-      if (i !== index) return linha
-      const atualizada = { ...linha, [campo]: valor }
-      if (campo === "tipo") atualizada.status = valor === "Pagar" ? "Pago" : "Recebido"
-      return atualizada
-    }))
+    setLinhas((atuais) => atuais.map((linha, i) => (i === index ? { ...linha, [campo]: valor } : linha)))
   }
 
   function selecionarServico(index, nomeServico) {
+    if (modoLancamento !== "Receber") return
+
     const servicoSelecionado = servicos.find((servico) => servico.nome === nomeServico)
     if (!servicoSelecionado) return
-    setLinhas((atuais) => atuais.map((linha, i) => i === index ? { ...linha, descricao: nomeServico, valor: servicoSelecionado.valor || linha.valor, centroCusto: servicoSelecionado.categoria || linha.centroCusto } : linha))
+
+    setLinhas((atuais) =>
+      atuais.map((linha, i) =>
+        i === index
+          ? {
+              ...linha,
+              descricao: nomeServico,
+              valor: servicoSelecionado.valor || linha.valor,
+              centroCusto: servicoSelecionado.categoria || linha.centroCusto,
+            }
+          : linha
+      )
+    )
   }
 
   function adicionarLinha() {
-    setLinhas((atuais) => [...atuais, linhaVazia()])
+    setLinhas((atuais) => [...atuais, linhaVazia(modoLancamento)])
   }
 
   function limparLinhas() {
-    setLinhas(Array.from({ length: LINHAS_INICIAIS }, () => linhaVazia()))
+    setLinhas(Array.from({ length: LINHAS_INICIAIS }, () => linhaVazia(modoLancamento)))
     setEditandoId(null)
   }
 
   function montarPayload(linha) {
-    const ehPagar = linha.tipo === "Pagar"
-    const descricaoFinal = linha.descricao?.trim() || linha.centroCusto || (ehPagar ? "Despesa do Escritório" : "Receita Avulsa")
-    const clienteFinal = linha.cliente?.trim() || (ehPagar ? "Escritório" : "Cliente Avulso")
+    const ehPagar = modoLancamento === "Pagar"
+    const descricaoFinal = ehPagar
+      ? linha.centroCusto || "Despesa do Escritório"
+      : linha.descricao?.trim() || linha.centroCusto || "Receita Avulsa"
+
+    const clienteFinal = ehPagar ? "Escritório" : linha.cliente?.trim() || "Cliente Avulso"
 
     return {
       descricao: descricaoFinal,
       cliente: clienteFinal,
-      tipo: linha.tipo,
+      tipo: ehPagar ? "Pagar" : "Receber",
       centroCusto: linha.centroCusto,
       formaPagamento: linha.formaPagamento,
       valor: linha.valor,
@@ -186,32 +239,37 @@ export default function Financeiro() {
   }
 
   function linhaValida(linha) {
-    if (!linha.data || !linha.tipo || !linha.centroCusto || !linha.formaPagamento || !linha.valor || !linha.status) {
+    if (!linha.data || !linha.centroCusto || !linha.formaPagamento || !linha.valor || !linha.status) {
       return false
     }
 
-    // Para despesa do escritório, descrição e cliente/fornecedor são opcionais.
-    // Se a descrição ficar vazia, o sistema usa o centro de custo como histórico.
-    if (linha.tipo === "Pagar") return true
+    if (modoLancamento === "Pagar") return true
 
-    // Para receita, a descrição continua necessária para identificar o serviço/entrada.
     return Boolean(linha.descricao?.trim())
   }
 
   async function salvarLancamentos() {
     const preenchidas = linhas.filter(linhaPreenchida)
     const validas = preenchidas.filter(linhaValida)
+
     if (!validas.length || validas.length !== preenchidas.length) {
-      alert("Preencha data, tipo, centro de custo, forma, valor e status. Para receitas, informe também a descrição.")
+      alert(
+        modoLancamento === "Pagar"
+          ? "Para despesas, preencha data, centro de custo, forma, valor e status."
+          : "Para receitas, preencha data, centro de custo, forma, descrição, valor e status."
+      )
       return
     }
+
     setCarregando(true)
+
     try {
       if (editandoId) {
         await api.put(`/financeiro/${editandoId}`, montarPayload(validas[0]))
       } else {
         for (const linha of validas) await api.post("/financeiro", montarPayload(linha))
       }
+
       await carregarLancamentos()
       limparLinhas()
     } catch (error) {
@@ -223,14 +281,32 @@ export default function Financeiro() {
   }
 
   function editarLancamento(item) {
+    const tipo = ehDespesa(item) ? "Pagar" : "Receber"
+
+    setModoLancamento(tipo)
     setEditandoId(item.id)
-    setLinhas([{ data: String(dataDoLancamento(item) || new Date().toISOString()).slice(0, 10), tipo: ehDespesa(item) ? "Pagar" : "Receber", centroCusto: item.centroCusto || "", formaPagamento: item.formaPagamento || "", descricao: item.descricao || "", cliente: item.cliente || "", valor: item.valor || "", status: item.status || (ehDespesa(item) ? "Pago" : "Recebido") }])
+    setLinhas([
+      {
+        data: String(dataDoLancamento(item) || new Date().toISOString()).slice(0, 10),
+        tipo,
+        centroCusto: item.centroCusto || "",
+        formaPagamento: item.formaPagamento || "",
+        descricao: tipo === "Pagar" ? "" : item.descricao || "",
+        cliente: tipo === "Pagar" ? "" : item.cliente || "",
+        valor: item.valor || "",
+        status: item.status || (tipo === "Pagar" ? "Pago" : "Recebido"),
+      },
+    ])
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   async function marcarComoPago(item) {
     try {
-      await api.put(`/financeiro/${item.id}`, { ...item, status: ehDespesa(item) ? "Pago" : "Recebido", dataRecebimento: new Date().toISOString().slice(0, 10) })
+      await api.put(`/financeiro/${item.id}`, {
+        ...item,
+        status: ehDespesa(item) ? "Pago" : "Recebido",
+        dataRecebimento: new Date().toISOString().slice(0, 10),
+      })
       await carregarLancamentos()
     } catch (error) {
       alert("Erro ao confirmar lançamento")
@@ -240,6 +316,7 @@ export default function Financeiro() {
 
   async function excluirLancamento(id) {
     if (!window.confirm("Deseja realmente excluir este lançamento?")) return
+
     try {
       await api.delete(`/financeiro/${id}`)
       await carregarLancamentos()
@@ -262,6 +339,7 @@ export default function Financeiro() {
           <h2 style={tituloInterno}>Movimentação do Escritório</h2>
           <p style={subtituloInterno}>Controle de receitas, despesas, avulsos e recebimentos automáticos.</p>
         </div>
+
         <div style={filtroCompetencia}>
           <button style={botaoSecundario} onClick={() => mudarCompetencia(-1)}>← Anterior</button>
           <input type="month" style={inputCompetencia} value={competencia} onChange={(e) => setCompetencia(e.target.value)} />
@@ -285,37 +363,91 @@ export default function Financeiro() {
             <span><b style={{ background: "#4cc9ff" }} /> Saldo</span>
           </div>
         </div>
+
         <GraficoLinha dados={evolucao} formatarMoeda={formatarMoeda} />
       </div>
 
       <div style={formBox}>
         <div style={formHeader}>
-          <h3>{editandoId ? "Corrigir Lançamento" : "Lançamentos em Massa"}</h3>
+          <div>
+            <h3>{editandoId ? "Corrigir Lançamento" : modoLancamento === "Pagar" ? "Nova Despesa" : "Nova Receita"}</h3>
+            <p style={ajudaLancamento}>
+              {modoLancamento === "Pagar"
+                ? "Despesa simples: data, centro de custo, forma, status e valor."
+                : "Receita avulsa: informe a descrição do serviço para identificar a entrada."}
+            </p>
+          </div>
+
           <div style={acoesTopo}>
+            <button style={modoLancamento === "Receber" ? botaoModoAtivoReceita : botaoModo} onClick={() => escolherModo("Receber")}>
+              + Receita
+            </button>
+            <button style={modoLancamento === "Pagar" ? botaoModoAtivoDespesa : botaoModo} onClick={() => escolherModo("Pagar")}>
+              + Despesa
+            </button>
             <button style={botaoEscuro} onClick={adicionarLinha}>+ Adicionar linha</button>
             {editandoId && <button style={botaoSecundario} onClick={limparLinhas}>Cancelar edição</button>}
-            <button style={button} onClick={salvarLancamentos} disabled={carregando}>{carregando ? "Salvando..." : editandoId ? "Salvar Correção" : "Salvar Lançamentos"}</button>
+            <button style={button} onClick={salvarLancamentos} disabled={carregando}>
+              {carregando ? "Salvando..." : editandoId ? "Salvar Correção" : "Salvar Lançamentos"}
+            </button>
           </div>
         </div>
 
         <div style={tabelaMassaWrapper}>
-          <table style={tabelaMassa}>
+          <table style={modoLancamento === "Pagar" ? tabelaMassaDespesa : tabelaMassaReceita}>
             <thead>
               <tr>
-                <th style={thMassa}>Data</th><th style={thMassa}>Tipo</th><th style={thMassa}>Plano/Centro</th><th style={thMassa}>Forma</th><th style={thMassa}>Descrição / Histórico</th><th style={thMassa}>Cliente / Fornecedor</th><th style={thMassa}>Status</th><th style={thMassa}>Valor</th>
+                <th style={thMassa}>Data</th>
+                <th style={thMassa}>Centro de Custo</th>
+                <th style={thMassa}>Forma</th>
+                {modoLancamento === "Receber" && <th style={thMassa}>Descrição / Serviço</th>}
+                {modoLancamento === "Receber" && <th style={thMassa}>Cliente</th>}
+                <th style={thMassa}>Status</th>
+                <th style={thMassa}>Valor</th>
               </tr>
             </thead>
+
             <tbody>
               {linhas.map((linha, index) => (
                 <tr key={index}>
-                  <td style={tdMassa}><input type="date" style={inputTabela} value={linha.data} onChange={(e) => atualizarLinha(index, "data", e.target.value)} /></td>
-                  <td style={tdMassa}><select style={inputTabela} value={linha.tipo} onChange={(e) => atualizarLinha(index, "tipo", e.target.value)}><option value="Receber">Receita</option><option value="Pagar">Despesa</option></select></td>
-                  <td style={tdMassa}><input style={inputTabela} list="centros-custo-financeiro" placeholder="Selecione ou digite" value={linha.centroCusto} onChange={(e) => atualizarLinha(index, "centroCusto", e.target.value)} /></td>
-                  <td style={tdMassa}><select style={inputTabela} value={linha.formaPagamento} onChange={(e) => atualizarLinha(index, "formaPagamento", e.target.value)}><option value="">Selecione</option>{formasPagamento.map((item) => <option key={item} value={item}>{item}</option>)}</select></td>
-                  <td style={tdMassa}><input style={inputTabela} list="servicos-financeiro" placeholder="Descrição / histórico (opcional para despesa)" value={linha.descricao} onChange={(e) => { atualizarLinha(index, "descricao", e.target.value); selecionarServico(index, e.target.value) }} /></td>
-                  <td style={tdMassa}><input style={inputTabela} list="clientes-financeiro" placeholder="Opcional" value={linha.cliente} onChange={(e) => atualizarLinha(index, "cliente", e.target.value)} /></td>
-                  <td style={tdMassa}><select style={inputTabela} value={linha.status} onChange={(e) => atualizarLinha(index, "status", e.target.value)}><option value="Recebido">Recebido</option><option value="Pago">Pago</option><option value="Pendente">Pendente</option><option value="Atrasado">Atrasado</option></select></td>
-                  <td style={tdMassa}><input style={{ ...inputTabela, textAlign: "right" }} placeholder="0,00" value={linha.valor} onChange={(e) => atualizarLinha(index, "valor", e.target.value)} /></td>
+                  <td style={tdMassa}>
+                    <input type="date" style={inputTabela} value={linha.data} onChange={(e) => atualizarLinha(index, "data", e.target.value)} />
+                  </td>
+
+                  <td style={tdMassa}>
+                    <input style={inputTabela} list="centros-custo-financeiro" placeholder="Selecione ou digite" value={linha.centroCusto} onChange={(e) => atualizarLinha(index, "centroCusto", e.target.value)} />
+                  </td>
+
+                  <td style={tdMassa}>
+                    <select style={inputTabela} value={linha.formaPagamento} onChange={(e) => atualizarLinha(index, "formaPagamento", e.target.value)}>
+                      <option value="">Selecione</option>
+                      {formasPagamento.map((item) => <option key={item} value={item}>{item}</option>)}
+                    </select>
+                  </td>
+
+                  {modoLancamento === "Receber" && (
+                    <td style={tdMassa}>
+                      <input style={inputTabela} list="servicos-financeiro" placeholder="Ex: abertura MEI, honorários..." value={linha.descricao} onChange={(e) => { atualizarLinha(index, "descricao", e.target.value); selecionarServico(index, e.target.value) }} />
+                    </td>
+                  )}
+
+                  {modoLancamento === "Receber" && (
+                    <td style={tdMassa}>
+                      <input style={inputTabela} list="clientes-financeiro" placeholder="Opcional" value={linha.cliente} onChange={(e) => atualizarLinha(index, "cliente", e.target.value)} />
+                    </td>
+                  )}
+
+                  <td style={tdMassa}>
+                    <select style={inputTabela} value={linha.status} onChange={(e) => atualizarLinha(index, "status", e.target.value)}>
+                      {modoLancamento === "Receber" ? <option value="Recebido">Recebido</option> : <option value="Pago">Pago</option>}
+                      <option value="Pendente">Pendente</option>
+                      <option value="Atrasado">Atrasado</option>
+                    </select>
+                  </td>
+
+                  <td style={tdMassa}>
+                    <input style={{ ...inputTabela, textAlign: "right" }} placeholder="0,00" value={linha.valor} onChange={(e) => atualizarLinha(index, "valor", e.target.value)} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -329,13 +461,27 @@ export default function Financeiro() {
 
       <div style={historicoBox}>
         <h3>Histórico Financeiro</h3>
+
         <div style={tabelaHistoricoWrapper}>
           <table style={table}>
             <thead>
-              <tr><th style={th}>Data</th><th style={th}>Tipo</th><th style={th}>Plano/Centro</th><th style={th}>Descrição</th><th style={th}>Cliente / Fornecedor</th><th style={th}>Forma</th><th style={th}>Origem</th><th style={th}>Valor</th><th style={th}>Status</th><th style={th}>Ações</th></tr>
+              <tr>
+                <th style={th}>Data</th>
+                <th style={th}>Tipo</th>
+                <th style={th}>Plano/Centro</th>
+                <th style={th}>Descrição</th>
+                <th style={th}>Cliente / Fornecedor</th>
+                <th style={th}>Forma</th>
+                <th style={th}>Origem</th>
+                <th style={th}>Valor</th>
+                <th style={th}>Status</th>
+                <th style={th}>Ações</th>
+              </tr>
             </thead>
+
             <tbody>
               {lancamentosCompetencia.length === 0 && <tr><td style={tdVazio} colSpan="10">Nenhum lançamento nesta competência.</td></tr>}
+
               {lancamentosCompetencia.map((item) => (
                 <tr key={item.id}>
                   <td style={td}>{formatarData(dataDoLancamento(item))}</td>
@@ -347,7 +493,13 @@ export default function Financeiro() {
                   <td style={td}>{origemDoLancamento(item)}</td>
                   <td style={tdValor(ehReceita(item))}>{formatarMoeda(item.valorNumber)}</td>
                   <td style={td}><span style={badgeStatus(item.statusCalculado)}>{item.statusCalculado}</span></td>
-                  <td style={td}><div style={actions}>{item.statusCalculado !== "Recebido" && item.statusCalculado !== "Pago" && <button style={receiveButton} onClick={() => marcarComoPago(item)}>Confirmar</button>}<button style={editButton} onClick={() => editarLancamento(item)}>Corrigir</button><button style={deleteButton} onClick={() => excluirLancamento(item.id)}>Excluir</button></div></td>
+                  <td style={td}>
+                    <div style={actions}>
+                      {item.statusCalculado !== "Recebido" && item.statusCalculado !== "Pago" && <button style={receiveButton} onClick={() => marcarComoPago(item)}>Confirmar</button>}
+                      <button style={editButton} onClick={() => editarLancamento(item)}>Corrigir</button>
+                      <button style={deleteButton} onClick={() => excluirLancamento(item.id)}>Excluir</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -367,13 +519,44 @@ function GraficoLinha({ dados, formatarMoeda }) {
   const altura = 260
   const padding = 34
   const maximo = Math.max(1, ...dados.flatMap((item) => [Math.abs(item.receitas), Math.abs(item.despesas), Math.abs(item.saldo)]))
+
   function ponto(valor, index) {
     const x = padding + (index * (largura - padding * 2)) / Math.max(dados.length - 1, 1)
     const y = altura - padding - (Math.abs(valor) / maximo) * (altura - padding * 2)
     return { x, y }
   }
-  function linha(campo) { return dados.map((item, index) => { const { x, y } = ponto(item[campo], index); return `${x},${y}` }).join(" ") }
-  return <div style={graficoScroll}><svg width={largura} height={altura} style={svgGrafico}><polyline points={linha("receitas")} fill="none" stroke="#37ff74" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /><polyline points={linha("despesas")} fill="none" stroke="#ff5d73" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" /><polyline points={linha("saldo")} fill="none" stroke="#4cc9ff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />{dados.map((item, index) => { const pReceita = ponto(item.receitas, index); const pDespesa = ponto(item.despesas, index); const pSaldo = ponto(item.saldo, index); return <g key={item.chave}><circle cx={pReceita.x} cy={pReceita.y} r="5" fill="#37ff74" /><circle cx={pDespesa.x} cy={pDespesa.y} r="5" fill="#ff5d73" /><circle cx={pSaldo.x} cy={pSaldo.y} r="5" fill="#4cc9ff" /><text x={pSaldo.x} y={altura - 8} textAnchor="middle" fill="#ffffff" fontSize="13" fontWeight="700">{item.label}</text><title>{`${item.chave}\nCrédito: ${formatarMoeda(item.receitas)}\nDébito: ${formatarMoeda(item.despesas)}\nSaldo: ${formatarMoeda(item.saldo)}`}</title></g> })}</svg></div>
+
+  function linha(campo) {
+    return dados.map((item, index) => {
+      const { x, y } = ponto(item[campo], index)
+      return `${x},${y}`
+    }).join(" ")
+  }
+
+  return (
+    <div style={graficoScroll}>
+      <svg width={largura} height={altura} style={svgGrafico}>
+        <polyline points={linha("receitas")} fill="none" stroke="#37ff74" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <polyline points={linha("despesas")} fill="none" stroke="#ff5d73" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <polyline points={linha("saldo")} fill="none" stroke="#4cc9ff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        {dados.map((item, index) => {
+          const pReceita = ponto(item.receitas, index)
+          const pDespesa = ponto(item.despesas, index)
+          const pSaldo = ponto(item.saldo, index)
+
+          return (
+            <g key={item.chave}>
+              <circle cx={pReceita.x} cy={pReceita.y} r="5" fill="#37ff74" />
+              <circle cx={pDespesa.x} cy={pDespesa.y} r="5" fill="#ff5d73" />
+              <circle cx={pSaldo.x} cy={pSaldo.y} r="5" fill="#4cc9ff" />
+              <text x={pSaldo.x} y={altura - 8} textAnchor="middle" fill="#ffffff" fontSize="13" fontWeight="700">{item.label}</text>
+              <title>{`${item.chave}\nCrédito: ${formatarMoeda(item.receitas)}\nDébito: ${formatarMoeda(item.despesas)}\nSaldo: ${formatarMoeda(item.saldo)}`}</title>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
 }
 
 function badgeStatus(status) {
@@ -408,10 +591,12 @@ const legenda = { display: "flex", gap: "16px", color: "white", fontWeight: "bol
 const graficoScroll = { width: "100%", overflowX: "auto" }
 const svgGrafico = { minWidth: "760px", marginTop: "10px" }
 const formBox = { background: "#061f47", border: "1px solid rgba(255,255,255,.12)", borderRadius: "18px", padding: "22px", marginBottom: "28px" }
-const formHeader = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }
+const formHeader = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }
+const ajudaLancamento = { margin: "6px 0 0", color: "#a9b8cc", fontSize: "14px" }
 const acoesTopo = { display: "flex", gap: "12px", flexWrap: "wrap" }
 const tabelaMassaWrapper = { overflowX: "auto" }
-const tabelaMassa = { width: "100%", minWidth: "1250px", borderCollapse: "collapse" }
+const tabelaMassaReceita = { width: "100%", minWidth: "1120px", borderCollapse: "collapse" }
+const tabelaMassaDespesa = { width: "100%", minWidth: "780px", borderCollapse: "collapse" }
 const thMassa = { textAlign: "left", padding: "12px", background: "#051b3d", color: "#4cc9ff" }
 const tdMassa = { padding: "8px" }
 const inputTabela = { width: "100%", boxSizing: "border-box", padding: "13px", borderRadius: "10px", border: "1px solid rgba(255,255,255,.14)", background: "#092b5d", color: "white", fontSize: "14px" }
@@ -425,6 +610,9 @@ const actions = { display: "flex", gap: "10px", flexWrap: "wrap" }
 const button = { padding: "13px 18px", borderRadius: "12px", border: "none", background: "linear-gradient(90deg, #00a8ff, #37ff74)", color: "#00112b", fontWeight: "bold", cursor: "pointer" }
 const botaoEscuro = { padding: "13px 18px", borderRadius: "12px", border: "1px solid rgba(255,255,255,.15)", background: "#061f47", color: "white", fontWeight: "bold", cursor: "pointer" }
 const botaoSecundario = { padding: "13px 18px", borderRadius: "12px", border: "1px solid rgba(255,255,255,.2)", background: "rgba(255,255,255,.08)", color: "white", fontWeight: "bold", cursor: "pointer" }
+const botaoModo = { padding: "13px 18px", borderRadius: "12px", border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "white", fontWeight: "bold", cursor: "pointer" }
+const botaoModoAtivoReceita = { ...botaoModo, background: "linear-gradient(90deg, #00a8ff, #37ff74)", color: "#00112b", border: "none" }
+const botaoModoAtivoDespesa = { ...botaoModo, background: "linear-gradient(90deg, #ff4d4f, #ff9f43)", color: "#00112b", border: "none" }
 const receiveButton = { padding: "10px 14px", borderRadius: "10px", border: "none", background: "#37ff74", color: "#00112b", fontWeight: "bold", cursor: "pointer" }
 const editButton = { padding: "10px 14px", borderRadius: "10px", border: "none", background: "#00a8ff", color: "white", fontWeight: "bold", cursor: "pointer" }
 const deleteButton = { padding: "10px 14px", borderRadius: "10px", border: "none", background: "#ff4d4f", color: "white", fontWeight: "bold", cursor: "pointer" }
