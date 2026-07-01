@@ -26,8 +26,33 @@ export default function Fiscal() {
     if (usuario?.perfil === "Cliente") {
       setCliente(usuario.clienteVinculado || "")
       setClienteFiltro(usuario.clienteVinculado || "")
+      return
+    }
+
+    const clienteDashboard = localStorage.getItem("nexaFiltroFiscalCliente") || ""
+
+    if (clienteDashboard) {
+      setCliente(clienteDashboard)
+      setClienteFiltro(clienteDashboard)
     }
   }, [])
+
+  useEffect(() => {
+    if (usuario?.perfil === "Cliente") return
+
+    const clienteDashboard = localStorage.getItem("nexaFiltroFiscalCliente") || ""
+
+    if (!clienteDashboard || clientesCadastrados.length === 0) return
+
+    const clienteEncontrado = clientesCadastrados.find(
+      (item) => String(item.nome || "").trim() === clienteDashboard.trim()
+    )
+
+    if (clienteEncontrado) {
+      setCliente(clienteEncontrado.nome)
+      setClienteFiltro(clienteEncontrado.nome)
+    }
+  }, [clientesCadastrados])
 
   async function carregarObrigacoes() {
     try {
@@ -228,6 +253,59 @@ export default function Fiscal() {
     return {}
   }
 
+  function limparTelefoneWhatsApp(telefone) {
+    let numero = String(telefone || "").replace(/\D/g, "")
+
+    if (!numero) return ""
+
+    if (numero.startsWith("55")) return numero
+
+    return `55${numero}`
+  }
+
+  function formatarDataBrasil(data) {
+    if (!data) return "Não informado"
+
+    const partes = String(data).split("-")
+
+    if (partes.length === 3) {
+      return `${partes[2]}/${partes[1]}/${partes[0]}`
+    }
+
+    return data
+  }
+
+  function obterClienteCadastrado(nomeCliente) {
+    return clientesCadastrados.find(
+      (item) => String(item.nome || "").trim() === String(nomeCliente || "").trim()
+    )
+  }
+
+  function abrirWhatsApp(item, tipoMensagem) {
+    const clienteCadastrado = obterClienteCadastrado(item.cliente)
+    const telefone = limparTelefoneWhatsApp(clienteCadastrado?.telefone)
+
+    if (!telefone) {
+      alert("Este cliente não possui telefone cadastrado.")
+      return
+    }
+
+    const nomeCliente = item.cliente || clienteCadastrado?.nome || "cliente"
+    const obrigacaoTexto = item.obrigacao || "pendência"
+    const vencimentoTexto = formatarDataBrasil(item.vencimento)
+    const valorTexto = item.valor ? `\nValor: ${item.valor}` : ""
+
+    const mensagens = {
+      nova: `Olá, ${nomeCliente}.\n\nFoi disponibilizada uma nova pendência no Portal do Cliente Nexa.\n\nObrigação: ${obrigacaoTexto}\nCompetência: ${item.competencia || "Não informada"}\nVencimento: ${vencimentoTexto}${valorTexto}\n\nAcesse o portal para visualizar os detalhes e o documento disponível.`,
+      tresDias: `Olá, ${nomeCliente}.\n\nLembrete: sua obrigação ${obrigacaoTexto} vence em 3 dias.\n\nCompetência: ${item.competencia || "Não informada"}\nVencimento: ${vencimentoTexto}${valorTexto}\n\nEvite atrasos, multas e juros.`,
+      hoje: `Olá, ${nomeCliente}.\n\nAtenção: sua obrigação ${obrigacaoTexto} vence hoje.\n\nCompetência: ${item.competencia || "Não informada"}\nVencimento: ${vencimentoTexto}${valorTexto}\n\nCaso ainda não tenha efetuado o pagamento, recomendamos regularizar dentro do prazo.`,
+    }
+
+    const mensagem = encodeURIComponent(mensagens[tipoMensagem] || mensagens.nova)
+
+    window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank")
+  }
+
   const obrigacoesVisiveis = obrigacoes.filter((item) => {
     const statusAtual = String(item.status || "").toLowerCase()
     const concluido = statusAtual.includes("concluído") || statusAtual.includes("concluido")
@@ -400,6 +478,9 @@ export default function Fiscal() {
                         if (url) window.open(url, "_blank")
                       }
 
+                      if (acao === "whatsapp-nova") abrirWhatsApp(item, "nova")
+                      if (acao === "whatsapp-tres-dias") abrirWhatsApp(item, "tresDias")
+                      if (acao === "whatsapp-hoje") abrirWhatsApp(item, "hoje")
                       if (acao === "concluir") concluirObrigacao(item)
                       if (acao === "editar") editarObrigacao(item)
                       if (acao === "excluir") excluirObrigacao(item)
@@ -411,6 +492,14 @@ export default function Fiscal() {
                       <>
                         <option value="visualizar">Visualizar</option>
                         <option value="baixar">Baixar</option>
+                      </>
+                    )}
+
+                    {usuario?.perfil !== "Cliente" && (
+                      <>
+                        <option value="whatsapp-nova">WhatsApp - Nova pendência</option>
+                        <option value="whatsapp-tres-dias">WhatsApp - Vence em 3 dias</option>
+                        <option value="whatsapp-hoje">WhatsApp - Vence hoje</option>
                       </>
                     )}
 

@@ -27,6 +27,7 @@ export default function Clientes() {
   const [anexos, setAnexos] = useState([])
 
   const regimes = [
+    "Avulso",
     "MEI",
     "Simples Nacional",
     "Lucro Presumido",

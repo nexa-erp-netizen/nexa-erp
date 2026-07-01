@@ -162,9 +162,12 @@ export default function Financeiro() {
   }
 
   function montarPayload(linha) {
-    const clienteFinal = linha.cliente?.trim() || (linha.tipo === "Pagar" ? "Fornecedor" : "Cliente Avulso")
+    const ehPagar = linha.tipo === "Pagar"
+    const descricaoFinal = linha.descricao?.trim() || linha.centroCusto || (ehPagar ? "Despesa do Escritório" : "Receita Avulsa")
+    const clienteFinal = linha.cliente?.trim() || (ehPagar ? "Escritório" : "Cliente Avulso")
+
     return {
-      descricao: linha.descricao,
+      descricao: descricaoFinal,
       cliente: clienteFinal,
       tipo: linha.tipo,
       centroCusto: linha.centroCusto,
@@ -174,15 +177,32 @@ export default function Financeiro() {
       status: linha.status,
       dataRecebimento: linha.status === "Pago" || linha.status === "Recebido" ? linha.data : "",
       anexos: [],
-      origem: linha.tipo === "Pagar" ? "Despesa Escritório" : "Avulso",
+      origem: ehPagar ? "Despesa Escritório" : "Avulso",
     }
   }
 
+  function linhaPreenchida(linha) {
+    return linha.data || linha.descricao || linha.valor || linha.centroCusto || linha.formaPagamento || linha.cliente
+  }
+
+  function linhaValida(linha) {
+    if (!linha.data || !linha.tipo || !linha.centroCusto || !linha.formaPagamento || !linha.valor || !linha.status) {
+      return false
+    }
+
+    // Para despesa do escritório, descrição e cliente/fornecedor são opcionais.
+    // Se a descrição ficar vazia, o sistema usa o centro de custo como histórico.
+    if (linha.tipo === "Pagar") return true
+
+    // Para receita, a descrição continua necessária para identificar o serviço/entrada.
+    return Boolean(linha.descricao?.trim())
+  }
+
   async function salvarLancamentos() {
-    const preenchidas = linhas.filter((linha) => linha.data || linha.descricao || linha.valor || linha.centroCusto || linha.cliente)
-    const validas = preenchidas.filter((linha) => linha.data && linha.tipo && linha.descricao && linha.centroCusto && linha.formaPagamento && linha.valor && linha.status)
+    const preenchidas = linhas.filter(linhaPreenchida)
+    const validas = preenchidas.filter(linhaValida)
     if (!validas.length || validas.length !== preenchidas.length) {
-      alert("Preencha data, tipo, centro de custo, forma, descrição, valor e status em cada linha usada.")
+      alert("Preencha data, tipo, centro de custo, forma, valor e status. Para receitas, informe também a descrição.")
       return
     }
     setCarregando(true)
@@ -292,7 +312,7 @@ export default function Financeiro() {
                   <td style={tdMassa}><select style={inputTabela} value={linha.tipo} onChange={(e) => atualizarLinha(index, "tipo", e.target.value)}><option value="Receber">Receita</option><option value="Pagar">Despesa</option></select></td>
                   <td style={tdMassa}><input style={inputTabela} list="centros-custo-financeiro" placeholder="Selecione ou digite" value={linha.centroCusto} onChange={(e) => atualizarLinha(index, "centroCusto", e.target.value)} /></td>
                   <td style={tdMassa}><select style={inputTabela} value={linha.formaPagamento} onChange={(e) => atualizarLinha(index, "formaPagamento", e.target.value)}><option value="">Selecione</option>{formasPagamento.map((item) => <option key={item} value={item}>{item}</option>)}</select></td>
-                  <td style={tdMassa}><input style={inputTabela} list="servicos-financeiro" placeholder="Ex: honorários, abertura MEI, internet..." value={linha.descricao} onChange={(e) => { atualizarLinha(index, "descricao", e.target.value); selecionarServico(index, e.target.value) }} /></td>
+                  <td style={tdMassa}><input style={inputTabela} list="servicos-financeiro" placeholder="Descrição / histórico (opcional para despesa)" value={linha.descricao} onChange={(e) => { atualizarLinha(index, "descricao", e.target.value); selecionarServico(index, e.target.value) }} /></td>
                   <td style={tdMassa}><input style={inputTabela} list="clientes-financeiro" placeholder="Opcional" value={linha.cliente} onChange={(e) => atualizarLinha(index, "cliente", e.target.value)} /></td>
                   <td style={tdMassa}><select style={inputTabela} value={linha.status} onChange={(e) => atualizarLinha(index, "status", e.target.value)}><option value="Recebido">Recebido</option><option value="Pago">Pago</option><option value="Pendente">Pendente</option><option value="Atrasado">Atrasado</option></select></td>
                   <td style={tdMassa}><input style={{ ...inputTabela, textAlign: "right" }} placeholder="0,00" value={linha.valor} onChange={(e) => atualizarLinha(index, "valor", e.target.value)} /></td>
