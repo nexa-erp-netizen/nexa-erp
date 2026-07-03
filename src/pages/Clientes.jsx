@@ -31,6 +31,8 @@ export default function Clientes() {
   const [anexos, setAnexos] = useState([])
   const [pesquisaCliente, setPesquisaCliente] = useState("")
   const [novaAnotacao, setNovaAnotacao] = useState("")
+  const [novaAcao, setNovaAcao] = useState("")
+  const [vencimentoAcao, setVencimentoAcao] = useState("")
 
   const regimes = [
     "Avulso",
@@ -186,6 +188,7 @@ export default function Clientes() {
       observacao,
       anexos,
       anotacoes: clienteSelecionado?.anotacoes || [],
+      proximasAcoes: clienteSelecionado?.proximasAcoes || [],
     }
 
     try {
@@ -222,6 +225,7 @@ export default function Clientes() {
     setClienteSelecionado(cliente)
     setEditandoId(cliente.id)
     setTela("detalhes")
+    setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0)
   }
 
   function editarCliente() {
@@ -385,6 +389,129 @@ export default function Clientes() {
       await carregarClientes()
     } catch (error) {
       alert("Erro ao excluir anotação")
+      console.error(error)
+    }
+  }
+
+    async function salvarProximaAcaoCliente() {
+    if (!clienteSelecionado || !novaAcao.trim()) {
+      alert("Digite a próxima ação antes de salvar")
+      return
+    }
+
+    const acao = {
+      id: Date.now(),
+      dataCriacao: new Date().toISOString(),
+      descricao: novaAcao.trim(),
+      vencimento: vencimentoAcao || "",
+      status: "Pendente",
+    }
+
+    const proximasAcoesAtualizadas = [
+      acao,
+      ...(Array.isArray(clienteSelecionado.proximasAcoes) ? clienteSelecionado.proximasAcoes : []),
+    ]
+
+    try {
+      const resposta = await api.put(`/clientes/${clienteSelecionado.id}`, {
+        ...clienteSelecionado,
+        proximasAcoes: proximasAcoesAtualizadas,
+      })
+
+      const clienteAtualizado = resposta.data || {
+        ...clienteSelecionado,
+        proximasAcoes: proximasAcoesAtualizadas,
+      }
+
+      setClienteSelecionado(clienteAtualizado)
+      setNovaAcao("")
+      setVencimentoAcao("")
+      await carregarClientes()
+    } catch (error) {
+      alert("Erro ao salvar próxima ação")
+      console.error(error)
+    }
+  }
+
+  async function concluirProximaAcaoCliente(acaoId) {
+    if (!clienteSelecionado) return
+
+    const proximasAcoesAtuais = Array.isArray(clienteSelecionado.proximasAcoes)
+      ? clienteSelecionado.proximasAcoes
+      : []
+
+    const acaoConcluida = proximasAcoesAtuais.find(
+      (item) => String(item.id || item.dataCriacao) === String(acaoId)
+    )
+
+    if (!acaoConcluida) return
+
+    const proximasAcoesAtualizadas = proximasAcoesAtuais.filter(
+      (item) => String(item.id || item.dataCriacao) !== String(acaoId)
+    )
+
+    const anotacaoAutomatica = {
+      id: Date.now(),
+      data: new Date().toISOString(),
+      tipo: "Ação concluída",
+      texto: `✔ ${acaoConcluida.descricao}`,
+    }
+
+    const anotacoesAtualizadas = [
+      anotacaoAutomatica,
+      ...(Array.isArray(clienteSelecionado.anotacoes) ? clienteSelecionado.anotacoes : []),
+    ]
+
+    try {
+      const resposta = await api.put(`/clientes/${clienteSelecionado.id}`, {
+        ...clienteSelecionado,
+        proximasAcoes: proximasAcoesAtualizadas,
+        anotacoes: anotacoesAtualizadas,
+      })
+
+      const clienteAtualizado = resposta.data || {
+        ...clienteSelecionado,
+        proximasAcoes: proximasAcoesAtualizadas,
+        anotacoes: anotacoesAtualizadas,
+      }
+
+      setClienteSelecionado(clienteAtualizado)
+      await carregarClientes()
+    } catch (error) {
+      alert("Erro ao concluir próxima ação")
+      console.error(error)
+    }
+  }
+
+  async function excluirProximaAcaoCliente(acaoId) {
+    if (!clienteSelecionado) return
+
+    const confirmar = window.confirm("Deseja realmente excluir esta próxima ação?")
+    if (!confirmar) return
+
+    const proximasAcoesAtuais = Array.isArray(clienteSelecionado.proximasAcoes)
+      ? clienteSelecionado.proximasAcoes
+      : []
+
+    const proximasAcoesAtualizadas = proximasAcoesAtuais.filter(
+      (item) => String(item.id || item.dataCriacao) !== String(acaoId)
+    )
+
+    try {
+      const resposta = await api.put(`/clientes/${clienteSelecionado.id}`, {
+        ...clienteSelecionado,
+        proximasAcoes: proximasAcoesAtualizadas,
+      })
+
+      const clienteAtualizado = resposta.data || {
+        ...clienteSelecionado,
+        proximasAcoes: proximasAcoesAtualizadas,
+      }
+
+      setClienteSelecionado(clienteAtualizado)
+      await carregarClientes()
+    } catch (error) {
+      alert("Erro ao excluir próxima ação")
       console.error(error)
     }
   }
@@ -747,6 +874,68 @@ export default function Clientes() {
           </div>
 
           <div style={observacaoBox}>
+            <span style={infoLabel}>Próximas Ações</span>
+
+            <div style={acaoForm}>
+              <input
+                style={input}
+                placeholder="Ex: Entregar DAS, emitir NFS-e, fazer declaração..."
+                value={novaAcao}
+                onChange={(e) => setNovaAcao(e.target.value)}
+              />
+
+              <input
+                style={input}
+                type="date"
+                value={vencimentoAcao}
+                onChange={(e) => setVencimentoAcao(e.target.value)}
+              />
+
+              <button style={button} onClick={salvarProximaAcaoCliente}>
+                Salvar Ação
+              </button>
+            </div>
+
+            <div style={anotacoesLista}>
+              {(Array.isArray(clienteSelecionado.proximasAcoes) ? clienteSelecionado.proximasAcoes : []).length > 0 ? (
+                [...clienteSelecionado.proximasAcoes]
+                  .sort((a, b) => String(a.vencimento || "9999-12-31").localeCompare(String(b.vencimento || "9999-12-31")))
+                  .map((item) => (
+                    <div key={item.id || item.dataCriacao} style={acaoItem}>
+                      <div>
+                        <strong style={acaoTitulo}>{item.descricao}</strong>
+                        <span style={acaoData}>
+                          {item.vencimento ? `Vence em ${formatarDataBR(item.vencimento)}` : "Sem vencimento"}
+                        </span>
+                      </div>
+
+                      <div style={acaoBotoes}>
+                        <button
+                          type="button"
+                          style={botaoConcluirAcao}
+                          onClick={() => concluirProximaAcaoCliente(item.id || item.dataCriacao)}
+                        >
+                          Concluir
+                        </button>
+
+                        <button
+                          type="button"
+                          title="Excluir ação"
+                          style={botaoLixeiraAnotacao}
+                          onClick={() => excluirProximaAcaoCliente(item.id || item.dataCriacao)}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                <p style={observacaoTexto}>Nenhuma próxima ação cadastrada.</p>
+              )}
+            </div>
+          </div>
+
+          <div style={observacaoBox}>
             <span style={infoLabel}>Histórico / Anotações do Cliente</span>
 
             <textarea
@@ -767,7 +956,7 @@ export default function Clientes() {
                   .map((item) => (
                     <div key={item.id || item.data} style={anotacaoItem}>
                       <div style={anotacaoTopo}>
-                        <span style={anotacaoData}>{formatarDataHoraBR(item.data)}</span>
+                        <span style={anotacaoData}>{item.tipo ? `${item.tipo} • ` : ""}{formatarDataHoraBR(item.data)}</span>
 
                         <button
                           type="button"
@@ -1072,6 +1261,53 @@ const anotacaoData = {
   fontWeight: "bold",
   fontSize: "13px",
   marginBottom: "8px",
+}
+
+const acaoForm = {
+  display: "grid",
+  gridTemplateColumns: "minmax(220px, 1fr) 180px auto",
+  gap: "12px",
+  marginBottom: "16px",
+}
+
+const acaoItem = {
+  background: "rgba(0,168,255,.08)",
+  border: "1px solid rgba(0,168,255,.18)",
+  borderRadius: "12px",
+  padding: "14px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "14px",
+  flexWrap: "wrap",
+}
+
+const acaoTitulo = {
+  display: "block",
+  color: "white",
+  fontSize: "15px",
+  marginBottom: "6px",
+}
+
+const acaoData = {
+  color: "#a9b8cc",
+  fontSize: "13px",
+}
+
+const acaoBotoes = {
+  display: "flex",
+  gap: "8px",
+  alignItems: "center",
+}
+
+const botaoConcluirAcao = {
+  padding: "8px 12px",
+  borderRadius: "8px",
+  border: "none",
+  background: "#37ff74",
+  color: "#00112b",
+  fontWeight: "bold",
+  cursor: "pointer",
 }
 
 const actions = {

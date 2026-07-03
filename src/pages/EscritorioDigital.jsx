@@ -92,6 +92,10 @@ export default function EscritorioDigital({ setPage }) {
     },
   ]
 
+  const clientesAcessoOrdenados = [...clientesAcesso].sort((a, b) =>
+    String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR", { sensitivity: "base" })
+  )
+
   const clienteAcessoSelecionado = clientesAcesso.find(
     (clienteItem) => String(clienteItem.id) === String(clienteAcessoId)
   )
@@ -311,7 +315,7 @@ export default function EscritorioDigital({ setPage }) {
               }}
             >
               <option value="">Selecione um cliente</option>
-              {clientesAcesso.map((clienteItem) => (
+              {clientesAcessoOrdenados.map((clienteItem) => (
                 <option key={clienteItem.id} value={clienteItem.id}>
                   {clienteItem.nome}
                 </option>
