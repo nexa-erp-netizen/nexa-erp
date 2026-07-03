@@ -1098,3 +1098,11 @@ const deleteButton = {
   fontWeight: "bold",
   cursor: "pointer",
 }
+
+ const anotacaoTopo = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "10px",
+  marginBottom: "8px",
+}
