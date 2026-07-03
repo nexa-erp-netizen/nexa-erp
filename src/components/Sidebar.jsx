@@ -71,7 +71,7 @@ export default function Sidebar({ page, setPage, usuario }) {
     {
       titulo: "Fiscal",
       icon: <FaFileInvoice />,
-      itens: ["Fiscal", "Acesso Rápido Fiscal"],
+      itens: ["Fiscal"],
     },
     {
       titulo: "Financeiro",

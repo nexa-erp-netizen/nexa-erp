@@ -12,7 +12,11 @@ export default function Clientes() {
   const [email, setEmail] = useState("")
   const [cnpj, setCnpj] = useState("")
   const [regime, setRegime] = useState("")
+  const [cep, setCep] = useState("")
   const [endereco, setEndereco] = useState("")
+  const [numero, setNumero] = useState("")
+  const [bairro, setBairro] = useState("")
+  const [complemento, setComplemento] = useState("")
   const [cidade, setCidade] = useState("")
   const [estado, setEstado] = useState("")
   const [dataNascimento, setDataNascimento] = useState("")
@@ -25,6 +29,8 @@ export default function Clientes() {
   const [alvara, setAlvara] = useState("")
   const [observacao, setObservacao] = useState("")
   const [anexos, setAnexos] = useState([])
+  const [pesquisaCliente, setPesquisaCliente] = useState("")
+  const [novaAnotacao, setNovaAnotacao] = useState("")
 
   const regimes = [
     "Avulso",
@@ -85,6 +91,39 @@ export default function Clientes() {
       .replace(/(\d{4})(\d{1,2})$/, "$1-$2")
   }
 
+  function formatarCEP(valor) {
+    return valor
+      .replace(/\D/g, "")
+      .slice(0, 8)
+      .replace(/(\d{5})(\d)/, "$1-$2")
+  }
+
+  async function buscarEnderecoPorCep(valorCep = cep) {
+    const cepLimpo = String(valorCep || "").replace(/\D/g, "")
+
+    if (cepLimpo.length !== 8) {
+      return
+    }
+
+    try {
+      const resposta = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
+      const dados = await resposta.json()
+
+      if (dados.erro) {
+        alert("CEP não encontrado")
+        return
+      }
+
+      setEndereco(dados.logradouro || "")
+      setBairro(dados.bairro || "")
+      setCidade(dados.localidade || "")
+      setEstado(dados.uf || "")
+    } catch (error) {
+      alert("Erro ao buscar CEP")
+      console.error(error)
+    }
+  }
+
   async function adicionarAnexos(e) {
     const arquivos = Array.from(e.target.files)
 
@@ -129,7 +168,11 @@ export default function Clientes() {
       email,
       cnpj,
       regime,
+      cep,
       endereco,
+      numero,
+      bairro,
+      complemento,
       cidade,
       estado,
       dataNascimento,
@@ -142,6 +185,7 @@ export default function Clientes() {
       alvara,
       observacao,
       anexos,
+      anotacoes: clienteSelecionado?.anotacoes || [],
     }
 
     try {
@@ -189,7 +233,11 @@ export default function Clientes() {
     setEmail(clienteSelecionado.email || "")
     setCnpj(clienteSelecionado.cnpj || "")
     setRegime(clienteSelecionado.regime || "")
+    setCep(clienteSelecionado.cep || "")
     setEndereco(clienteSelecionado.endereco || "")
+    setNumero(clienteSelecionado.numero || "")
+    setBairro(clienteSelecionado.bairro || "")
+    setComplemento(clienteSelecionado.complemento || "")
     setCidade(clienteSelecionado.cidade || "")
     setEstado(clienteSelecionado.estado || "")
     setDataNascimento(clienteSelecionado.dataNascimento || "")
@@ -271,6 +319,43 @@ export default function Clientes() {
     setTela("lista")
   }
 
+  async function salvarAnotacaoCliente() {
+    if (!clienteSelecionado || !novaAnotacao.trim()) {
+      alert("Digite uma anotação antes de salvar")
+      return
+    }
+
+    const anotacao = {
+      id: Date.now(),
+      data: new Date().toISOString(),
+      texto: novaAnotacao.trim(),
+    }
+
+    const anotacoesAtualizadas = [
+      anotacao,
+      ...(Array.isArray(clienteSelecionado.anotacoes) ? clienteSelecionado.anotacoes : []),
+    ]
+
+    try {
+      const resposta = await api.put(`/clientes/${clienteSelecionado.id}`, {
+        ...clienteSelecionado,
+        anotacoes: anotacoesAtualizadas,
+      })
+
+      const clienteAtualizado = resposta.data || {
+        ...clienteSelecionado,
+        anotacoes: anotacoesAtualizadas,
+      }
+
+      setClienteSelecionado(clienteAtualizado)
+      setNovaAnotacao("")
+      await carregarClientes()
+    } catch (error) {
+      alert("Erro ao salvar anotação")
+      console.error(error)
+    }
+  }
+
   function limparCampos() {
     setNome("")
     setCpf("")
@@ -278,7 +363,11 @@ export default function Clientes() {
     setEmail("")
     setCnpj("")
     setRegime("")
+    setCep("")
     setEndereco("")
+    setNumero("")
+    setBairro("")
+    setComplemento("")
     setCidade("")
     setEstado("")
     setDataNascimento("")
@@ -293,6 +382,14 @@ export default function Clientes() {
     setAnexos([])
   }
 
+  const clientesOrdenados = [...clientes].sort((a, b) =>
+    String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR", { sensitivity: "base" })
+  )
+
+  const clientesFiltrados = clientesOrdenados.filter((cliente) =>
+    String(cliente.nome || "").toLowerCase().includes(pesquisaCliente.toLowerCase())
+  )
+
   return (
     <div style={box}>
       {tela === "lista" && (
@@ -303,6 +400,15 @@ export default function Clientes() {
             <button style={button} onClick={novoCliente}>
               Novo Cliente
             </button>
+          </div>
+
+          <div style={pesquisaBox}>
+            <input
+              style={input}
+              placeholder="Pesquisar cliente pelo nome..."
+              value={pesquisaCliente}
+              onChange={(e) => setPesquisaCliente(e.target.value)}
+            />
           </div>
 
           <table style={table}>
@@ -316,7 +422,7 @@ export default function Clientes() {
             </thead>
 
             <tbody>
-              {clientes.map((cliente) => (
+              {clientesFiltrados.map((cliente) => (
                 <tr key={cliente.id}>
                   <td style={td}>{cliente.nome}</td>
                   <td style={td}>{cliente.cpf}</td>
@@ -401,9 +507,31 @@ export default function Clientes() {
 
             <input
               style={input}
+              placeholder="CEP"
+              value={cep}
+              onChange={(e) => setCep(formatarCEP(e.target.value))}
+              onBlur={() => buscarEnderecoPorCep()}
+            />
+
+            <input
+              style={input}
               placeholder="Endereço"
               value={endereco}
               onChange={(e) => setEndereco(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="Número"
+              value={numero}
+              onChange={(e) => setNumero(e.target.value)}
+            />
+
+            <input
+              style={input}
+              placeholder="Bairro"
+              value={bairro}
+              onChange={(e) => setBairro(e.target.value)}
             />
 
             <input
@@ -426,6 +554,13 @@ export default function Clientes() {
                 </option>
               ))}
             </select>
+
+            <input
+              style={input}
+              placeholder="Complemento"
+              value={complemento}
+              onChange={(e) => setComplemento(e.target.value)}
+            />
 
             <div style={dateBox}>
               <span style={dateLabel}>Data de nascimento</span>
@@ -556,14 +691,14 @@ export default function Clientes() {
             <Info label="E-mail" value={clienteSelecionado.email} />
             <Info label="CNPJ" value={clienteSelecionado.cnpj} />
             <Info label="Regime" value={clienteSelecionado.regime} />
+            <Info label="CEP" value={clienteSelecionado.cep} />
             <Info label="Endereço" value={clienteSelecionado.endereco} />
+            <Info label="Número" value={clienteSelecionado.numero} />
+            <Info label="Bairro" value={clienteSelecionado.bairro} />
             <Info label="Cidade" value={clienteSelecionado.cidade} />
             <Info label="Estado" value={clienteSelecionado.estado} />
+            <Info label="Complemento" value={clienteSelecionado.complemento} />
             <Info label="Data Nascimento" value={formatarDataBR(clienteSelecionado.dataNascimento)} />
-            <Info label="CNAE Principal" value={clienteSelecionado.cnaePrincipal} />
-            <Info label="Inscrição Municipal" value={clienteSelecionado.inscricaoMunicipal} />
-            <Info label="Inscrição Estadual" value={clienteSelecionado.inscricaoEstadual} />
-            <Info label="Alvará" value={clienteSelecionado.alvara} />
             <Info label="CNAE Principal" value={clienteSelecionado.cnaePrincipal} />
             <Info label="Inscrição Municipal" value={clienteSelecionado.inscricaoMunicipal} />
             <Info label="Inscrição Estadual" value={clienteSelecionado.inscricaoEstadual} />
@@ -576,6 +711,34 @@ export default function Clientes() {
             <p style={observacaoTexto}>
               {clienteSelecionado.observacao || "Não informado"}
             </p>
+          </div>
+
+          <div style={observacaoBox}>
+            <span style={infoLabel}>Histórico / Anotações do Cliente</span>
+
+            <textarea
+              style={anotacaoTextarea}
+              placeholder="Ex: Feita declaração IRPF 2025, emitida NFS-e, cliente enviou documentos..."
+              value={novaAnotacao}
+              onChange={(e) => setNovaAnotacao(e.target.value)}
+            />
+
+            <button style={button} onClick={salvarAnotacaoCliente}>
+              Salvar Anotação
+            </button>
+
+            <div style={anotacoesLista}>
+              {(Array.isArray(clienteSelecionado.anotacoes) ? clienteSelecionado.anotacoes : []).length > 0 ? (
+                clienteSelecionado.anotacoes.map((item) => (
+                  <div key={item.id || item.data} style={anotacaoItem}>
+                    <span style={anotacaoData}>{formatarDataHoraBR(item.data)}</span>
+                    <p style={observacaoTexto}>{item.texto}</p>
+                  </div>
+                ))
+              ) : (
+                <p style={observacaoTexto}>Nenhuma anotação registrada.</p>
+              )}
+            </div>
           </div>
 
           <div style={observacaoBox}>
@@ -624,6 +787,12 @@ function formatarDataBR(data) {
   return new Date(data + "T00:00:00").toLocaleDateString("pt-BR")
 }
 
+function formatarDataHoraBR(data) {
+  if (!data) return ""
+
+  return new Date(data).toLocaleString("pt-BR")
+}
+
 function Info({ label, value }) {
   return (
     <div style={infoBox}>
@@ -644,6 +813,10 @@ const topo = {
   justifyContent: "space-between",
   alignItems: "center",
   marginBottom: "25px",
+}
+
+const pesquisaBox = {
+  marginBottom: "18px",
 }
 
 const form = {
@@ -824,6 +997,34 @@ const observacaoTexto = {
   color: "white",
   lineHeight: "28px",
   margin: 0,
+}
+
+const anotacaoTextarea = {
+  ...textarea,
+  minHeight: "90px",
+  marginBottom: "12px",
+}
+
+const anotacoesLista = {
+  marginTop: "16px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "12px",
+}
+
+const anotacaoItem = {
+  background: "rgba(255,255,255,.06)",
+  border: "1px solid rgba(255,255,255,.10)",
+  borderRadius: "12px",
+  padding: "14px",
+}
+
+const anotacaoData = {
+  display: "block",
+  color: "#37ff74",
+  fontWeight: "bold",
+  fontSize: "13px",
+  marginBottom: "8px",
 }
 
 const actions = {

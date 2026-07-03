@@ -7,9 +7,13 @@ export default function EscritorioDigital({ setPage }) {
   const [cliente, setCliente] = useState("")
   const [data, setData] = useState("")
   const [tipo, setTipo] = useState("")
+  const [clientesAcesso, setClientesAcesso] = useState([])
+  const [clienteAcessoId, setClienteAcessoId] = useState("")
+  const [mensagemAcesso, setMensagemAcesso] = useState("")
   
   useEffect(() => {
     carregarEventos()
+    carregarClientesAcesso()
   }, [])
 
   async function carregarEventos() {
@@ -21,6 +25,124 @@ export default function EscritorioDigital({ setPage }) {
     console.error(error)
   }
 }
+
+  async function carregarClientesAcesso() {
+    try {
+      const resposta = await api.get("/clientes")
+      setClientesAcesso(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (error) {
+      console.error("Erro ao carregar clientes para acesso rápido:", error)
+    }
+  }
+
+  const atalhosRapidos = [
+    {
+      titulo: "PGMEI - DAS MEI",
+      descricao: "Emitir ou reemitir DAS do MEI.",
+      link: "https://www8.receita.fazenda.gov.br/SimplesNacional/Aplicacoes/ATSPO/pgmei.app/Identificacao",
+      copiarCnpj: true,
+    },
+    {
+      titulo: "DASN-SIMEI",
+      descricao: "Declaração anual do MEI.",
+      link: "https://www8.receita.fazenda.gov.br/SimplesNacional/Aplicacoes/ATSPO/dasnsimei.app/Identificacao",
+      copiarCnpj: true,
+    },
+    {
+      titulo: "Simples Nacional",
+      descricao: "Portal do Simples Nacional.",
+      link: "https://www8.receita.fazenda.gov.br/SimplesNacional/",
+      copiarCnpj: true,
+    },
+    {
+      titulo: "PGDAS-D",
+      descricao: "Apuração e emissão de DAS do Simples Nacional.",
+      link: "https://www8.receita.fazenda.gov.br/SimplesNacional/Aplicacoes/ATSPO/pgdasd.app/",
+      copiarCnpj: true,
+    },
+    {
+      titulo: "e-CAC",
+      descricao: "Centro Virtual de Atendimento da Receita Federal.",
+      link: "https://cav.receita.fazenda.gov.br/autenticacao/login",
+      copiarCnpj: false,
+    },
+    {
+      titulo: "Consulta CNPJ",
+      descricao: "Consultar dados cadastrais de empresa.",
+      link: "https://solucoes.receita.fazenda.gov.br/servicos/cnpjreva/cnpjreva_solicitacao.asp",
+      copiarCnpj: true,
+    },
+    {
+      titulo: "CND Federal",
+      descricao: "Emitir certidão negativa de débitos federais.",
+      link: "https://solucoes.receita.fazenda.gov.br/Servicos/certidaointernet/PJ/Emitir",
+      copiarCnpj: true,
+    },
+    {
+      titulo: "FGTS - Regularidade",
+      descricao: "Consultar certidão de regularidade do FGTS.",
+      link: "https://consulta-crf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf",
+      copiarCnpj: true,
+    },
+    {
+      titulo: "Meu INSS",
+      descricao: "Acessar o portal Meu INSS.",
+      link: "https://meu.inss.gov.br",
+      copiarCnpj: false,
+    },
+  ]
+
+  const clienteAcessoSelecionado = clientesAcesso.find(
+    (clienteItem) => String(clienteItem.id) === String(clienteAcessoId)
+  )
+
+  function obterCnpj(clienteItem) {
+    return (
+      clienteItem?.cnpj ||
+      clienteItem?.CNPJ ||
+      clienteItem?.documento ||
+      clienteItem?.cpfCnpj ||
+      clienteItem?.cpf_cnpj ||
+      ""
+    )
+  }
+
+  function limparCnpj(cnpj) {
+    return String(cnpj || "").replace(/\D/g, "")
+  }
+
+  async function copiarCnpj(clienteItem, tituloAtalho) {
+    const cnpj = limparCnpj(obterCnpj(clienteItem))
+
+    if (!cnpj) {
+      setMensagemAcesso("Cliente selecionado não possui CNPJ cadastrado.")
+      return false
+    }
+
+    try {
+      await navigator.clipboard.writeText(cnpj)
+      setMensagemAcesso(`CNPJ de ${clienteItem.nome} copiado para usar em ${tituloAtalho}.`)
+      setTimeout(() => setMensagemAcesso(""), 4500)
+      return true
+    } catch (error) {
+      console.error("Erro ao copiar CNPJ:", error)
+      setMensagemAcesso("Não foi possível copiar o CNPJ automaticamente.")
+      return false
+    }
+  }
+
+  async function abrirAtalhoRapido(item) {
+    if (item.copiarCnpj) {
+      if (!clienteAcessoSelecionado) {
+        setMensagemAcesso("Selecione um cliente antes de acessar este atalho.")
+        return
+      }
+
+      await copiarCnpj(clienteAcessoSelecionado, item.titulo)
+    }
+
+    window.open(item.link, "_blank")
+  }
 
   const hoje = new Date()
   const ano = hoje.getFullYear()
@@ -166,6 +288,59 @@ export default function EscritorioDigital({ setPage }) {
           >
             Abrir Central
           </button>
+        </div>
+      </div>
+
+      <div style={acessoRapidoBox}>
+        <div style={agendaTopo}>
+          <div>
+            <h3>Acesso Rápido</h3>
+            <p style={subtitle}>Central de portais fiscais, previdenciários e consultas do escritório.</p>
+          </div>
+        </div>
+
+        <div style={filtroAcessoBox}>
+          <div>
+            <label style={labelAcesso}>Cliente para copiar CNPJ</label>
+            <select
+              style={input}
+              value={clienteAcessoId}
+              onChange={(e) => {
+                setClienteAcessoId(e.target.value)
+                setMensagemAcesso("")
+              }}
+            >
+              <option value="">Selecione um cliente</option>
+              {clientesAcesso.map((clienteItem) => (
+                <option key={clienteItem.id} value={clienteItem.id}>
+                  {clienteItem.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={infoAcessoCliente}>
+            <span style={labelAcesso}>CNPJ selecionado</span>
+            <strong>
+              {clienteAcessoSelecionado
+                ? obterCnpj(clienteAcessoSelecionado) || "Sem CNPJ cadastrado"
+                : "Nenhum cliente selecionado"}
+            </strong>
+          </div>
+        </div>
+
+        {mensagemAcesso && <div style={toastAcesso}>{mensagemAcesso}</div>}
+
+        <div style={gridAtalhos}>
+          {atalhosRapidos.map((item, index) => (
+            <div key={index} style={atalhoCard}>
+              <h4>{item.titulo}</h4>
+              <p>{item.descricao}</p>
+              <button style={button} onClick={() => abrirAtalhoRapido(item)}>
+                {item.copiarCnpj ? "Copiar CNPJ e Acessar" : "Acessar"}
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -405,4 +580,58 @@ const deleteEventoButton = {
   cursor: "pointer",
   fontWeight: "bold",
   marginLeft: "8px",
+}
+const acessoRapidoBox = {
+  background: "rgba(255,255,255,0.06)",
+  borderRadius: "24px",
+  padding: "28px",
+  color: "white",
+  marginBottom: "28px",
+}
+
+const filtroAcessoBox = {
+  display: "grid",
+  gridTemplateColumns: "1.5fr 1fr",
+  gap: "16px",
+  marginBottom: "18px",
+}
+
+const labelAcesso = {
+  display: "block",
+  color: "#a9b8cc",
+  marginBottom: "8px",
+  fontSize: "14px",
+}
+
+const infoAcessoCliente = {
+  background: "#061f47",
+  border: "1px solid rgba(255,255,255,.12)",
+  borderRadius: "14px",
+  padding: "14px",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+}
+
+const toastAcesso = {
+  background: "rgba(55,255,116,.12)",
+  border: "1px solid rgba(55,255,116,.35)",
+  color: "#37ff74",
+  padding: "12px 16px",
+  borderRadius: "12px",
+  marginBottom: "18px",
+  fontWeight: "bold",
+}
+
+const gridAtalhos = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+  gap: "16px",
+}
+
+const atalhoCard = {
+  background: "#061f47",
+  border: "1px solid rgba(255,255,255,.12)",
+  borderRadius: "18px",
+  padding: "18px",
 }

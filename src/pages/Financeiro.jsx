@@ -213,9 +213,7 @@ export default function Financeiro() {
 
   function montarPayload(linha) {
     const ehPagar = modoLancamento === "Pagar"
-    const descricaoFinal = ehPagar
-      ? linha.centroCusto || "Despesa do Escritório"
-      : linha.descricao?.trim() || linha.centroCusto || "Receita Avulsa"
+    const descricaoFinal = linha.descricao?.trim() || linha.centroCusto || (ehPagar ? "Despesa do Escritório" : "Receita Avulsa")
 
     const clienteFinal = ehPagar ? "Escritório" : linha.cliente?.trim() || "Cliente Avulso"
 
@@ -235,7 +233,13 @@ export default function Financeiro() {
   }
 
   function linhaPreenchida(linha) {
-    return linha.data || linha.descricao || linha.valor || linha.centroCusto || linha.formaPagamento || linha.cliente
+    return Boolean(
+      linha.descricao?.trim() ||
+        linha.valor?.trim() ||
+        linha.centroCusto?.trim() ||
+        linha.formaPagamento?.trim() ||
+        linha.cliente?.trim()
+    )
   }
 
   function linhaValida(linha) {
@@ -291,7 +295,7 @@ export default function Financeiro() {
         tipo,
         centroCusto: item.centroCusto || "",
         formaPagamento: item.formaPagamento || "",
-        descricao: tipo === "Pagar" ? "" : item.descricao || "",
+        descricao: item.descricao || "",
         cliente: tipo === "Pagar" ? "" : item.cliente || "",
         valor: item.valor || "",
         status: item.status || (tipo === "Pagar" ? "Pago" : "Recebido"),
@@ -373,7 +377,7 @@ export default function Financeiro() {
             <h3>{editandoId ? "Corrigir Lançamento" : modoLancamento === "Pagar" ? "Nova Despesa" : "Nova Receita"}</h3>
             <p style={ajudaLancamento}>
               {modoLancamento === "Pagar"
-                ? "Despesa simples: data, centro de custo, forma, status e valor."
+                ? "Despesa simples: informe o centro de custo e digite o histórico, como combustível, internet ou material."
                 : "Receita avulsa: informe a descrição do serviço para identificar a entrada."}
             </p>
           </div>
@@ -400,7 +404,7 @@ export default function Financeiro() {
                 <th style={thMassa}>Data</th>
                 <th style={thMassa}>Centro de Custo</th>
                 <th style={thMassa}>Forma</th>
-                {modoLancamento === "Receber" && <th style={thMassa}>Descrição / Serviço</th>}
+                <th style={thMassa}>{modoLancamento === "Pagar" ? "Descrição / Histórico" : "Descrição / Serviço"}</th>
                 {modoLancamento === "Receber" && <th style={thMassa}>Cliente</th>}
                 <th style={thMassa}>Status</th>
                 <th style={thMassa}>Valor</th>
@@ -425,11 +429,13 @@ export default function Financeiro() {
                     </select>
                   </td>
 
-                  {modoLancamento === "Receber" && (
-                    <td style={tdMassa}>
+                  <td style={tdMassa}>
+                    {modoLancamento === "Receber" ? (
                       <input style={inputTabela} list="servicos-financeiro" placeholder="Ex: abertura MEI, honorários..." value={linha.descricao} onChange={(e) => { atualizarLinha(index, "descricao", e.target.value); selecionarServico(index, e.target.value) }} />
-                    </td>
-                  )}
+                    ) : (
+                      <input style={inputTabela} placeholder="Ex: combustível, internet, estacionamento..." value={linha.descricao} onChange={(e) => atualizarLinha(index, "descricao", e.target.value)} />
+                    )}
+                  </td>
 
                   {modoLancamento === "Receber" && (
                     <td style={tdMassa}>
@@ -596,7 +602,7 @@ const ajudaLancamento = { margin: "6px 0 0", color: "#a9b8cc", fontSize: "14px" 
 const acoesTopo = { display: "flex", gap: "12px", flexWrap: "wrap" }
 const tabelaMassaWrapper = { overflowX: "auto" }
 const tabelaMassaReceita = { width: "100%", minWidth: "1120px", borderCollapse: "collapse" }
-const tabelaMassaDespesa = { width: "100%", minWidth: "780px", borderCollapse: "collapse" }
+const tabelaMassaDespesa = { width: "100%", minWidth: "980px", borderCollapse: "collapse" }
 const thMassa = { textAlign: "left", padding: "12px", background: "#051b3d", color: "#4cc9ff" }
 const tdMassa = { padding: "8px" }
 const inputTabela = { width: "100%", boxSizing: "border-box", padding: "13px", borderRadius: "10px", border: "1px solid rgba(255,255,255,.14)", background: "#092b5d", color: "white", fontSize: "14px" }

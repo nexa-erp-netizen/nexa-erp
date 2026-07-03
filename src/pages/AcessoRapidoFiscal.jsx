@@ -26,6 +26,12 @@ export default function AcessoRapidoFiscal() {
       copiarCnpj: true,
     },
     {
+      titulo: "Meu INSS",
+      descricao: "Acessar o portal Meu INSS.",
+      link: "https://meu.inss.gov.br",
+      copiarCnpj: false,
+    },  
+    {
       titulo: "PGDAS-D",
       descricao: "Apuração e emissão de DAS do Simples Nacional.",
       link: "https://www8.receita.fazenda.gov.br/SimplesNacional/Aplicacoes/ATSPO/pgdasd.app/",
