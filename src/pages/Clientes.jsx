@@ -1106,3 +1106,13 @@ const deleteButton = {
   gap: "10px",
   marginBottom: "8px",
 }
+
+ const botaoLixeiraAnotacao = {
+  border: "none",
+  background: "rgba(255,77,79,.18)",
+  color: "#ff7072",
+  borderRadius: "8px",
+  padding: "6px 10px",
+  cursor: "pointer",
+  fontSize: "16px",
+}
