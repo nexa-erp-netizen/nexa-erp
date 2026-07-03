@@ -356,6 +356,39 @@ export default function Clientes() {
     }
   }
 
+  async function excluirAnotacaoCliente(anotacaoId) {
+    if (!clienteSelecionado) return
+
+    const confirmar = window.confirm("Deseja realmente excluir esta anotação?")
+    if (!confirmar) return
+
+    const anotacoesAtuais = Array.isArray(clienteSelecionado.anotacoes)
+      ? clienteSelecionado.anotacoes
+      : []
+
+    const anotacoesAtualizadas = anotacoesAtuais.filter(
+      (item) => String(item.id || item.data) !== String(anotacaoId)
+    )
+
+    try {
+      const resposta = await api.put(`/clientes/${clienteSelecionado.id}`, {
+        ...clienteSelecionado,
+        anotacoes: anotacoesAtualizadas,
+      })
+
+      const clienteAtualizado = resposta.data || {
+        ...clienteSelecionado,
+        anotacoes: anotacoesAtualizadas,
+      }
+
+      setClienteSelecionado(clienteAtualizado)
+      await carregarClientes()
+    } catch (error) {
+      alert("Erro ao excluir anotação")
+      console.error(error)
+    }
+  }
+
   function limparCampos() {
     setNome("")
     setCpf("")
@@ -729,12 +762,26 @@ export default function Clientes() {
 
             <div style={anotacoesLista}>
               {(Array.isArray(clienteSelecionado.anotacoes) ? clienteSelecionado.anotacoes : []).length > 0 ? (
-                clienteSelecionado.anotacoes.map((item) => (
-                  <div key={item.id || item.data} style={anotacaoItem}>
-                    <span style={anotacaoData}>{formatarDataHoraBR(item.data)}</span>
-                    <p style={observacaoTexto}>{item.texto}</p>
-                  </div>
-                ))
+                [...clienteSelecionado.anotacoes]
+                  .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))
+                  .map((item) => (
+                    <div key={item.id || item.data} style={anotacaoItem}>
+                      <div style={anotacaoTopo}>
+                        <span style={anotacaoData}>{formatarDataHoraBR(item.data)}</span>
+
+                        <button
+                          type="button"
+                          title="Excluir anotação"
+                          style={botaoLixeiraAnotacao}
+                          onClick={() => excluirAnotacaoCliente(item.id || item.data)}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+
+                      <p style={observacaoTexto}>{item.texto}</p>
+                    </div>
+                  ))
               ) : (
                 <p style={observacaoTexto}>Nenhuma anotação registrada.</p>
               )}
