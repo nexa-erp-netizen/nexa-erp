@@ -221,11 +221,37 @@ export default function Clientes() {
     }
   }
 
+  function rolarParaTopo() {
+    const opcoes = { top: 0, left: 0, behavior: "smooth" }
+
+    window.scrollTo(opcoes)
+    document.documentElement?.scrollTo?.(opcoes)
+    document.body?.scrollTo?.(opcoes)
+
+    const possiveisContainers = [
+      document.querySelector("main"),
+      document.querySelector("#root"),
+      document.querySelector(".content"),
+      document.querySelector(".main-content"),
+      document.querySelector("[data-scroll-container]"),
+    ].filter(Boolean)
+
+    possiveisContainers.forEach((container) => {
+      if (container && typeof container.scrollTo === "function") {
+        container.scrollTo(opcoes)
+      }
+    })
+  }
+
   function visualizarCliente(cliente) {
     setClienteSelecionado(cliente)
     setEditandoId(cliente.id)
     setTela("detalhes")
-    setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0)
+
+    requestAnimationFrame(() => {
+      rolarParaTopo()
+      setTimeout(rolarParaTopo, 80)
+    })
   }
 
   function editarCliente() {
@@ -550,6 +576,26 @@ export default function Clientes() {
     String(cliente.nome || "").toLowerCase().includes(pesquisaCliente.toLowerCase())
   )
 
+  const proximasAcoesCliente = Array.isArray(clienteSelecionado?.proximasAcoes)
+    ? clienteSelecionado.proximasAcoes
+    : []
+
+  const anotacoesCliente = Array.isArray(clienteSelecionado?.anotacoes)
+    ? clienteSelecionado.anotacoes
+    : []
+
+  const anexosCliente = Array.isArray(clienteSelecionado?.anexos)
+    ? clienteSelecionado.anexos
+    : []
+
+  const ultimaAnotacao = anotacoesCliente
+    .slice()
+    .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))[0]
+
+  const localidadeCliente = [clienteSelecionado?.cidade, clienteSelecionado?.estado]
+    .filter(Boolean)
+    .join(" / ")
+
   return (
     <div style={box}>
       {tela === "lista" && (
@@ -836,45 +882,67 @@ export default function Clientes() {
 
       {tela === "detalhes" && clienteSelecionado && (
         <>
-          <div style={topo}>
-            <h2>Dados do Cliente</h2>
+          <div style={centralHero}>
+            <div style={centralHeroInfo}>
+              <div style={clienteAvatar}>
+                {String(clienteSelecionado.nome || "N").slice(0, 1).toUpperCase()}
+              </div>
 
-            <button style={backButton} onClick={voltarLista}>
-              Voltar
-            </button>
+              <div>
+                <span style={centralBadge}>Central do Cliente</span>
+                <h2 style={centralTitulo}>{clienteSelecionado.nome}</h2>
+
+                <div style={centralMeta}>
+                  <span>{clienteSelecionado.regime || "Regime não informado"}</span>
+                  <span>•</span>
+                  <span>{localidadeCliente || "Cidade não informada"}</span>
+                  <span>•</span>
+                  <span>{clienteSelecionado.cnpj || clienteSelecionado.cpf || "CPF/CNPJ não informado"}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={centralBotoes}>
+              <button style={backButton} onClick={voltarLista}>
+                Voltar
+              </button>
+
+              <button style={editButton} onClick={editarCliente}>
+                Corrigir
+              </button>
+
+              <button style={deleteButton} onClick={excluirCliente}>
+                Excluir
+              </button>
+            </div>
           </div>
 
-          <div style={detailsGrid}>
-            <Info label="Cliente" value={clienteSelecionado.nome} />
-            <Info label="CPF" value={clienteSelecionado.cpf} />
+          <div style={contatoRapido}>
             <Info label="Telefone" value={clienteSelecionado.telefone} />
             <Info label="E-mail" value={clienteSelecionado.email} />
             <Info label="CNPJ" value={clienteSelecionado.cnpj} />
-            <Info label="Regime" value={clienteSelecionado.regime} />
-            <Info label="CEP" value={clienteSelecionado.cep} />
-            <Info label="Endereço" value={clienteSelecionado.endereco} />
-            <Info label="Número" value={clienteSelecionado.numero} />
-            <Info label="Bairro" value={clienteSelecionado.bairro} />
-            <Info label="Cidade" value={clienteSelecionado.cidade} />
-            <Info label="Estado" value={clienteSelecionado.estado} />
-            <Info label="Complemento" value={clienteSelecionado.complemento} />
-            <Info label="Data Nascimento" value={formatarDataBR(clienteSelecionado.dataNascimento)} />
-            <Info label="CNAE Principal" value={clienteSelecionado.cnaePrincipal} />
-            <Info label="Inscrição Municipal" value={clienteSelecionado.inscricaoMunicipal} />
-            <Info label="Inscrição Estadual" value={clienteSelecionado.inscricaoEstadual} />
-            <Info label="Alvará" value={clienteSelecionado.alvara} />
+            <Info label="CPF" value={clienteSelecionado.cpf} />
+          </div>
+
+          <div style={resumoGrid}>
+            <ResumoCard titulo="Próximas ações" valor={proximasAcoesCliente.length} detalhe="tarefas pendentes" />
+            <ResumoCard titulo="Histórico" valor={anotacoesCliente.length} detalhe="anotações registradas" />
+            <ResumoCard titulo="Documentos" valor={anexosCliente.length} detalhe="arquivos anexados" />
+            <ResumoCard titulo="Pendências" valor="Em breve" detalhe="integração fiscal" />
+            <ResumoCard
+              titulo="Último atendimento"
+              valor={ultimaAnotacao ? formatarDataBR(String(ultimaAnotacao.data).slice(0, 10)) : "-"}
+              detalhe={ultimaAnotacao?.texto || "sem registro"}
+            />
           </div>
 
           <div style={observacaoBox}>
-            <span style={infoLabel}>Observação</span>
-
-            <p style={observacaoTexto}>
-              {clienteSelecionado.observacao || "Não informado"}
-            </p>
-          </div>
-
-          <div style={observacaoBox}>
-            <span style={infoLabel}>Próximas Ações</span>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Próximas Ações</span>
+                <p style={secaoDescricao}>Tarefas que ainda precisam ser feitas para este cliente.</p>
+              </div>
+            </div>
 
             <div style={acaoForm}>
               <input
@@ -897,8 +965,9 @@ export default function Clientes() {
             </div>
 
             <div style={anotacoesLista}>
-              {(Array.isArray(clienteSelecionado.proximasAcoes) ? clienteSelecionado.proximasAcoes : []).length > 0 ? (
-                [...clienteSelecionado.proximasAcoes]
+              {proximasAcoesCliente.length > 0 ? (
+                proximasAcoesCliente
+                  .slice()
                   .sort((a, b) => String(a.vencimento || "9999-12-31").localeCompare(String(b.vencimento || "9999-12-31")))
                   .map((item) => (
                     <div key={item.id || item.dataCriacao} style={acaoItem}>
@@ -936,7 +1005,12 @@ export default function Clientes() {
           </div>
 
           <div style={observacaoBox}>
-            <span style={infoLabel}>Histórico / Anotações do Cliente</span>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Histórico / Anotações do Cliente</span>
+                <p style={secaoDescricao}>Linha do tempo do que já foi feito ou combinado com o cliente.</p>
+              </div>
+            </div>
 
             <textarea
               style={anotacaoTextarea}
@@ -950,8 +1024,9 @@ export default function Clientes() {
             </button>
 
             <div style={anotacoesLista}>
-              {(Array.isArray(clienteSelecionado.anotacoes) ? clienteSelecionado.anotacoes : []).length > 0 ? (
-                [...clienteSelecionado.anotacoes]
+              {anotacoesCliente.length > 0 ? (
+                anotacoesCliente
+                  .slice()
                   .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))
                   .map((item) => (
                     <div key={item.id || item.data} style={anotacaoItem}>
@@ -978,11 +1053,16 @@ export default function Clientes() {
           </div>
 
           <div style={observacaoBox}>
-            <span style={infoLabel}>Arquivos Anexados</span>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Arquivos Anexados</span>
+                <p style={secaoDescricao}>Documentos do cadastro do cliente.</p>
+              </div>
+            </div>
 
-            {clienteSelecionado.anexos?.length > 0 ? (
+            {anexosCliente.length > 0 ? (
               <div style={arquivosLista}>
-                {clienteSelecionado.anexos.map((arquivo, index) => (
+                {anexosCliente.map((arquivo, index) => (
                   <div key={index} style={arquivoItem}>
                     <span>📎 {arquivo.nome}</span>
 
@@ -1002,14 +1082,45 @@ export default function Clientes() {
             )}
           </div>
 
-          <div style={actions}>
-            <button style={editButton} onClick={editarCliente}>
-              Corrigir
-            </button>
+          <div style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Dados Cadastrais</span>
+                <p style={secaoDescricao}>Informações completas do cadastro.</p>
+              </div>
+            </div>
 
-            <button style={deleteButton} onClick={excluirCliente}>
-              Excluir
-            </button>
+            <div style={detailsGrid}>
+              <Info label="Cliente" value={clienteSelecionado.nome} />
+              <Info label="CPF" value={clienteSelecionado.cpf} />
+              <Info label="Telefone" value={clienteSelecionado.telefone} />
+              <Info label="E-mail" value={clienteSelecionado.email} />
+              <Info label="CNPJ" value={clienteSelecionado.cnpj} />
+              <Info label="Regime" value={clienteSelecionado.regime} />
+              <Info label="CEP" value={clienteSelecionado.cep} />
+              <Info label="Endereço" value={clienteSelecionado.endereco} />
+              <Info label="Número" value={clienteSelecionado.numero} />
+              <Info label="Bairro" value={clienteSelecionado.bairro} />
+              <Info label="Cidade" value={clienteSelecionado.cidade} />
+              <Info label="Estado" value={clienteSelecionado.estado} />
+              <Info label="Complemento" value={clienteSelecionado.complemento} />
+              <Info label="Data Nascimento" value={formatarDataBR(clienteSelecionado.dataNascimento)} />
+              <Info label="Título de Eleitor" value={clienteSelecionado.tituloEleitor} />
+              <Info label="Código Simples Nacional" value={clienteSelecionado.codigoSimplesNacional} />
+              <Info label="Senha Gov.br" value={clienteSelecionado.senhaGovBr} />
+              <Info label="CNAE Principal" value={clienteSelecionado.cnaePrincipal} />
+              <Info label="Inscrição Municipal" value={clienteSelecionado.inscricaoMunicipal} />
+              <Info label="Inscrição Estadual" value={clienteSelecionado.inscricaoEstadual} />
+              <Info label="Alvará" value={clienteSelecionado.alvara} />
+            </div>
+          </div>
+
+          <div style={observacaoBox}>
+            <span style={infoLabel}>Observação</span>
+
+            <p style={observacaoTexto}>
+              {clienteSelecionado.observacao || "Não informado"}
+            </p>
           </div>
         </>
       )}
@@ -1036,6 +1147,143 @@ function Info({ label, value }) {
       <strong style={infoValue}>{value || "Não informado"}</strong>
     </div>
   )
+}
+
+function ResumoCard({ titulo, valor, detalhe }) {
+  return (
+    <div style={resumoCard}>
+      <span style={resumoTitulo}>{titulo}</span>
+      <strong style={resumoValor}>{valor}</strong>
+      <small style={resumoDetalhe}>{detalhe}</small>
+    </div>
+  )
+}
+
+const centralHero = {
+  background: "linear-gradient(135deg, rgba(0,168,255,.18), rgba(55,255,116,.10))",
+  border: "1px solid rgba(255,255,255,.14)",
+  borderRadius: "22px",
+  padding: "24px",
+  marginBottom: "18px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "20px",
+  flexWrap: "wrap",
+}
+
+const centralHeroInfo = {
+  display: "flex",
+  alignItems: "center",
+  gap: "18px",
+}
+
+const clienteAvatar = {
+  width: "72px",
+  height: "72px",
+  borderRadius: "22px",
+  background: "linear-gradient(135deg, #00a8ff, #37ff74)",
+  color: "#00112b",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: "32px",
+  fontWeight: "900",
+  flexShrink: 0,
+}
+
+const centralBadge = {
+  display: "inline-block",
+  color: "#37ff74",
+  background: "rgba(55,255,116,.10)",
+  border: "1px solid rgba(55,255,116,.18)",
+  borderRadius: "999px",
+  padding: "6px 12px",
+  fontSize: "12px",
+  fontWeight: "800",
+  marginBottom: "8px",
+  textTransform: "uppercase",
+  letterSpacing: ".06em",
+}
+
+const centralTitulo = {
+  margin: 0,
+  color: "white",
+  fontSize: "30px",
+  lineHeight: "36px",
+}
+
+const centralMeta = {
+  marginTop: "8px",
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
+  color: "#c4d4ea",
+  fontWeight: "600",
+}
+
+const centralBotoes = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+}
+
+const contatoRapido = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "14px",
+  marginBottom: "18px",
+}
+
+const resumoGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "14px",
+  marginBottom: "24px",
+}
+
+const resumoCard = {
+  background: "#061f47",
+  border: "1px solid rgba(255,255,255,.12)",
+  borderRadius: "18px",
+  padding: "18px",
+}
+
+const resumoTitulo = {
+  display: "block",
+  color: "#a9b8cc",
+  fontSize: "13px",
+  marginBottom: "8px",
+}
+
+const resumoValor = {
+  display: "block",
+  color: "white",
+  fontSize: "24px",
+  lineHeight: "30px",
+}
+
+const resumoDetalhe = {
+  display: "block",
+  color: "#7f93ad",
+  marginTop: "6px",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+}
+
+const secaoTopo = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "12px",
+  marginBottom: "14px",
+}
+
+const secaoDescricao = {
+  margin: "4px 0 0",
+  color: "#a9b8cc",
+  fontSize: "14px",
 }
 
 const box = {
