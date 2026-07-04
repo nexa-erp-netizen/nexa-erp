@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
 
-export default function Clientes() {
+export default function Clientes({ setPage }) {
   const [tela, setTela] = useState("lista")
   const [clienteSelecionado, setClienteSelecionado] = useState(null)
   const [editandoId, setEditandoId] = useState(null)
@@ -33,6 +33,9 @@ export default function Clientes() {
   const [novaAnotacao, setNovaAnotacao] = useState("")
   const [novaAcao, setNovaAcao] = useState("")
   const [vencimentoAcao, setVencimentoAcao] = useState("")
+  const [financeiroResumoCliente, setFinanceiroResumoCliente] = useState(null)
+  const [fiscalResumoCliente, setFiscalResumoCliente] = useState(null)
+  const [carregandoIntegracoes, setCarregandoIntegracoes] = useState(false)
 
   const regimes = [
     "Avulso",
@@ -54,6 +57,12 @@ export default function Clientes() {
     carregarClientes()
   }, [])
 
+  useEffect(() => {
+    if (tela === "detalhes" && clienteSelecionado?.nome) {
+      carregarResumoIntegracoes(clienteSelecionado.nome)
+    }
+  }, [tela, clienteSelecionado?.id])
+
   async function carregarClientes() {
     try {
       const resposta = await api.get("/clientes")
@@ -63,6 +72,105 @@ export default function Clientes() {
       alert("Erro ao carregar clientes da API")
       console.error(error)
       return []
+    }
+  }
+
+
+  function valorNumerico(valorFormatado) {
+    return Number(
+      String(valorFormatado || 0)
+        .replace("R$", "")
+        .replace(/\./g, "")
+        .replace(",", ".")
+        .trim()
+    ) || 0
+  }
+
+  function formatarMoeda(valor) {
+    return Number(valor || 0).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    })
+  }
+
+  function mesmoCliente(nomeA, nomeB) {
+    return String(nomeA || "").trim().toLowerCase() === String(nomeB || "").trim().toLowerCase()
+  }
+
+  function dataDoFinanceiro(item) {
+    return item.vencimento || item.dataRecebimento || item.createdAt || item.updatedAt || ""
+  }
+
+  function ehReceitaFinanceira(item) {
+    const tipo = String(item.tipo || "").toLowerCase()
+    return tipo.includes("receber") || tipo.includes("receita") || tipo.includes("crédito") || tipo.includes("credito")
+  }
+
+  function statusFinanceiro(item) {
+    if (item.status === "Pago" || item.status === "Recebido") return item.status
+    if (item.vencimento && new Date(item.vencimento) < new Date()) return "Atrasado"
+    return item.status || "Pendente"
+  }
+
+  async function carregarResumoIntegracoes(nomeCliente) {
+    setCarregandoIntegracoes(true)
+
+    try {
+      const [financeiroResp, fiscalResp] = await Promise.all([
+        api.get("/financeiro").catch(() => ({ data: [] })),
+        api.get("/fiscal").catch(() => ({ data: [] })),
+      ])
+
+      const financeiros = Array.isArray(financeiroResp.data) ? financeiroResp.data : []
+      const financeirosCliente = financeiros
+        .filter((item) => mesmoCliente(item.cliente, nomeCliente))
+        .filter(ehReceitaFinanceira)
+        .map((item) => ({ ...item, statusCalculado: statusFinanceiro(item), valorNumber: valorNumerico(item.valor) }))
+
+      const recebidos = financeirosCliente
+        .filter((item) => item.statusCalculado === "Pago" || item.statusCalculado === "Recebido")
+        .reduce((total, item) => total + item.valorNumber, 0)
+
+      const emAberto = financeirosCliente
+        .filter((item) => item.statusCalculado !== "Pago" && item.statusCalculado !== "Recebido")
+        .reduce((total, item) => total + item.valorNumber, 0)
+
+      const ultimoFinanceiro = [...financeirosCliente].sort(
+        (a, b) => new Date(dataDoFinanceiro(b) || 0) - new Date(dataDoFinanceiro(a) || 0)
+      )[0]
+
+      setFinanceiroResumoCliente({
+        total: financeirosCliente.length,
+        recebidos,
+        emAberto,
+        ultimo: ultimoFinanceiro,
+        situacao: emAberto > 0 ? "Atenção" : financeirosCliente.length > 0 ? "Em dia" : "Sem lançamentos",
+      })
+
+      const fiscais = Array.isArray(fiscalResp.data) ? fiscalResp.data : []
+      const fiscaisCliente = fiscais.filter((item) => mesmoCliente(item.cliente, nomeCliente))
+
+      const abertas = fiscaisCliente.filter((item) => !["Concluído", "Concluido", "Pago", "Recebido"].includes(item.status))
+      const proximaFiscal = [...abertas].sort(
+        (a, b) => new Date(a.vencimento || "9999-12-31") - new Date(b.vencimento || "9999-12-31")
+      )[0]
+      const ultimaFiscal = [...fiscaisCliente].sort(
+        (a, b) => new Date(b.updatedAt || b.createdAt || b.vencimento || 0) - new Date(a.updatedAt || a.createdAt || a.vencimento || 0)
+      )[0]
+
+      setFiscalResumoCliente({
+        total: fiscaisCliente.length,
+        abertas: abertas.length,
+        proxima: proximaFiscal,
+        ultima: ultimaFiscal,
+        situacao: abertas.length > 0 ? "Atenção" : fiscaisCliente.length > 0 ? "Em dia" : "Sem obrigações",
+      })
+    } catch (error) {
+      console.error("Erro ao carregar integrações da central", error)
+      setFinanceiroResumoCliente(null)
+      setFiscalResumoCliente(null)
+    } finally {
+      setCarregandoIntegracoes(false)
     }
   }
 
@@ -264,6 +372,31 @@ export default function Clientes() {
 
     if (elemento) {
       elemento.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }
+
+
+  function abrirFinanceiroDoCliente() {
+    if (!clienteSelecionado?.nome) return
+
+    localStorage.setItem("nexaFiltroFinanceiroCliente", clienteSelecionado.nome)
+
+    if (typeof setPage === "function") {
+      setPage("Financeiro")
+    } else {
+      alert("Filtro financeiro preparado para este cliente.")
+    }
+  }
+
+  function abrirFiscalDoCliente() {
+    if (!clienteSelecionado?.nome) return
+
+    localStorage.setItem("nexaFiltroFiscalCliente", clienteSelecionado.nome)
+
+    if (typeof setPage === "function") {
+      setPage("Fiscal")
+    } else {
+      alert("Filtro fiscal preparado para este cliente.")
     }
   }
 
@@ -954,8 +1087,8 @@ export default function Clientes() {
             <button style={centralMenuBotao} onClick={() => rolarParaSecao("historico")}>📝 Histórico</button>
             <button style={centralMenuBotao} onClick={() => rolarParaSecao("documentos")}>📎 Documentos</button>
             <button style={centralMenuBotao} onClick={() => rolarParaSecao("dados")}>📋 Dados</button>
-            <button style={centralMenuBotaoPreparado} onClick={() => alert("Financeiro será integrado na próxima etapa.")}>💰 Financeiro</button>
-            <button style={centralMenuBotaoPreparado} onClick={() => alert("Fiscal será integrado na próxima etapa.")}>🏛 Fiscal</button>
+            <button style={centralMenuBotao} onClick={() => rolarParaSecao("financeiro")}>💰 Financeiro</button>
+            <button style={centralMenuBotao} onClick={() => rolarParaSecao("fiscal")}>🏛 Fiscal</button>
           </div>
 
           <div style={contatoRapido}>
@@ -999,21 +1132,21 @@ export default function Clientes() {
             <ResumoCard
               icone="💰"
               titulo="Financeiro"
-              valor="Em breve"
-              detalhe="integração financeira"
-              status="preparado"
-              acao="Preparado"
-              onClick={() => alert("Financeiro será integrado na próxima etapa.")}
+              valor={financeiroCardValor}
+              detalhe={financeiroCardDetalhe}
+              status={financeiroResumoCliente?.emAberto > 0 ? "atencao" : financeiroResumoCliente?.total > 0 ? "ok" : "neutro"}
+              acao="Ver resumo"
+              onClick={() => rolarParaSecao("financeiro")}
             />
 
             <ResumoCard
               icone="🏛️"
               titulo="Fiscal"
-              valor="Em breve"
-              detalhe="guias e obrigações"
-              status="preparado"
-              acao="Preparado"
-              onClick={() => alert("Fiscal será integrado na próxima etapa.")}
+              valor={fiscalCardValor}
+              detalhe={fiscalCardDetalhe}
+              status={fiscalResumoCliente?.abertas > 0 ? "atencao" : fiscalResumoCliente?.total > 0 ? "ok" : "neutro"}
+              acao="Ver resumo"
+              onClick={() => rolarParaSecao("fiscal")}
             />
 
             <ResumoCard
@@ -1025,6 +1158,72 @@ export default function Clientes() {
               acao="Ver histórico"
               onClick={() => rolarParaSecao("historico")}
             />
+          </div>
+
+          <div id="central-financeiro" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Financeiro do Cliente</span>
+                <p style={secaoDescricao}>Resumo vindo do módulo Financeiro, sem duplicar lançamentos.</p>
+              </div>
+
+              <button style={button} onClick={abrirFinanceiroDoCliente}>
+                Abrir Financeiro
+              </button>
+            </div>
+
+            <div style={miniResumoGrid}>
+              <MiniResumo label="Recebido" value={financeiroResumoCliente ? formatarMoeda(financeiroResumoCliente.recebidos) : "-"} destaque="positivo" />
+              <MiniResumo label="Em aberto" value={financeiroResumoCliente ? formatarMoeda(financeiroResumoCliente.emAberto) : "-"} destaque={financeiroResumoCliente?.emAberto > 0 ? "atencao" : "positivo"} />
+              <MiniResumo label="Lançamentos" value={financeiroResumoCliente?.total ?? "-"} />
+              <MiniResumo label="Situação" value={financeiroResumoCliente?.situacao || "-"} destaque={financeiroResumoCliente?.emAberto > 0 ? "atencao" : "positivo"} />
+            </div>
+
+            {financeiroResumoCliente?.ultimo ? (
+              <div style={resumoLinhaDestaque}>
+                <strong>Último lançamento:</strong>
+                <span>{financeiroResumoCliente.ultimo.descricao || "Lançamento financeiro"}</span>
+                <span>{formatarMoeda(financeiroResumoCliente.ultimo.valorNumber)}</span>
+              </div>
+            ) : (
+              <p style={observacaoTexto}>Nenhum lançamento financeiro encontrado para este cliente.</p>
+            )}
+          </div>
+
+          <div id="central-fiscal" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Fiscal do Cliente</span>
+                <p style={secaoDescricao}>Resumo vindo do módulo Fiscal, mantendo o Fiscal como fonte oficial.</p>
+              </div>
+
+              <button style={button} onClick={abrirFiscalDoCliente}>
+                Abrir Fiscal
+              </button>
+            </div>
+
+            <div style={miniResumoGrid}>
+              <MiniResumo label="Em aberto" value={fiscalResumoCliente?.abertas ?? "-"} destaque={fiscalResumoCliente?.abertas > 0 ? "atencao" : "positivo"} />
+              <MiniResumo label="Total fiscal" value={fiscalResumoCliente?.total ?? "-"} />
+              <MiniResumo label="Situação" value={fiscalResumoCliente?.situacao || "-"} destaque={fiscalResumoCliente?.abertas > 0 ? "atencao" : "positivo"} />
+              <MiniResumo label="Próximo vencimento" value={fiscalResumoCliente?.proxima?.vencimento ? formatarDataBR(fiscalResumoCliente.proxima.vencimento) : "-"} />
+            </div>
+
+            {fiscalResumoCliente?.proxima ? (
+              <div style={resumoLinhaDestaque}>
+                <strong>Próxima obrigação:</strong>
+                <span>{fiscalResumoCliente.proxima.obrigacao || "Obrigação fiscal"}</span>
+                <span>{formatarDataBR(fiscalResumoCliente.proxima.vencimento)}</span>
+              </div>
+            ) : fiscalResumoCliente?.ultima ? (
+              <div style={resumoLinhaDestaque}>
+                <strong>Última obrigação:</strong>
+                <span>{fiscalResumoCliente.ultima.obrigacao || "Obrigação fiscal"}</span>
+                <span>{fiscalResumoCliente.ultima.status || "-"}</span>
+              </div>
+            ) : (
+              <p style={observacaoTexto}>Nenhuma obrigação fiscal encontrada para este cliente.</p>
+            )}
           </div>
 
           <div id="central-acoes" style={observacaoBox}>
@@ -1810,4 +2009,50 @@ const deleteButton = {
   padding: "6px 10px",
   cursor: "pointer",
   fontSize: "16px",
+}
+
+
+const miniResumoGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  marginBottom: "16px",
+}
+
+const miniResumoCard = {
+  background: "rgba(255,255,255,.06)",
+  border: "1px solid rgba(255,255,255,.10)",
+  borderRadius: "14px",
+  padding: "16px",
+}
+
+function miniResumoStatus(status) {
+  if (status === "positivo") return { borderColor: "rgba(55,255,116,.28)" }
+  if (status === "atencao") return { borderColor: "rgba(255,159,67,.32)" }
+  return {}
+}
+
+const miniResumoLabel = {
+  display: "block",
+  color: "#a9b8cc",
+  fontSize: "13px",
+  marginBottom: "8px",
+}
+
+const miniResumoValor = {
+  color: "white",
+  fontSize: "20px",
+}
+
+const resumoLinhaDestaque = {
+  background: "rgba(0,168,255,.08)",
+  border: "1px solid rgba(0,168,255,.16)",
+  borderRadius: "12px",
+  padding: "14px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+  flexWrap: "wrap",
+  color: "white",
 }

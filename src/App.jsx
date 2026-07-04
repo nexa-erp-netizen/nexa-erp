@@ -125,7 +125,7 @@ export default function App() {
         return <EscritorioDigital setPage={setPage} />
 
       case "Clientes":
-        return <Clientes />
+        return <Clientes setPage={setPage} />
 
       case "Serviços":
         return <Servicos />

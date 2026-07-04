@@ -19,6 +19,7 @@ function linhaVazia(tipo = "Receber") {
 export default function Financeiro() {
   const [lancamentos, setLancamentos] = useState([])
   const [clientesCadastrados, setClientesCadastrados] = useState([])
+  const [clienteFiltro, setClienteFiltro] = useState(localStorage.getItem("nexaFiltroFinanceiroCliente") || "")
   const [servicos, setServicos] = useState([])
   const [competencia, setCompetencia] = useState(new Date().toISOString().slice(0, 7))
   const [modoLancamento, setModoLancamento] = useState("Receber")
@@ -47,6 +48,9 @@ export default function Financeiro() {
     carregarLancamentos()
     carregarClientes()
     carregarServicos()
+
+    const filtroCentral = localStorage.getItem("nexaFiltroFinanceiroCliente") || ""
+    if (filtroCentral) setClienteFiltro(filtroCentral)
   }, [])
 
   async function carregarLancamentos() {
@@ -122,22 +126,31 @@ export default function Financeiro() {
     return ehDespesa(item) ? "Despesa Escritório" : "Avulso"
   }
 
+  function mesmoCliente(nomeA, nomeB) {
+    return String(nomeA || "").trim().toLowerCase() === String(nomeB || "").trim().toLowerCase()
+  }
+
   const lancamentosComStatus = useMemo(
     () => lancamentos.map((item) => ({ ...item, statusCalculado: statusAutomatico(item), valorNumber: valorNumerico(item.valor) })),
     [lancamentos]
   )
 
   const lancamentosCompetencia = useMemo(
-    () => lancamentosComStatus.filter((item) => !competencia || competenciaDoLancamento(item) === competencia),
-    [lancamentosComStatus, competencia]
+    () => lancamentosComStatus.filter((item) => {
+      const bateCompetencia = !competencia || competenciaDoLancamento(item) === competencia
+      const bateCliente = !clienteFiltro || mesmoCliente(item.cliente, clienteFiltro)
+      return bateCompetencia && bateCliente
+    }),
+    [lancamentosComStatus, competencia, clienteFiltro]
   )
 
   const lancamentosAnteriores = useMemo(
     () => lancamentosComStatus.filter((item) => {
       const comp = competenciaDoLancamento(item)
-      return competencia && comp && comp < competencia
+      const bateCliente = !clienteFiltro || mesmoCliente(item.cliente, clienteFiltro)
+      return competencia && comp && comp < competencia && bateCliente
     }),
-    [lancamentosComStatus, competencia]
+    [lancamentosComStatus, competencia, clienteFiltro]
   )
 
   function calcularSaldo(lista) {
@@ -156,7 +169,10 @@ export default function Financeiro() {
     for (let i = 5; i >= 0; i--) {
       const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1)
       const chave = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`
-      const itensMes = lancamentosComStatus.filter((item) => competenciaDoLancamento(item) === chave)
+      const itensMes = lancamentosComStatus.filter((item) => {
+        const bateCliente = !clienteFiltro || mesmoCliente(item.cliente, clienteFiltro)
+        return competenciaDoLancamento(item) === chave && bateCliente
+      })
       const receitas = itensMes.filter(ehReceita).reduce((total, item) => total + item.valorNumber, 0)
       const despesas = itensMes.filter(ehDespesa).reduce((total, item) => total + item.valorNumber, 0)
 
@@ -170,7 +186,7 @@ export default function Financeiro() {
     }
 
     return meses
-  }, [lancamentosComStatus])
+  }, [lancamentosComStatus, clienteFiltro])
 
   function escolherModo(tipo) {
     setModoLancamento(tipo)
@@ -336,6 +352,11 @@ export default function Financeiro() {
     setCompetencia(`${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`)
   }
 
+  function limparFiltroCliente() {
+    localStorage.removeItem("nexaFiltroFinanceiroCliente")
+    setClienteFiltro("")
+  }
+
   return (
     <div style={box}>
       <div style={topo}>
@@ -350,6 +371,13 @@ export default function Financeiro() {
           <button style={botaoSecundario} onClick={() => mudarCompetencia(1)}>Próximo →</button>
         </div>
       </div>
+
+      {clienteFiltro && (
+        <div style={filtroClienteAtivo}>
+          <span>Financeiro filtrado para: <strong>{clienteFiltro}</strong></span>
+          <button style={botaoSecundario} onClick={limparFiltroCliente}>Limpar filtro</button>
+        </div>
+      )}
 
       <div style={cards}>
         <Card title="Total de Crédito" value={formatarMoeda(totalReceitas)} cor="#37ff74" />
@@ -622,3 +650,6 @@ const botaoModoAtivoDespesa = { ...botaoModo, background: "linear-gradient(90deg
 const receiveButton = { padding: "10px 14px", borderRadius: "10px", border: "none", background: "#37ff74", color: "#00112b", fontWeight: "bold", cursor: "pointer" }
 const editButton = { padding: "10px 14px", borderRadius: "10px", border: "none", background: "#00a8ff", color: "white", fontWeight: "bold", cursor: "pointer" }
 const deleteButton = { padding: "10px 14px", borderRadius: "10px", border: "none", background: "#ff4d4f", color: "white", fontWeight: "bold", cursor: "pointer" }
+
+
+const filtroClienteAtivo = { background: "rgba(0,168,255,.10)", border: "1px solid rgba(0,168,255,.20)", borderRadius: "14px", padding: "14px", marginBottom: "18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", color: "white" }
