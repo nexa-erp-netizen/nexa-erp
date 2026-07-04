@@ -686,7 +686,7 @@ export default function Clientes({ setPage }) {
   }
 
   function dataFinanceira(item) {
-    return item.vencimento || item.dataRecebimento || item.createdAt || item.updatedAt || ""
+    return item.data || item.vencimento || item.dataRecebimento || item.createdAt || item.updatedAt || ""
   }
 
   function dataFiscal(item) {
@@ -722,7 +722,7 @@ export default function Clientes({ setPage }) {
     .filter(ehDespesaFinanceira)
     .reduce((total, item) => total + valorNumerico(item.valor), 0)
 
-  const financeiroSaldoAtual = financeiroSaldoAnterior + financeiroCreditos - financeiroDebitos
+  const financeiroSaldoAtual = financeiroCreditos - financeiroDebitos
 
   const ultimoLancamentoFinanceiro = financeiroDoCliente
     .slice()
@@ -1080,13 +1080,13 @@ export default function Clientes({ setPage }) {
           </div>
 
           <div style={centralMenu}>
-            <button style={centralMenuBotao} onClick={() => rolarParaSecao("resumo")}>🏠 Resumo</button>
-            <button style={centralMenuBotao} onClick={() => rolarParaSecao("acoes")}>⏰ Próximas Ações</button>
-            <button style={centralMenuBotao} onClick={() => rolarParaSecao("historico")}>📝 Histórico</button>
-            <button style={centralMenuBotao} onClick={() => rolarParaSecao("documentos")}>📎 Documentos</button>
-            <button style={centralMenuBotao} onClick={() => rolarParaSecao("dados")}>📋 Dados</button>
-            <button style={centralMenuBotao} onClick={() => rolarParaSecao("financeiro")}>💰 Financeiro</button>
-            <button style={centralMenuBotao} onClick={() => rolarParaSecao("fiscal")}>🏛 Fiscal</button>
+            <button title="Resumo" style={centralMenuBotao} onClick={() => rolarParaSecao("resumo")}>🏠</button>
+            <button title="Próximas Ações" style={centralMenuBotao} onClick={() => rolarParaSecao("acoes")}>⏰</button>
+            <button title="Histórico" style={centralMenuBotao} onClick={() => rolarParaSecao("historico")}>📝</button>
+            <button title="Documentos" style={centralMenuBotao} onClick={() => rolarParaSecao("documentos")}>📎</button>
+            <button title="Dados" style={centralMenuBotao} onClick={() => rolarParaSecao("dados")}>📋</button>
+            <button title="Financeiro do Cliente" style={centralMenuBotao} onClick={() => rolarParaSecao("financeiro")}>💰</button>
+            <button title="Fiscal" style={centralMenuBotao} onClick={() => rolarParaSecao("fiscal")}>🏛</button>
           </div>
 
           <div style={contatoRapido}>
@@ -1131,7 +1131,7 @@ export default function Clientes({ setPage }) {
               icone="💰"
               titulo="Financeiro do Cliente"
               valor={formatarMoeda(financeiroSaldoAtual)}
-              detalhe={financeiroDoCliente.length > 0 ? `Créditos do mês: ${formatarMoeda(financeiroCreditos)}` : financeiroSituacao}
+              detalhe={financeiroMesAtual.length > 0 ? `Créditos do mês: ${formatarMoeda(financeiroCreditos)}` : financeiroSituacao}
               status={financeiroSituacao === "Atenção" ? "atencao" : financeiroDoCliente.length > 0 ? "ok" : "neutro"}
               acao="Ver resumo"
               onClick={() => rolarParaSecao("financeiro")}
@@ -1319,7 +1319,7 @@ export default function Clientes({ setPage }) {
             <div style={miniResumoGrid}>
               <Info label="Créditos do mês" value={formatarMoeda(financeiroCreditos)} />
               <Info label="Débitos do mês" value={formatarMoeda(financeiroDebitos)} />
-              <Info label="Saldo atual" value={formatarMoeda(financeiroSaldoAtual)} />
+              <Info label="Saldo do mês" value={formatarMoeda(financeiroSaldoAtual)} />
               <Info label="Situação" value={financeiroSituacao} />
             </div>
 
@@ -1519,34 +1519,36 @@ const centralBotoes = {
 }
 
 const centralMenu = {
-  position: "sticky",
-  top: "16px",
-  zIndex: 2,
-  float: "left",
-  width: "190px",
+  position: "fixed",
+  top: "120px",
+  right: "18px",
+  zIndex: 20,
+  width: "58px",
   background: "rgba(3,18,42,.94)",
   backdropFilter: "blur(10px)",
-  border: "1px solid rgba(255,255,255,.14)",
+  border: "1px solid rgba(55,255,116,.35)",
   borderRadius: "18px",
-  padding: "12px",
-  margin: "0 18px 18px 0",
+  padding: "8px",
   display: "flex",
   flexDirection: "column",
   gap: "10px",
-  boxShadow: "0 14px 30px rgba(0,0,0,.20)",
+  boxShadow: "0 14px 30px rgba(0,0,0,.26)",
 }
 
 const centralMenuBotao = {
-  padding: "10px 13px",
+  width: "42px",
+  height: "42px",
+  padding: 0,
   borderRadius: "12px",
   border: "1px solid rgba(255,255,255,.12)",
   background: "rgba(255,255,255,.08)",
   color: "white",
   fontWeight: "800",
   cursor: "pointer",
-  fontSize: "13px",
-  width: "100%",
-  textAlign: "left",
+  fontSize: "20px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
 }
 
 const centralMenuBotaoPreparado = {
