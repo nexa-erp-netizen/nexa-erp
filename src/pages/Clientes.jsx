@@ -605,6 +605,24 @@ export default function Clientes() {
     .slice()
     .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))[0]
 
+  const proximaAcaoMaisProxima = proximasAcoesCliente
+    .slice()
+    .sort((a, b) => String(a.vencimento || "9999-12-31").localeCompare(String(b.vencimento || "9999-12-31")))[0]
+
+  const ultimoAnexo = anexosCliente[anexosCliente.length - 1]
+
+  const ultimaAnotacaoTexto = ultimaAnotacao?.texto
+    ? String(ultimaAnotacao.texto).slice(0, 42) + (String(ultimaAnotacao.texto).length > 42 ? "..." : "")
+    : "sem registro"
+
+  const ultimoAnexoNome = ultimoAnexo?.nome
+    ? String(ultimoAnexo.nome).slice(0, 34) + (String(ultimoAnexo.nome).length > 34 ? "..." : "")
+    : "nenhum arquivo"
+
+  const proximaAcaoDetalhe = proximaAcaoMaisProxima?.vencimento
+    ? `Mais próxima: ${formatarDataBR(proximaAcaoMaisProxima.vencimento)}`
+    : proximaAcaoMaisProxima?.descricao || "nenhuma ação pendente"
+
   const localidadeCliente = [clienteSelecionado?.cidade, clienteSelecionado?.estado]
     .filter(Boolean)
     .join(" / ")
@@ -948,14 +966,64 @@ export default function Clientes() {
           </div>
 
           <div style={resumoGrid}>
-            <ResumoCard titulo="Próximas ações" valor={proximasAcoesCliente.length} detalhe="tarefas pendentes" />
-            <ResumoCard titulo="Histórico" valor={anotacoesCliente.length} detalhe="anotações registradas" />
-            <ResumoCard titulo="Documentos" valor={anexosCliente.length} detalhe="arquivos anexados" />
-            <ResumoCard titulo="Pendências" valor="Em breve" detalhe="integração fiscal" />
             <ResumoCard
+              icone="⏰"
+              titulo="Próximas ações"
+              valor={proximasAcoesCliente.length}
+              detalhe={proximaAcaoDetalhe}
+              status={proximasAcoesCliente.length > 0 ? "atencao" : "ok"}
+              acao="Abrir ações"
+              onClick={() => rolarParaSecao("acoes")}
+            />
+
+            <ResumoCard
+              icone="📝"
+              titulo="Histórico"
+              valor={anotacoesCliente.length}
+              detalhe={ultimaAnotacao ? `Último: ${formatarDataBR(String(ultimaAnotacao.data).slice(0, 10))}` : "sem registro"}
+              status={anotacoesCliente.length > 0 ? "ok" : "neutro"}
+              acao="Abrir histórico"
+              onClick={() => rolarParaSecao("historico")}
+            />
+
+            <ResumoCard
+              icone="📎"
+              titulo="Documentos"
+              valor={anexosCliente.length}
+              detalhe={ultimoAnexoNome}
+              status={anexosCliente.length > 0 ? "ok" : "neutro"}
+              acao="Abrir documentos"
+              onClick={() => rolarParaSecao("documentos")}
+            />
+
+            <ResumoCard
+              icone="💰"
+              titulo="Financeiro"
+              valor="Em breve"
+              detalhe="integração financeira"
+              status="preparado"
+              acao="Preparado"
+              onClick={() => alert("Financeiro será integrado na próxima etapa.")}
+            />
+
+            <ResumoCard
+              icone="🏛️"
+              titulo="Fiscal"
+              valor="Em breve"
+              detalhe="guias e obrigações"
+              status="preparado"
+              acao="Preparado"
+              onClick={() => alert("Fiscal será integrado na próxima etapa.")}
+            />
+
+            <ResumoCard
+              icone="📌"
               titulo="Último atendimento"
               valor={ultimaAnotacao ? formatarDataBR(String(ultimaAnotacao.data).slice(0, 10)) : "-"}
-              detalhe={ultimaAnotacao?.texto || "sem registro"}
+              detalhe={ultimaAnotacaoTexto}
+              status={ultimaAnotacao ? "ok" : "neutro"}
+              acao="Ver histórico"
+              onClick={() => rolarParaSecao("historico")}
             />
           </div>
 
@@ -1172,13 +1240,20 @@ function Info({ label, value }) {
   )
 }
 
-function ResumoCard({ titulo, valor, detalhe }) {
+function ResumoCard({ icone, titulo, valor, detalhe, status = "neutro", acao, onClick }) {
   return (
-    <div style={resumoCard}>
+    <button type="button" style={{ ...resumoCard, ...resumoCardStatus(status) }} onClick={onClick}>
+      <div style={resumoCardTopo}>
+        <span style={resumoIcone}>{icone}</span>
+        <span style={resumoStatusPonto(status)} />
+      </div>
+
       <span style={resumoTitulo}>{titulo}</span>
       <strong style={resumoValor}>{valor}</strong>
       <small style={resumoDetalhe}>{detalhe}</small>
-    </div>
+
+      <span style={resumoAcao}>{acao || "Abrir"}</span>
+    </button>
   )
 }
 
@@ -1304,6 +1379,73 @@ const resumoCard = {
   border: "1px solid rgba(255,255,255,.12)",
   borderRadius: "18px",
   padding: "18px",
+  textAlign: "left",
+  cursor: "pointer",
+  transition: "transform .18s ease, border .18s ease, background .18s ease",
+  color: "white",
+  minHeight: "172px",
+}
+
+function resumoCardStatus(status) {
+  if (status === "ok") {
+    return {
+      border: "1px solid rgba(55,255,116,.35)",
+      background: "linear-gradient(180deg, rgba(55,255,116,.12), #061f47)",
+    }
+  }
+
+  if (status === "atencao") {
+    return {
+      border: "1px solid rgba(255,193,7,.42)",
+      background: "linear-gradient(180deg, rgba(255,193,7,.13), #061f47)",
+    }
+  }
+
+  if (status === "urgente") {
+    return {
+      border: "1px solid rgba(255,77,79,.42)",
+      background: "linear-gradient(180deg, rgba(255,77,79,.14), #061f47)",
+    }
+  }
+
+  if (status === "preparado") {
+    return {
+      border: "1px dashed rgba(0,168,255,.45)",
+      background: "linear-gradient(180deg, rgba(0,168,255,.10), #061f47)",
+    }
+  }
+
+  return {}
+}
+
+function resumoStatusPonto(status) {
+  const cores = {
+    ok: "#37ff74",
+    atencao: "#ffd166",
+    urgente: "#ff7072",
+    preparado: "#00a8ff",
+    neutro: "#7f93ad",
+  }
+
+  return {
+    width: "10px",
+    height: "10px",
+    borderRadius: "999px",
+    background: cores[status] || cores.neutro,
+    boxShadow: `0 0 12px ${cores[status] || cores.neutro}`,
+  }
+}
+
+const resumoCardTopo = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "12px",
+}
+
+const resumoIcone = {
+  fontSize: "26px",
+  lineHeight: "30px",
 }
 
 const resumoTitulo = {
@@ -1311,22 +1453,33 @@ const resumoTitulo = {
   color: "#a9b8cc",
   fontSize: "13px",
   marginBottom: "8px",
+  textTransform: "uppercase",
+  letterSpacing: ".5px",
 }
 
 const resumoValor = {
   display: "block",
   color: "white",
-  fontSize: "24px",
-  lineHeight: "30px",
+  fontSize: "26px",
+  lineHeight: "32px",
+  marginBottom: "6px",
 }
 
 const resumoDetalhe = {
   display: "block",
-  color: "#7f93ad",
+  color: "#c4d4ea",
   marginTop: "6px",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
+}
+
+const resumoAcao = {
+  display: "inline-block",
+  color: "#37ff74",
+  fontSize: "12px",
+  fontWeight: "bold",
+  marginTop: "12px",
 }
 
 const secaoTopo = {
