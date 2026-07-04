@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
 
-export default function Clientes() {
+export default function Clientes({ setPage }) {
   const [tela, setTela] = useState("lista")
   const [clienteSelecionado, setClienteSelecionado] = useState(null)
   const [editandoId, setEditandoId] = useState(null)
@@ -33,6 +33,8 @@ export default function Clientes() {
   const [novaAnotacao, setNovaAnotacao] = useState("")
   const [novaAcao, setNovaAcao] = useState("")
   const [vencimentoAcao, setVencimentoAcao] = useState("")
+  const [financeiroLancamentos, setFinanceiroLancamentos] = useState([])
+  const [fiscalObrigacoes, setFiscalObrigacoes] = useState([])
 
   const regimes = [
     "Avulso",
@@ -52,6 +54,8 @@ export default function Clientes() {
 
   useEffect(() => {
     carregarClientes()
+    carregarFinanceiroCliente()
+    carregarFiscalCliente()
   }, [])
 
   async function carregarClientes() {
@@ -63,6 +67,24 @@ export default function Clientes() {
       alert("Erro ao carregar clientes da API")
       console.error(error)
       return []
+    }
+  }
+
+  async function carregarFinanceiroCliente() {
+    try {
+      const resposta = await api.get("/financeiro")
+      setFinanceiroLancamentos(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (error) {
+      console.error("Erro ao carregar resumo financeiro do cliente", error)
+    }
+  }
+
+  async function carregarFiscalCliente() {
+    try {
+      const resposta = await api.get("/fiscal")
+      setFiscalObrigacoes(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (error) {
+      console.error("Erro ao carregar resumo fiscal do cliente", error)
     }
   }
 
@@ -627,6 +649,100 @@ export default function Clientes() {
     .filter(Boolean)
     .join(" / ")
 
+  function valorNumerico(valorFormatado) {
+    return Number(
+      String(valorFormatado || 0)
+        .replace("R$", "")
+        .replace(/\./g, "")
+        .replace(",", ".")
+        .trim()
+    ) || 0
+  }
+
+  function formatarMoeda(valor) {
+    return Number(valor || 0).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    })
+  }
+
+  function mesmoCliente(nomeA, nomeB) {
+    return String(nomeA || "").trim().toLowerCase() === String(nomeB || "").trim().toLowerCase()
+  }
+
+  function ehReceitaFinanceira(item) {
+    const tipo = String(item.tipo || "").toLowerCase()
+    return tipo.includes("receber") || tipo.includes("receita") || tipo.includes("crédito") || tipo.includes("credito")
+  }
+
+  function ehDespesaFinanceira(item) {
+    const tipo = String(item.tipo || "").toLowerCase()
+    return tipo.includes("pagar") || tipo.includes("despesa") || tipo.includes("débito") || tipo.includes("debito")
+  }
+
+  function estaPago(item) {
+    const status = String(item.status || "").toLowerCase()
+    return status.includes("pago") || status.includes("recebido") || status.includes("concluído") || status.includes("concluido")
+  }
+
+  function dataFinanceira(item) {
+    return item.vencimento || item.dataRecebimento || item.createdAt || item.updatedAt || ""
+  }
+
+  function dataFiscal(item) {
+    return item.vencimento || item.createdAt || item.updatedAt || ""
+  }
+
+  const financeiroDoCliente = financeiroLancamentos.filter((item) =>
+    mesmoCliente(item.cliente, clienteSelecionado?.nome)
+  )
+
+  const financeiroRecebido = financeiroDoCliente
+    .filter((item) => ehReceitaFinanceira(item) && estaPago(item))
+    .reduce((total, item) => total + valorNumerico(item.valor), 0)
+
+  const financeiroEmAberto = financeiroDoCliente
+    .filter((item) => ehReceitaFinanceira(item) && !estaPago(item))
+    .reduce((total, item) => total + valorNumerico(item.valor), 0)
+
+  const financeiroDespesas = financeiroDoCliente
+    .filter(ehDespesaFinanceira)
+    .reduce((total, item) => total + valorNumerico(item.valor), 0)
+
+  const ultimoLancamentoFinanceiro = financeiroDoCliente
+    .slice()
+    .sort((a, b) => new Date(dataFinanceira(b) || 0) - new Date(dataFinanceira(a) || 0))[0]
+
+  const financeiroSituacao = financeiroEmAberto > 0 ? "Atenção" : financeiroDoCliente.length > 0 ? "Em dia" : "Sem lançamentos"
+
+  const obrigacoesDoCliente = fiscalObrigacoes.filter((item) =>
+    mesmoCliente(item.cliente, clienteSelecionado?.nome)
+  )
+
+  const obrigacoesPendentes = obrigacoesDoCliente.filter((item) => !estaPago(item))
+
+  const proximaObrigacaoFiscal = obrigacoesPendentes
+    .slice()
+    .sort((a, b) => String(dataFiscal(a) || "9999-12-31").localeCompare(String(dataFiscal(b) || "9999-12-31")))[0]
+
+  const ultimaObrigacaoFiscal = obrigacoesDoCliente
+    .slice()
+    .sort((a, b) => new Date(dataFiscal(b) || 0) - new Date(dataFiscal(a) || 0))[0]
+
+  const fiscalSituacao = obrigacoesPendentes.length > 0 ? "Atenção" : obrigacoesDoCliente.length > 0 ? "Em dia" : "Sem obrigações"
+
+  function abrirFinanceiroCliente() {
+    if (!clienteSelecionado?.nome) return
+    localStorage.setItem("nexaFiltroFinanceiroCliente", clienteSelecionado.nome)
+    if (typeof setPage === "function") setPage("Financeiro")
+  }
+
+  function abrirFiscalCliente() {
+    if (!clienteSelecionado?.nome) return
+    localStorage.setItem("nexaFiltroFiscalCliente", clienteSelecionado.nome)
+    if (typeof setPage === "function") setPage("Fiscal")
+  }
+
   return (
     <div style={box}>
       {tela === "lista" && (
@@ -954,8 +1070,8 @@ export default function Clientes() {
             <button style={centralMenuBotao} onClick={() => rolarParaSecao("historico")}>📝 Histórico</button>
             <button style={centralMenuBotao} onClick={() => rolarParaSecao("documentos")}>📎 Documentos</button>
             <button style={centralMenuBotao} onClick={() => rolarParaSecao("dados")}>📋 Dados</button>
-            <button style={centralMenuBotaoPreparado} onClick={() => alert("Financeiro será integrado na próxima etapa.")}>💰 Financeiro</button>
-            <button style={centralMenuBotaoPreparado} onClick={() => alert("Fiscal será integrado na próxima etapa.")}>🏛 Fiscal</button>
+            <button style={centralMenuBotao} onClick={() => rolarParaSecao("financeiro")}>💰 Financeiro</button>
+            <button style={centralMenuBotao} onClick={() => rolarParaSecao("fiscal")}>🏛 Fiscal</button>
           </div>
 
           <div style={contatoRapido}>
@@ -999,21 +1115,21 @@ export default function Clientes() {
             <ResumoCard
               icone="💰"
               titulo="Financeiro"
-              valor="Em breve"
-              detalhe="integração financeira"
-              status="preparado"
-              acao="Preparado"
-              onClick={() => alert("Financeiro será integrado na próxima etapa.")}
+              valor={formatarMoeda(financeiroRecebido)}
+              detalhe={financeiroEmAberto > 0 ? `Em aberto: ${formatarMoeda(financeiroEmAberto)}` : financeiroSituacao}
+              status={financeiroEmAberto > 0 ? "atencao" : financeiroDoCliente.length > 0 ? "ok" : "neutro"}
+              acao="Ver resumo"
+              onClick={() => rolarParaSecao("financeiro")}
             />
 
             <ResumoCard
               icone="🏛️"
               titulo="Fiscal"
-              valor="Em breve"
-              detalhe="guias e obrigações"
-              status="preparado"
-              acao="Preparado"
-              onClick={() => alert("Fiscal será integrado na próxima etapa.")}
+              valor={obrigacoesPendentes.length}
+              detalhe={proximaObrigacaoFiscal?.vencimento ? `Próx.: ${formatarDataBR(proximaObrigacaoFiscal.vencimento)}` : fiscalSituacao}
+              status={obrigacoesPendentes.length > 0 ? "atencao" : obrigacoesDoCliente.length > 0 ? "ok" : "neutro"}
+              acao="Ver fiscal"
+              onClick={() => rolarParaSecao("fiscal")}
             />
 
             <ResumoCard
@@ -1170,6 +1286,66 @@ export default function Clientes() {
               <p style={observacaoTexto}>
                 Nenhum arquivo anexado.
               </p>
+            )}
+          </div>
+
+          <div id="central-financeiro" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Financeiro do Cliente</span>
+                <p style={secaoDescricao}>Resumo dos lançamentos financeiros vinculados a este cliente.</p>
+              </div>
+
+              <button style={button} onClick={abrirFinanceiroCliente}>
+                Abrir Financeiro
+              </button>
+            </div>
+
+            <div style={miniResumoGrid}>
+              <Info label="Recebido" value={formatarMoeda(financeiroRecebido)} />
+              <Info label="Em aberto" value={formatarMoeda(financeiroEmAberto)} />
+              <Info label="Despesas" value={formatarMoeda(financeiroDespesas)} />
+              <Info label="Situação" value={financeiroSituacao} />
+            </div>
+
+            {ultimoLancamentoFinanceiro ? (
+              <div style={resumoLinhaDestaque}>
+                <strong>Último lançamento</strong>
+                <span>{ultimoLancamentoFinanceiro.descricao || "Lançamento financeiro"}</span>
+                <small>{dataFinanceira(ultimoLancamentoFinanceiro) ? formatarDataBR(String(dataFinanceira(ultimoLancamentoFinanceiro)).slice(0, 10)) : "Sem data"}</small>
+              </div>
+            ) : (
+              <p style={observacaoTexto}>Nenhum lançamento financeiro encontrado para este cliente.</p>
+            )}
+          </div>
+
+          <div id="central-fiscal" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Fiscal do Cliente</span>
+                <p style={secaoDescricao}>Resumo das guias e obrigações fiscais vinculadas a este cliente.</p>
+              </div>
+
+              <button style={button} onClick={abrirFiscalCliente}>
+                Abrir Fiscal
+              </button>
+            </div>
+
+            <div style={miniResumoGrid}>
+              <Info label="Pendentes" value={obrigacoesPendentes.length} />
+              <Info label="Total de obrigações" value={obrigacoesDoCliente.length} />
+              <Info label="Situação" value={fiscalSituacao} />
+              <Info label="Próximo vencimento" value={proximaObrigacaoFiscal?.vencimento ? formatarDataBR(proximaObrigacaoFiscal.vencimento) : "Não informado"} />
+            </div>
+
+            {ultimaObrigacaoFiscal ? (
+              <div style={resumoLinhaDestaque}>
+                <strong>Última obrigação</strong>
+                <span>{ultimaObrigacaoFiscal.obrigacao || ultimaObrigacaoFiscal.descricao || "Obrigação fiscal"}</span>
+                <small>{dataFiscal(ultimaObrigacaoFiscal) ? formatarDataBR(String(dataFiscal(ultimaObrigacaoFiscal)).slice(0, 10)) : "Sem data"}</small>
+              </div>
+            ) : (
+              <p style={observacaoTexto}>Nenhuma obrigação fiscal encontrada para este cliente.</p>
             )}
           </div>
 
@@ -1494,6 +1670,25 @@ const secaoDescricao = {
   margin: "4px 0 0",
   color: "#a9b8cc",
   fontSize: "14px",
+}
+
+
+const miniResumoGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+  gap: "14px",
+  marginBottom: "16px",
+}
+
+const resumoLinhaDestaque = {
+  background: "rgba(255,255,255,.06)",
+  border: "1px solid rgba(255,255,255,.10)",
+  borderRadius: "14px",
+  padding: "16px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "6px",
+  color: "white",
 }
 
 const box = {
