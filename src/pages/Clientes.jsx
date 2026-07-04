@@ -72,7 +72,7 @@ export default function Clientes({ setPage }) {
 
   async function carregarFinanceiroCliente() {
     try {
-      const resposta = await api.get("/financeiro")
+      const resposta = await api.get("/movimentos-cliente")
       setFinanceiroLancamentos(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
       console.error("Erro ao carregar resumo financeiro do cliente", error)
@@ -693,27 +693,42 @@ export default function Clientes({ setPage }) {
     return item.vencimento || item.createdAt || item.updatedAt || ""
   }
 
+  const competenciaFinanceiraAtual = new Date().toISOString().slice(0, 7)
+
   const financeiroDoCliente = financeiroLancamentos.filter((item) =>
     mesmoCliente(item.cliente, clienteSelecionado?.nome)
   )
 
-  const financeiroRecebido = financeiroDoCliente
-    .filter((item) => ehReceitaFinanceira(item) && estaPago(item))
+  const financeiroMesAtual = financeiroDoCliente.filter((item) => {
+    const data = dataFinanceira(item)
+    return data && String(data).slice(0, 7) === competenciaFinanceiraAtual
+  })
+
+  const financeiroSaldoAnterior = financeiroDoCliente
+    .filter((item) => {
+      const data = dataFinanceira(item)
+      return data && String(data).slice(0, 7) < competenciaFinanceiraAtual
+    })
+    .reduce((total, item) => {
+      const valor = valorNumerico(item.valor)
+      return ehReceitaFinanceira(item) ? total + valor : ehDespesaFinanceira(item) ? total - valor : total
+    }, 0)
+
+  const financeiroCreditos = financeiroMesAtual
+    .filter(ehReceitaFinanceira)
     .reduce((total, item) => total + valorNumerico(item.valor), 0)
 
-  const financeiroEmAberto = financeiroDoCliente
-    .filter((item) => ehReceitaFinanceira(item) && !estaPago(item))
-    .reduce((total, item) => total + valorNumerico(item.valor), 0)
-
-  const financeiroDespesas = financeiroDoCliente
+  const financeiroDebitos = financeiroMesAtual
     .filter(ehDespesaFinanceira)
     .reduce((total, item) => total + valorNumerico(item.valor), 0)
+
+  const financeiroSaldoAtual = financeiroSaldoAnterior + financeiroCreditos - financeiroDebitos
 
   const ultimoLancamentoFinanceiro = financeiroDoCliente
     .slice()
     .sort((a, b) => new Date(dataFinanceira(b) || 0) - new Date(dataFinanceira(a) || 0))[0]
 
-  const financeiroSituacao = financeiroEmAberto > 0 ? "Atenção" : financeiroDoCliente.length > 0 ? "Em dia" : "Sem lançamentos"
+  const financeiroSituacao = financeiroDoCliente.length === 0 ? "Sem lançamentos" : financeiroSaldoAtual >= 0 ? "Em dia" : "Atenção"
 
   const obrigacoesDoCliente = fiscalObrigacoes.filter((item) =>
     mesmoCliente(item.cliente, clienteSelecionado?.nome)
@@ -733,8 +748,8 @@ export default function Clientes({ setPage }) {
 
   function abrirFinanceiroCliente() {
     if (!clienteSelecionado?.nome) return
-    localStorage.setItem("nexaFiltroFinanceiroCliente", clienteSelecionado.nome)
-    if (typeof setPage === "function") setPage("Financeiro")
+    localStorage.setItem("nexaFiltroMovimentosCliente", clienteSelecionado.nome)
+    if (typeof setPage === "function") setPage("Movimentos Clientes")
   }
 
   function abrirFiscalCliente() {
@@ -1114,10 +1129,10 @@ export default function Clientes({ setPage }) {
 
             <ResumoCard
               icone="💰"
-              titulo="Financeiro"
-              valor={formatarMoeda(financeiroRecebido)}
-              detalhe={financeiroEmAberto > 0 ? `Em aberto: ${formatarMoeda(financeiroEmAberto)}` : financeiroSituacao}
-              status={financeiroEmAberto > 0 ? "atencao" : financeiroDoCliente.length > 0 ? "ok" : "neutro"}
+              titulo="Financeiro do Cliente"
+              valor={formatarMoeda(financeiroSaldoAtual)}
+              detalhe={financeiroDoCliente.length > 0 ? `Créditos do mês: ${formatarMoeda(financeiroCreditos)}` : financeiroSituacao}
+              status={financeiroSituacao === "Atenção" ? "atencao" : financeiroDoCliente.length > 0 ? "ok" : "neutro"}
               acao="Ver resumo"
               onClick={() => rolarParaSecao("financeiro")}
             />
@@ -1293,18 +1308,18 @@ export default function Clientes({ setPage }) {
             <div style={secaoTopo}>
               <div>
                 <span style={infoLabel}>Financeiro do Cliente</span>
-                <p style={secaoDescricao}>Resumo dos lançamentos financeiros vinculados a este cliente.</p>
+                <p style={secaoDescricao}>Resumo dos movimentos do cliente no mês atual. Não inclui receitas ou despesas internas do escritório.</p>
               </div>
 
               <button style={button} onClick={abrirFinanceiroCliente}>
-                Abrir Financeiro
+                Abrir Movimentos
               </button>
             </div>
 
             <div style={miniResumoGrid}>
-              <Info label="Recebido" value={formatarMoeda(financeiroRecebido)} />
-              <Info label="Em aberto" value={formatarMoeda(financeiroEmAberto)} />
-              <Info label="Despesas" value={formatarMoeda(financeiroDespesas)} />
+              <Info label="Créditos do mês" value={formatarMoeda(financeiroCreditos)} />
+              <Info label="Débitos do mês" value={formatarMoeda(financeiroDebitos)} />
+              <Info label="Saldo atual" value={formatarMoeda(financeiroSaldoAtual)} />
               <Info label="Situação" value={financeiroSituacao} />
             </div>
 
@@ -1505,17 +1520,19 @@ const centralBotoes = {
 
 const centralMenu = {
   position: "sticky",
-  top: "12px",
-  zIndex: 5,
+  top: "16px",
+  zIndex: 2,
+  float: "left",
+  width: "190px",
   background: "rgba(3,18,42,.94)",
   backdropFilter: "blur(10px)",
   border: "1px solid rgba(255,255,255,.14)",
   borderRadius: "18px",
   padding: "12px",
-  marginBottom: "18px",
+  margin: "0 18px 18px 0",
   display: "flex",
+  flexDirection: "column",
   gap: "10px",
-  flexWrap: "wrap",
   boxShadow: "0 14px 30px rgba(0,0,0,.20)",
 }
 
@@ -1528,6 +1545,8 @@ const centralMenuBotao = {
   fontWeight: "800",
   cursor: "pointer",
   fontSize: "13px",
+  width: "100%",
+  textAlign: "left",
 }
 
 const centralMenuBotaoPreparado = {

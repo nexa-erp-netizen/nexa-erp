@@ -39,8 +39,26 @@ export default function MovimentosClientesEscritorio() {
       api.get("/clientes"),
     ])
 
-    setMovimentos(Array.isArray(movimentosResp.data) ? movimentosResp.data : [])
-    setClientes(Array.isArray(clientesResp.data) ? clientesResp.data : [])
+    const movimentosDados = Array.isArray(movimentosResp.data) ? movimentosResp.data : []
+    const clientesDados = Array.isArray(clientesResp.data) ? clientesResp.data : []
+
+    setMovimentos(movimentosDados)
+    setClientes(
+      clientesDados
+        .slice()
+        .sort((a, b) =>
+          String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR", {
+            sensitivity: "base",
+          })
+        )
+    )
+
+    const filtroCentral = localStorage.getItem("nexaFiltroMovimentosCliente")
+
+    if (filtroCentral) {
+      setClienteFiltro(filtroCentral)
+      localStorage.removeItem("nexaFiltroMovimentosCliente")
+    }
   }
 
   function valorSeguro(valor) {
