@@ -254,6 +254,19 @@ export default function Clientes() {
     })
   }
 
+  function rolarParaSecao(secao) {
+    if (secao === "resumo") {
+      rolarParaTopo()
+      return
+    }
+
+    const elemento = document.getElementById(`central-${secao}`)
+
+    if (elemento) {
+      elemento.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }
+
   function editarCliente() {
     if (!clienteSelecionado) return
 
@@ -882,7 +895,7 @@ export default function Clientes() {
 
       {tela === "detalhes" && clienteSelecionado && (
         <>
-          <div style={centralHero}>
+          <div id="central-resumo" style={centralHero}>
             <div style={centralHeroInfo}>
               <div style={clienteAvatar}>
                 {String(clienteSelecionado.nome || "N").slice(0, 1).toUpperCase()}
@@ -917,6 +930,16 @@ export default function Clientes() {
             </div>
           </div>
 
+          <div style={centralMenu}>
+            <button style={centralMenuBotao} onClick={() => rolarParaSecao("resumo")}>🏠 Resumo</button>
+            <button style={centralMenuBotao} onClick={() => rolarParaSecao("acoes")}>⏰ Próximas Ações</button>
+            <button style={centralMenuBotao} onClick={() => rolarParaSecao("historico")}>📝 Histórico</button>
+            <button style={centralMenuBotao} onClick={() => rolarParaSecao("documentos")}>📎 Documentos</button>
+            <button style={centralMenuBotao} onClick={() => rolarParaSecao("dados")}>📋 Dados</button>
+            <button style={centralMenuBotaoPreparado} onClick={() => alert("Financeiro será integrado na próxima etapa.")}>💰 Financeiro</button>
+            <button style={centralMenuBotaoPreparado} onClick={() => alert("Fiscal será integrado na próxima etapa.")}>🏛 Fiscal</button>
+          </div>
+
           <div style={contatoRapido}>
             <Info label="Telefone" value={clienteSelecionado.telefone} />
             <Info label="E-mail" value={clienteSelecionado.email} />
@@ -936,7 +959,7 @@ export default function Clientes() {
             />
           </div>
 
-          <div style={observacaoBox}>
+          <div id="central-acoes" style={observacaoBox}>
             <div style={secaoTopo}>
               <div>
                 <span style={infoLabel}>Próximas Ações</span>
@@ -1004,7 +1027,7 @@ export default function Clientes() {
             </div>
           </div>
 
-          <div style={observacaoBox}>
+          <div id="central-historico" style={observacaoBox}>
             <div style={secaoTopo}>
               <div>
                 <span style={infoLabel}>Histórico / Anotações do Cliente</span>
@@ -1052,7 +1075,7 @@ export default function Clientes() {
             </div>
           </div>
 
-          <div style={observacaoBox}>
+          <div id="central-documentos" style={observacaoBox}>
             <div style={secaoTopo}>
               <div>
                 <span style={infoLabel}>Arquivos Anexados</span>
@@ -1082,7 +1105,7 @@ export default function Clientes() {
             )}
           </div>
 
-          <div style={observacaoBox}>
+          <div id="central-dados" style={observacaoBox}>
             <div style={secaoTopo}>
               <div>
                 <span style={infoLabel}>Dados Cadastrais</span>
@@ -1160,6 +1183,7 @@ function ResumoCard({ titulo, valor, detalhe }) {
 }
 
 const centralHero = {
+  scrollMarginTop: "96px",
   background: "linear-gradient(135deg, rgba(0,168,255,.18), rgba(55,255,116,.10))",
   border: "1px solid rgba(255,255,255,.14)",
   borderRadius: "22px",
@@ -1226,6 +1250,39 @@ const centralBotoes = {
   display: "flex",
   gap: "10px",
   flexWrap: "wrap",
+}
+
+const centralMenu = {
+  position: "sticky",
+  top: "12px",
+  zIndex: 5,
+  background: "rgba(3,18,42,.94)",
+  backdropFilter: "blur(10px)",
+  border: "1px solid rgba(255,255,255,.14)",
+  borderRadius: "18px",
+  padding: "12px",
+  marginBottom: "18px",
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  boxShadow: "0 14px 30px rgba(0,0,0,.20)",
+}
+
+const centralMenuBotao = {
+  padding: "10px 13px",
+  borderRadius: "12px",
+  border: "1px solid rgba(255,255,255,.12)",
+  background: "rgba(255,255,255,.08)",
+  color: "white",
+  fontWeight: "800",
+  cursor: "pointer",
+  fontSize: "13px",
+}
+
+const centralMenuBotaoPreparado = {
+  ...centralMenuBotao,
+  color: "#37ff74",
+  background: "rgba(55,255,116,.10)",
 }
 
 const contatoRapido = {
@@ -1470,6 +1527,7 @@ const infoValue = {
 }
 
 const observacaoBox = {
+  scrollMarginTop: "96px",
   background: "#061f47",
   border: "1px solid rgba(255,255,255,.12)",
   borderRadius: "16px",
