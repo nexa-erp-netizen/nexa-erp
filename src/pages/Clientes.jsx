@@ -2011,6 +2011,12 @@ const deleteButton = {
   fontSize: "16px",
 }
 
+ const financeiroCardValor = {
+  color: "#37ff74",
+  fontSize: "20px",
+  fontWeight: "bold",
+  marginTop: "6px",
+}
 
 const miniResumoGrid = {
   display: "grid",
