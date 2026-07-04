@@ -2025,6 +2025,12 @@ const miniResumoGrid = {
   marginBottom: "16px",
 }
 
+ const financeiroCardDetalhe = {
+  color: "#a9b8cc",
+  fontSize: "13px",
+  marginTop: "4px",
+}
+
 const miniResumoCard = {
   background: "rgba(255,255,255,.06)",
   border: "1px solid rgba(255,255,255,.10)",
