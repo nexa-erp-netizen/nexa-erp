@@ -29,6 +29,7 @@ import MovimentosClientesEscritorio from "./pages/MovimentosClientesEscritorio"
 import Notificacoes from "./pages/Notificacoes"
 import ObrigacoesCliente from "./pages/ObrigacoesCliente"
 import WhatsAppInteligente from "./pages/WhatsAppInteligente"
+import AssistenteDoDia from "./pages/AssistenteDoDia"
 import SobreNexa from "./pages/SobreNexa"
 
 export default function App() {
@@ -52,6 +53,7 @@ export default function App() {
       "Acesso Rápido Fiscal",
       "Documentos Digitais",
       "WhatsApp Inteligente",
+      "Assistente do Dia",
       "Relatórios",
       "Usuários",
       "Backup Sistema",
@@ -74,6 +76,7 @@ export default function App() {
       "Acesso Rápido Fiscal",
       "Documentos Digitais",
       "WhatsApp Inteligente",
+      "Assistente do Dia",
       "Relatórios",
       "Calculadora IRPF MEI",
       "Agenda",
@@ -178,6 +181,9 @@ export default function App() {
 
       case "WhatsApp Inteligente":
         return <WhatsAppInteligente />
+
+      case "Assistente do Dia":
+        return <AssistenteDoDia setPage={setPage} />
 
       case "Movimentos Clientes":
         return <MovimentosClientesEscritorio />

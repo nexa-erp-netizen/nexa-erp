@@ -6,6 +6,7 @@ import {
   obterModeloWhatsApp,
   registrarHistoricoWhatsApp,
 } from "../services/whatsappService"
+import { montarFilaAssistenteDia, montarResumoAssistenteDia } from "../services/assistenteDiaService"
 import Calendar from "react-calendar"
 import "react-calendar/dist/Calendar.css"
 import {
@@ -551,6 +552,19 @@ export default function Dashboard({ setPage }) {
       .slice(0, 5)
   }, [fiscal, documentos, pendencias, clientes])
 
+  const filaAssistenteDia = useMemo(() => {
+    return montarFilaAssistenteDia({
+      clientes,
+      fiscal,
+      pendencias,
+      documentos,
+    })
+  }, [clientes, fiscal, pendencias, documentos])
+
+  const resumoAssistenteDia = useMemo(() => {
+    return montarResumoAssistenteDia(filaAssistenteDia)
+  }, [filaAssistenteDia])
+
   const eventosCalendario = useMemo(() => {
     const eventos = {}
 
@@ -909,6 +923,80 @@ export default function Dashboard({ setPage }) {
         .bg-neutral { background: rgba(255,255,255,.14); color: white; }
         .bg-document { background: #b388ff; color: #00112b; }
 
+        .dia-box {
+          margin-bottom: 24px;
+          background: linear-gradient(135deg, rgba(0,168,255,.18), rgba(55,255,116,.10));
+          border: 1px solid rgba(55,255,116,.26);
+        }
+
+        .dia-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          flex-wrap: wrap;
+          margin-bottom: 16px;
+        }
+
+        .dia-stats {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+
+        .dia-stat {
+          background: #061f47;
+          border: 1px solid rgba(255,255,255,.10);
+          border-radius: 16px;
+          padding: 13px;
+        }
+
+        .dia-stat span {
+          display: block;
+          color: #a9b8cc;
+          font-size: 12px;
+          margin-bottom: 6px;
+        }
+
+        .dia-stat strong {
+          display: block;
+          font-size: 22px;
+          font-weight: 900;
+        }
+
+        .dia-progress {
+          background: #061f47;
+          border-radius: 999px;
+          height: 10px;
+          overflow: hidden;
+          margin-bottom: 16px;
+        }
+
+        .dia-progress-bar {
+          height: 100%;
+          background: linear-gradient(90deg, #00a8ff, #37ff74);
+        }
+
+        .dia-action {
+          border: none;
+          border-radius: 14px;
+          padding: 12px 18px;
+          background: linear-gradient(90deg, #00a8ff, #37ff74);
+          color: #00112b;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .dia-next {
+          background: #061f47;
+          border: 1px solid rgba(255,255,255,.10);
+          border-radius: 16px;
+          padding: 14px;
+          color: #dce8f8;
+          font-size: 13px;
+        }
+
         .assist-box {
           margin-bottom: 24px;
           background: linear-gradient(135deg, rgba(0,168,255,.16), rgba(55,255,116,.10));
@@ -1097,6 +1185,40 @@ export default function Dashboard({ setPage }) {
         <ResumoCard icon={<FaFileAlt />} label="Documentos Pendentes" value={resumo.documentosPendentes} color="success" />
         <ResumoCard icon={<FaBell />} label="Notificações" value={resumo.notificacoes} color="warning" />
       </div>
+
+      <section className="box dia-box">
+        <div className="dia-row">
+          <div>
+            <div className="box-title" style={{ marginBottom: 0 }}>☀️ Assistente do Dia</div>
+            <div className="assist-subtitle">
+              Fila operacional montada com dados reais do Fiscal, Documentos e Atendimento.
+            </div>
+          </div>
+
+          <button type="button" className="dia-action" onClick={() => setPage("Assistente do Dia")}>
+            Iniciar o Dia
+          </button>
+        </div>
+
+        <div className="dia-progress">
+          <div className="dia-progress-bar" style={{ width: `${resumoAssistenteDia.progresso}%` }} />
+        </div>
+
+        <div className="dia-stats">
+          <div className="dia-stat"><span>Urgentes</span><strong className="danger">{resumoAssistenteDia.urgentes}</strong></div>
+          <div className="dia-stat"><span>Atenção</span><strong className="warning">{resumoAssistenteDia.atencao}</strong></div>
+          <div className="dia-stat"><span>Programados</span><strong className="success">{resumoAssistenteDia.programados}</strong></div>
+          <div className="dia-stat"><span>Ações reais</span><strong className="blue">{resumoAssistenteDia.acoes}</strong></div>
+        </div>
+
+        {filaAssistenteDia[0] ? (
+          <div className="dia-next">
+            Primeiro cliente: <strong>{filaAssistenteDia[0].cliente}</strong> • {filaAssistenteDia[0].motivos[0]}
+          </div>
+        ) : (
+          <div className="dia-next">Nenhuma ação real encontrada para hoje.</div>
+        )}
+      </section>
 
       <section className="box assist-box">
         <div className="assist-title-row">
