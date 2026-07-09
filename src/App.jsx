@@ -28,6 +28,8 @@ import DRE from "./pages/DRE"
 import MovimentosClientesEscritorio from "./pages/MovimentosClientesEscritorio"
 import Notificacoes from "./pages/Notificacoes"
 import ObrigacoesCliente from "./pages/ObrigacoesCliente"
+import WhatsAppInteligente from "./pages/WhatsAppInteligente"
+import SobreNexa from "./pages/SobreNexa"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -49,9 +51,11 @@ export default function App() {
       "Pendências Clientes",
       "Acesso Rápido Fiscal",
       "Documentos Digitais",
+      "WhatsApp Inteligente",
       "Relatórios",
       "Usuários",
       "Backup Sistema",
+      "Sobre",
       "Calculadora IRPF MEI",
       "Agenda",
       "DRE Gerencial",
@@ -69,9 +73,11 @@ export default function App() {
       "Pendências Clientes",
       "Acesso Rápido Fiscal",
       "Documentos Digitais",
+      "WhatsApp Inteligente",
       "Relatórios",
       "Calculadora IRPF MEI",
       "Agenda",
+      "Sobre",
     ],
 
     Cliente: [
@@ -170,6 +176,9 @@ export default function App() {
       case "Documentos Digitais":
         return <DocumentosDigitais />
 
+      case "WhatsApp Inteligente":
+        return <WhatsAppInteligente />
+
       case "Movimentos Clientes":
         return <MovimentosClientesEscritorio />
 
@@ -181,6 +190,9 @@ export default function App() {
 
       case "Backup Sistema":
         return <BackupSistema />
+
+      case "Sobre":
+        return <SobreNexa />
 
       case "DRE Gerencial":
         return <DRE />

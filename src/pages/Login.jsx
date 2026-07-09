@@ -1,6 +1,7 @@
 import { useState } from "react"
 import api from "../services/api"
 import logo from "../assets/logo.png"
+import NEXA_VERSION from "../config/version"
 
 export default function Login({ onLogin }) {
   const [login, setLogin] = useState("")
@@ -199,6 +200,8 @@ export default function Login({ onLogin }) {
           </button>
 
           <p style={aviso}>Acesso exclusivo para usuários autorizados pelo escritório.</p>
+
+          <p style={versionLogin}>v{NEXA_VERSION.version} • {NEXA_VERSION.release}</p>
         </div>
       </div>
 
@@ -375,4 +378,12 @@ const loadingBox = {
 const loadingText = {
   color: "#00112b",
   fontSize: "15px",
+}
+
+
+const versionLogin = {
+  marginTop: "14px",
+  color: "#6f87a8",
+  fontSize: "12px",
+  fontWeight: "bold",
 }

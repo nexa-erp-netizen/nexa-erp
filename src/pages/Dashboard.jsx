@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
+import {
+  abrirWhatsAppWeb,
+  montarMensagemWhatsApp,
+  obterModeloWhatsApp,
+  registrarHistoricoWhatsApp,
+} from "../services/whatsappService"
 import Calendar from "react-calendar"
 import "react-calendar/dist/Calendar.css"
 import {
@@ -93,6 +99,85 @@ export default function Dashboard({ setPage }) {
 
   setPage(destino)
 }
+
+  function localizarClientePorNome(nomeCliente) {
+    const nomeNormalizado = String(nomeCliente || "").trim().toLowerCase()
+
+    if (!nomeNormalizado) return null
+
+    return clientes.find((cliente) => {
+      const nomes = [
+        cliente.nome,
+        cliente.cliente,
+        cliente.razaoSocial,
+        cliente.nomeFantasia,
+        cliente.empresa,
+      ]
+
+      return nomes.some(
+        (nome) => String(nome || "").trim().toLowerCase() === nomeNormalizado
+      )
+    }) || null
+  }
+
+  function telefoneCliente(cliente) {
+    return (
+      cliente?.whatsapp ||
+      cliente?.celular ||
+      cliente?.telefone ||
+      cliente?.fone ||
+      cliente?.telefone1 ||
+      cliente?.telefone2 ||
+      ""
+    )
+  }
+
+  async function enviarWhatsAppAssist(sugestao) {
+    const clienteCadastrado = localizarClientePorNome(sugestao.cliente)
+    const clienteWhatsApp = clienteCadastrado || {
+      nome: sugestao.cliente,
+      telefone: sugestao.telefone || "",
+    }
+
+    const modelo = obterModeloWhatsApp(sugestao.modeloId)
+    const mensagem = montarMensagemWhatsApp({
+      modeloId: sugestao.modeloId,
+      cliente: clienteWhatsApp,
+      clienteNome: sugestao.cliente,
+      descricao: sugestao.descricao,
+      pendencia: sugestao.pendencia,
+      competencia: sugestao.competencia,
+      vencimento: sugestao.vencimento,
+      valor: sugestao.valor,
+      status: sugestao.status,
+      mensagem: sugestao.mensagem,
+      textoLivre: sugestao.mensagem,
+      usuario: usuario?.nome || "Equipe Nexa",
+    })
+
+    const abriu = abrirWhatsAppWeb({
+      cliente: clienteWhatsApp,
+      telefone: telefoneCliente(clienteWhatsApp),
+      mensagem,
+    })
+
+    if (!abriu) return
+
+    try {
+      if (clienteCadastrado?.id) {
+        await registrarHistoricoWhatsApp(api, clienteCadastrado, modelo?.titulo, mensagem)
+      } else {
+        registrarHistoricoWhatsApp({
+          cliente: sugestao.cliente,
+          modeloTitulo: modelo?.titulo,
+          mensagem,
+          usuario: usuario?.nome || "Nexa",
+        })
+      }
+    } catch (error) {
+      console.warn("WhatsApp aberto, mas o histórico não foi atualizado", error)
+    }
+  }
 
   function dataLocalISO(data) {
     const ano = data.getFullYear()
@@ -346,6 +431,125 @@ export default function Dashboard({ setPage }) {
         referenciaId: item.id,
       }))
   }, [documentos])
+
+  const sugestoesWhatsApp = useMemo(() => {
+    const lista = []
+
+    fiscal
+      .filter(fiscalAguardandoPagamento)
+      .forEach((item) => {
+        const dias = diferencaDias(item.vencimento)
+        const cliente = localizarClientePorNome(item.cliente)
+
+        if (dias !== null && dias <= 0) {
+          lista.push({
+            id: `assist-whatsapp-fiscal-hoje-${item.id}`,
+            tipo: "Fiscal",
+            prioridade: 1,
+            icone: "🚨",
+            cliente: item.cliente,
+            telefone: telefoneCliente(cliente),
+            titulo: "Avisar vencimento de hoje",
+            descricao: `${item.obrigacao || "Obrigação"} vence hoje ou está em atraso.`,
+            modeloId: "vence_hoje",
+            pendencia: item.obrigacao || "Obrigação fiscal",
+            competencia: item.competencia,
+            vencimento: item.vencimento,
+            valor: item.valor,
+            status: item.status,
+          })
+        } else if (dias !== null && dias <= 3) {
+          lista.push({
+            id: `assist-whatsapp-fiscal-3dias-${item.id}`,
+            tipo: "Fiscal",
+            prioridade: 2,
+            icone: "⏰",
+            cliente: item.cliente,
+            telefone: telefoneCliente(cliente),
+            titulo: "Enviar lembrete de vencimento",
+            descricao: `${item.obrigacao || "Obrigação"} vence em ${dias} dia(s).`,
+            modeloId: dias === 0 ? "vence_hoje" : "vence_3_dias",
+            pendencia: item.obrigacao || "Obrigação fiscal",
+            competencia: item.competencia,
+            vencimento: item.vencimento,
+            valor: item.valor,
+            status: item.status,
+          })
+        } else if (String(item.status || "").toLowerCase().includes("pendente")) {
+          lista.push({
+            id: `assist-whatsapp-fiscal-das-${item.id}`,
+            tipo: "Fiscal",
+            prioridade: 4,
+            icone: "📄",
+            cliente: item.cliente,
+            telefone: telefoneCliente(cliente),
+            titulo: "Avisar guia disponível",
+            descricao: `${item.obrigacao || "Guia"} disponível para o cliente.`,
+            modeloId: "das_disponivel",
+            pendencia: item.obrigacao || "Guia fiscal",
+            competencia: item.competencia,
+            vencimento: item.vencimento,
+            valor: item.valor,
+            status: item.status,
+          })
+        }
+      })
+
+    documentos
+      .filter(documentoPendente)
+      .forEach((item) => {
+        const cliente = localizarClientePorNome(item.cliente)
+
+        lista.push({
+          id: `assist-whatsapp-doc-${item.id}`,
+          tipo: "Documentos",
+          prioridade: 3,
+          icone: "📂",
+          cliente: item.cliente,
+          telefone: telefoneCliente(cliente),
+          titulo: "Confirmar documento recebido",
+          descricao: `${item.tipo || "Documento"} recebido e aguardando análise.`,
+          modeloId: "documento_recebido",
+          pendencia: item.tipo || "Documento recebido",
+          competencia: item.competencia || item.anoCalendario,
+          status: item.status,
+        })
+      })
+
+    pendencias
+      .filter((item) => item.status !== "Concluída")
+      .forEach((item) => {
+        const cliente = localizarClientePorNome(item.cliente)
+
+        lista.push({
+          id: `assist-whatsapp-pend-${item.id}`,
+          tipo: "Pendência",
+          prioridade: 5,
+          icone: "📎",
+          cliente: item.cliente,
+          telefone: telefoneCliente(cliente),
+          titulo: "Cobrar pendência do cliente",
+          descricao: item.titulo || item.categoria || "Pendência aguardando resposta.",
+          modeloId: "documento_pendente",
+          pendencia: item.titulo || item.categoria || "Pendência",
+          competencia: item.competencia,
+          vencimento: item.vencimento || item.prazo,
+          status: item.status,
+        })
+      })
+
+    const vistos = new Set()
+
+    return lista
+      .filter((item) => {
+        const chave = `${item.cliente}-${item.modeloId}-${item.pendencia}-${item.vencimento}`
+        if (vistos.has(chave)) return false
+        vistos.add(chave)
+        return true
+      })
+      .sort((a, b) => a.prioridade - b.prioridade)
+      .slice(0, 5)
+  }, [fiscal, documentos, pendencias, clientes])
 
   const eventosCalendario = useMemo(() => {
     const eventos = {}
@@ -705,6 +909,94 @@ export default function Dashboard({ setPage }) {
         .bg-neutral { background: rgba(255,255,255,.14); color: white; }
         .bg-document { background: #b388ff; color: #00112b; }
 
+        .assist-box {
+          margin-bottom: 24px;
+          background: linear-gradient(135deg, rgba(0,168,255,.16), rgba(55,255,116,.10));
+          border: 1px solid rgba(55,255,116,.24);
+        }
+
+        .assist-title-row {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+          margin-bottom: 16px;
+        }
+
+        .assist-subtitle {
+          color: #a9b8cc;
+          font-size: 13px;
+          margin-top: 5px;
+        }
+
+        .assist-badge {
+          border-radius: 999px;
+          padding: 8px 11px;
+          background: rgba(55,255,116,.16);
+          color: #37ff74;
+          font-size: 12px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .assist-list {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 12px;
+        }
+
+        .assist-item {
+          background: #061f47;
+          border: 1px solid rgba(255,255,255,.10);
+          border-radius: 16px;
+          padding: 15px;
+          display: grid;
+          gap: 12px;
+        }
+
+        .assist-item-top {
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
+        }
+
+        .assist-icon {
+          width: 38px;
+          height: 38px;
+          border-radius: 14px;
+          background: rgba(55,255,116,.14);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          font-size: 18px;
+        }
+
+        .assist-client {
+          display: block;
+          font-size: 15px;
+          font-weight: 900;
+          margin-bottom: 5px;
+        }
+
+        .assist-text {
+          display: block;
+          color: #a9b8cc;
+          font-size: 13px;
+          line-height: 1.35;
+        }
+
+        .assist-action {
+          border: none;
+          border-radius: 12px;
+          padding: 10px 12px;
+          background: linear-gradient(90deg, #00a8ff, #37ff74);
+          color: #00112b;
+          font-weight: 900;
+          cursor: pointer;
+          width: 100%;
+        }
+
         .empty {
           color: #a9b8cc;
           padding: 18px;
@@ -805,6 +1097,51 @@ export default function Dashboard({ setPage }) {
         <ResumoCard icon={<FaFileAlt />} label="Documentos Pendentes" value={resumo.documentosPendentes} color="success" />
         <ResumoCard icon={<FaBell />} label="Notificações" value={resumo.notificacoes} color="warning" />
       </div>
+
+      <section className="box assist-box">
+        <div className="assist-title-row">
+          <div>
+            <div className="box-title" style={{ marginBottom: 0 }}>🤖 Nexa Assist WhatsApp</div>
+            <div className="assist-subtitle">
+              Sugestões automáticas para avisar clientes sem precisar escolher o modelo manualmente.
+            </div>
+          </div>
+          <span className="assist-badge">v3 em teste</span>
+        </div>
+
+        {sugestoesWhatsApp.length === 0 ? (
+          <div className="empty">Nenhuma sugestão de WhatsApp no momento.</div>
+        ) : (
+          <div className="assist-list">
+            {sugestoesWhatsApp.map((item) => {
+              const modelo = obterModeloWhatsApp(item.modeloId)
+
+              return (
+                <div className="assist-item" key={item.id}>
+                  <div className="assist-item-top">
+                    <span className="assist-icon">{item.icone}</span>
+                    <div>
+                      <strong className="assist-client">{item.cliente}</strong>
+                      <span className="assist-text">
+                        {item.titulo} • Modelo sugerido: {modelo?.titulo || "WhatsApp"}
+                      </span>
+                      <span className="assist-text">{item.descricao}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="assist-action"
+                    onClick={() => enviarWhatsAppAssist(item)}
+                  >
+                    Abrir WhatsApp com mensagem sugerida
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
 
       <div className="grid-main">
         <section className="box">

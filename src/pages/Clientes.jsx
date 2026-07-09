@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
+import WhatsAppMenu from "../components/WhatsAppMenu"
 
 export default function Clientes({ setPage }) {
   const [tela, setTela] = useState("lista")
@@ -421,6 +422,41 @@ export default function Clientes({ setPage }) {
     }
   }
 
+  async function registrarWhatsAppCliente(envio) {
+    if (!clienteSelecionado) return
+
+    const anotacao = {
+      id: Date.now(),
+      data: new Date().toISOString(),
+      tipo: "WhatsApp",
+      texto: `💬 WhatsApp enviado — ${envio?.modeloTitulo || "Mensagem"}`,
+      mensagem: envio?.mensagem || "",
+    }
+
+    const anotacoesAtualizadas = [
+      anotacao,
+      ...(Array.isArray(clienteSelecionado.anotacoes) ? clienteSelecionado.anotacoes : []),
+    ]
+
+    try {
+      const resposta = await api.put(`/clientes/${clienteSelecionado.id}`, {
+        ...clienteSelecionado,
+        anotacoes: anotacoesAtualizadas,
+      })
+
+      const clienteAtualizado = resposta.data || {
+        ...clienteSelecionado,
+        anotacoes: anotacoesAtualizadas,
+      }
+
+      setClienteSelecionado(clienteAtualizado)
+      await carregarClientes()
+    } catch (error) {
+      console.error("Erro ao registrar WhatsApp no histórico", error)
+      alert("WhatsApp aberto, mas não foi possível registrar no histórico.")
+    }
+  }
+
   async function excluirAnotacaoCliente(anotacaoId) {
     if (!clienteSelecionado) return
 
@@ -649,18 +685,25 @@ export default function Clientes({ setPage }) {
     .filter(Boolean)
     .join(" / ")
 
-  function valorNumerico(valorFormatado) {
-    return Number(
-      String(valorFormatado || 0)
-        .replace("R$", "")
-        .replace(/\./g, "")
-        .replace(",", ".")
-        .trim()
-    ) || 0
+  function valorNumerico(valor) {
+    if (valor === null || valor === undefined || valor === "") return 0
+
+    if (typeof valor === "number") {
+      return Number.isFinite(valor) ? valor : 0
+    }
+
+    let texto = String(valor).replace("R$", "").trim()
+
+    if (texto.includes(",")) {
+      texto = texto.replace(/\./g, "").replace(",", ".")
+    }
+
+    const numero = Number(texto)
+    return Number.isFinite(numero) ? numero : 0
   }
 
   function formatarMoeda(valor) {
-    return Number(valor || 0).toLocaleString("pt-BR", {
+    return valorNumerico(valor).toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
     })
@@ -1073,6 +1116,18 @@ export default function Clientes({ setPage }) {
                 Corrigir
               </button>
 
+              <WhatsAppMenu
+                cliente={clienteSelecionado}
+                contexto={{
+                  obrigacao: proximaObrigacaoFiscal?.obrigacao || "pendência",
+                  competencia: proximaObrigacaoFiscal?.competencia || "Não informada",
+                  vencimento: proximaObrigacaoFiscal?.vencimento || "",
+                  valor: proximaObrigacaoFiscal?.valor || "",
+                  status: proximaObrigacaoFiscal?.status || "",
+                }}
+                onRegister={registrarWhatsAppCliente}
+              />
+
               <button style={deleteButton} onClick={excluirCliente}>
                 Excluir
               </button>
@@ -1087,6 +1142,29 @@ export default function Clientes({ setPage }) {
             <button title="Dados" style={centralMenuBotao} onClick={() => rolarParaSecao("dados")}>📋</button>
             <button title="Financeiro do Cliente" style={centralMenuBotao} onClick={() => rolarParaSecao("financeiro")}>💰</button>
             <button title="Fiscal" style={centralMenuBotao} onClick={() => rolarParaSecao("fiscal")}>🏛</button>
+            <button title="WhatsApp" style={centralMenuBotao} onClick={() => rolarParaSecao("whatsapp")}>💬</button>
+          </div>
+
+          <div id="central-whatsapp" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>WhatsApp Inteligente</span>
+                <p style={secaoDescricao}>Escolha um modelo, revise a mensagem e abra o WhatsApp Web com os dados do cliente preenchidos.</p>
+              </div>
+
+              <WhatsAppMenu
+                cliente={clienteSelecionado}
+                contexto={{
+                  obrigacao: proximaObrigacaoFiscal?.obrigacao || "pendência",
+                  competencia: proximaObrigacaoFiscal?.competencia || "Não informada",
+                  vencimento: proximaObrigacaoFiscal?.vencimento || "",
+                  valor: proximaObrigacaoFiscal?.valor || "",
+                  status: proximaObrigacaoFiscal?.status || "",
+                }}
+                modo="central"
+                onRegister={registrarWhatsAppCliente}
+              />
+            </div>
           </div>
 
           <div style={contatoRapido}>

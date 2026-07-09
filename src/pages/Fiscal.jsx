@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
+import { abrirWhatsAppWeb, montarMensagemWhatsApp } from "../services/whatsappService"
 
 export default function Fiscal() {
   const [cliente, setCliente] = useState("")
@@ -281,29 +282,71 @@ export default function Fiscal() {
     )
   }
 
-  function abrirWhatsApp(item, tipoMensagem) {
-    const clienteCadastrado = obterClienteCadastrado(item.cliente)
-    const telefone = limparTelefoneWhatsApp(clienteCadastrado?.telefone)
+  async function registrarWhatsAppNoHistorico(clienteCadastrado, modeloTitulo, mensagem) {
+    if (!clienteCadastrado?.id) return
 
-    if (!telefone) {
+    const anotacao = {
+      id: Date.now(),
+      data: new Date().toISOString(),
+      tipo: "WhatsApp",
+      texto: `💬 WhatsApp enviado pelo Fiscal — ${modeloTitulo}`,
+      mensagem,
+    }
+
+    const anotacoesAtualizadas = [
+      anotacao,
+      ...(Array.isArray(clienteCadastrado.anotacoes) ? clienteCadastrado.anotacoes : []),
+    ]
+
+    try {
+      await api.put(`/clientes/${clienteCadastrado.id}`, {
+        ...clienteCadastrado,
+        anotacoes: anotacoesAtualizadas,
+      })
+
+      await carregarClientes()
+    } catch (error) {
+      console.error("Erro ao registrar WhatsApp no histórico do cliente", error)
+      alert("WhatsApp aberto, mas não foi possível registrar no histórico.")
+    }
+  }
+
+  async function abrirWhatsApp(item, tipoMensagem) {
+    const clienteCadastrado = obterClienteCadastrado(item.cliente)
+
+    if (!clienteCadastrado?.telefone) {
       alert("Este cliente não possui telefone cadastrado.")
       return
     }
 
-    const nomeCliente = item.cliente || clienteCadastrado?.nome || "cliente"
-    const obrigacaoTexto = item.obrigacao || "pendência"
-    const vencimentoTexto = formatarDataBrasil(item.vencimento)
-    const valorTexto = item.valor ? `\nValor: ${item.valor}` : ""
-
-    const mensagens = {
-      nova: `Olá, ${nomeCliente}.\n\nFoi disponibilizada uma nova pendência no Portal do Cliente Nexa.\n\nObrigação: ${obrigacaoTexto}\nCompetência: ${item.competencia || "Não informada"}\nVencimento: ${vencimentoTexto}${valorTexto}\n\nAcesse o portal para visualizar os detalhes e o documento disponível.`,
-      tresDias: `Olá, ${nomeCliente}.\n\nLembrete: sua obrigação ${obrigacaoTexto} vence em 3 dias.\n\nCompetência: ${item.competencia || "Não informada"}\nVencimento: ${vencimentoTexto}${valorTexto}\n\nEvite atrasos, multas e juros.`,
-      hoje: `Olá, ${nomeCliente}.\n\nAtenção: sua obrigação ${obrigacaoTexto} vence hoje.\n\nCompetência: ${item.competencia || "Não informada"}\nVencimento: ${vencimentoTexto}${valorTexto}\n\nCaso ainda não tenha efetuado o pagamento, recomendamos regularizar dentro do prazo.`,
+    const modelosPorTipo = {
+      nova: "novaPendencia",
+      tresDias: "venceTresDias",
+      hoje: "venceHoje",
     }
 
-    const mensagem = encodeURIComponent(mensagens[tipoMensagem] || mensagens.nova)
+    const modeloKey = modelosPorTipo[tipoMensagem] || "novaPendencia"
+    const titulosPorTipo = {
+      nova: "Nova pendência",
+      tresDias: "Vence em 3 dias",
+      hoje: "Vence hoje",
+    }
 
-    window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank")
+    const mensagem = montarMensagemWhatsApp(modeloKey, {
+      cliente: item.cliente || clienteCadastrado?.nome || "cliente",
+      telefone: clienteCadastrado.telefone,
+      obrigacao: item.obrigacao || "pendência",
+      competencia: item.competencia || "Não informada",
+      vencimento: item.vencimento,
+      valor: item.valor || "",
+    })
+
+    try {
+      abrirWhatsAppWeb({ telefone: clienteCadastrado.telefone, mensagem })
+      await registrarWhatsAppNoHistorico(clienteCadastrado, titulosPorTipo[tipoMensagem] || "Mensagem", mensagem)
+    } catch (error) {
+      alert(error.message || "Erro ao abrir WhatsApp")
+    }
   }
 
   const obrigacoesVisiveis = obrigacoes.filter((item) => {

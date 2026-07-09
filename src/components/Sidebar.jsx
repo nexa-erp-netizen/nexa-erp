@@ -81,12 +81,12 @@ export default function Sidebar({ page, setPage, usuario }) {
     {
       titulo: "Atendimento",
       icon: <FaGlobe />,
-      itens: ["Pendências Clientes", "Documentos Digitais"],
+      itens: ["Pendências Clientes", "Documentos Digitais", "WhatsApp Inteligente"],
     },
     {
       titulo: "Configurações",
       icon: <FaCog />,
-      itens: ["Usuários", "Backup Sistema"],
+      itens: ["Usuários", "Backup Sistema", "Sobre"],
     },
   ]
 
