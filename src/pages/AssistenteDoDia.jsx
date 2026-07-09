@@ -4,6 +4,14 @@ import {
   montarFilaAssistenteDia,
   montarResumoAssistenteDia,
 } from "../services/assistenteDiaService"
+import {
+  abrirWhatsAppWeb,
+  montarMensagemWhatsApp,
+  obterModeloWhatsApp,
+  registrarHistoricoWhatsApp,
+} from "../services/whatsappService"
+
+const CHAVE_PROGRESSO = `nexa_assistente_dia_${new Date().toISOString().slice(0, 10)}`
 
 export default function AssistenteDoDia({ setPage }) {
   const [clientes, setClientes] = useState([])
@@ -12,9 +20,15 @@ export default function AssistenteDoDia({ setPage }) {
   const [documentos, setDocumentos] = useState([])
   const [financeiro, setFinanceiro] = useState([])
   const [carregando, setCarregando] = useState(true)
+  const [atendimentoAtivo, setAtendimentoAtivo] = useState(false)
+  const [clienteAtualIndex, setClienteAtualIndex] = useState(0)
+  const [acoesConcluidas, setAcoesConcluidas] = useState({})
+  const [historicoDia, setHistoricoDia] = useState([])
+  const [inicioDia, setInicioDia] = useState(null)
 
   useEffect(() => {
     carregarDados()
+    restaurarProgresso()
   }, [])
 
   async function carregarDados() {
@@ -48,6 +62,21 @@ export default function AssistenteDoDia({ setPage }) {
     return Array.isArray(resultado.value.data) ? resultado.value.data : []
   }
 
+  function restaurarProgresso() {
+    try {
+      const salvo = JSON.parse(localStorage.getItem(CHAVE_PROGRESSO) || "null")
+      if (!salvo) return
+
+      setAtendimentoAtivo(Boolean(salvo.atendimentoAtivo))
+      setClienteAtualIndex(Number(salvo.clienteAtualIndex || 0))
+      setAcoesConcluidas(salvo.acoesConcluidas || {})
+      setHistoricoDia(Array.isArray(salvo.historicoDia) ? salvo.historicoDia : [])
+      setInicioDia(salvo.inicioDia || null)
+    } catch (error) {
+      console.warn("Não foi possível restaurar o progresso do Assistente do Dia", error)
+    }
+  }
+
   const fila = useMemo(() => {
     return montarFilaAssistenteDia({
       clientes,
@@ -58,7 +87,118 @@ export default function AssistenteDoDia({ setPage }) {
     })
   }, [clientes, fiscal, pendencias, documentos, financeiro])
 
-  const resumo = useMemo(() => montarResumoAssistenteDia(fila), [fila])
+  const resumoBase = useMemo(() => montarResumoAssistenteDia(fila), [fila])
+
+  const progresso = useMemo(() => {
+    const totalAcoes = fila.reduce((total, cliente) => total + cliente.acoes.length, 0)
+    const concluidas = fila.reduce(
+      (total, cliente) => total + cliente.acoes.filter((acao) => acoesConcluidas[acao.id]).length,
+      0
+    )
+    const clientesConcluidos = fila.filter((cliente) => cliente.acoes.every((acao) => acoesConcluidas[acao.id])).length
+
+    return {
+      totalAcoes,
+      concluidas,
+      clientesConcluidos,
+      percentual: totalAcoes ? Math.round((concluidas / totalAcoes) * 100) : 0,
+    }
+  }, [fila, acoesConcluidas])
+
+  const clienteAtual = fila[clienteAtualIndex] || null
+  const resumo = { ...resumoBase, progresso: progresso.percentual }
+  const expedienteConcluido = fila.length > 0 && progresso.clientesConcluidos === fila.length
+
+  useEffect(() => {
+    salvarProgresso()
+  }, [atendimentoAtivo, clienteAtualIndex, acoesConcluidas, historicoDia, inicioDia])
+
+  function salvarProgresso() {
+    try {
+      localStorage.setItem(
+        CHAVE_PROGRESSO,
+        JSON.stringify({
+          atendimentoAtivo,
+          clienteAtualIndex,
+          acoesConcluidas,
+          historicoDia,
+          inicioDia,
+        })
+      )
+    } catch (error) {
+      console.warn("Não foi possível salvar o progresso do Assistente do Dia", error)
+    }
+  }
+
+  function registrarEvento(texto) {
+    const evento = {
+      id: `${Date.now()}-${Math.random()}`,
+      hora: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      texto,
+    }
+
+    setHistoricoDia((lista) => [evento, ...lista].slice(0, 80))
+  }
+
+  function iniciarDia(index = 0) {
+    setAtendimentoAtivo(true)
+    setClienteAtualIndex(index)
+    if (!inicioDia) setInicioDia(new Date().toISOString())
+    registrarEvento(`Dia iniciado em ${fila[index]?.cliente || "cliente da fila"}`)
+  }
+
+  function reiniciarDia() {
+    if (!confirm("Deseja reiniciar o progresso do Assistente do Dia?")) return
+
+    localStorage.removeItem(CHAVE_PROGRESSO)
+    setAtendimentoAtivo(false)
+    setClienteAtualIndex(0)
+    setAcoesConcluidas({})
+    setHistoricoDia([])
+    setInicioDia(null)
+  }
+
+  function marcarAcao(acao, concluida = true) {
+    setAcoesConcluidas((atual) => ({ ...atual, [acao.id]: concluida }))
+    registrarEvento(`${concluida ? "Ação concluída" : "Ação reaberta"}: ${acao.titulo} • ${acao.cliente}`)
+  }
+
+  function alternarAcao(acao) {
+    marcarAcao(acao, !acoesConcluidas[acao.id])
+  }
+
+  async function executarAcao(acao) {
+    if (!acao) return
+
+    if (acao.tipo === "whatsapp" || acao.destino === "WhatsApp Inteligente") {
+      const modelo = obterModeloWhatsApp(acao.modeloWhatsApp || "mensagem_personalizada")
+      const clienteDados = acao.clienteDados || { nome: acao.cliente }
+      const mensagem = montarMensagemWhatsApp(modelo.id, {
+        cliente: clienteDados,
+        clienteNome: acao.cliente,
+        descricao: acao.descricao,
+        vencimento: acao.data,
+        competencia: acao.competencia,
+        valor: acao.valor,
+      })
+
+      const abriu = abrirWhatsAppWeb({ ...clienteDados, mensagem }, mensagem)
+
+      if (abriu) {
+        await registrarHistoricoWhatsApp({
+          cliente: acao.cliente,
+          modelo: modelo.titulo,
+          mensagem,
+          usuario: "Nexa Assist",
+        })
+        marcarAcao(acao, true)
+      }
+      return
+    }
+
+    abrirDestino(acao)
+    marcarAcao(acao, true)
+  }
 
   function abrirDestino(acao) {
     if (!acao || typeof setPage !== "function") return
@@ -81,152 +221,85 @@ export default function AssistenteDoDia({ setPage }) {
     setPage(acao.destino || "Dashboard")
   }
 
+  function irProximoCliente() {
+    const proximoIndex = fila.findIndex((cliente, index) => {
+      if (index <= clienteAtualIndex) return false
+      return !cliente.acoes.every((acao) => acoesConcluidas[acao.id])
+    })
+
+    if (proximoIndex >= 0) {
+      setClienteAtualIndex(proximoIndex)
+      registrarEvento(`Atendimento iniciado: ${fila[proximoIndex].cliente}`)
+      return
+    }
+
+    const qualquerPendente = fila.findIndex((cliente) => !cliente.acoes.every((acao) => acoesConcluidas[acao.id]))
+
+    if (qualquerPendente >= 0) {
+      setClienteAtualIndex(qualquerPendente)
+      registrarEvento(`Atendimento iniciado: ${fila[qualquerPendente].cliente}`)
+      return
+    }
+
+    registrarEvento("Expediente concluído")
+  }
+
+  function progressoCliente(cliente) {
+    if (!cliente?.acoes?.length) return { total: 0, concluidas: 0, percentual: 0, concluido: false }
+
+    const concluidas = cliente.acoes.filter((acao) => acoesConcluidas[acao.id]).length
+    const total = cliente.acoes.length
+
+    return {
+      total,
+      concluidas,
+      percentual: Math.round((concluidas / total) * 100),
+      concluido: concluidas === total,
+    }
+  }
+
   function nivelTexto(nivel) {
     if (nivel === "urgente") return "🔴 Prioridade Alta"
     if (nivel === "atencao") return "🟡 Atenção"
     return "🟢 Programado"
   }
 
+  function textoBotaoAcao(acao) {
+    if (acao.tipo === "whatsapp" || acao.destino === "WhatsApp Inteligente") return "Abrir WhatsApp"
+    if (acao.destino === "Fiscal") return "Abrir Fiscal"
+    if (acao.destino === "Financeiro") return "Abrir Financeiro"
+    if (acao.destino === "Documentos Digitais") return "Abrir Documentos"
+    if (acao.destino === "Pendências Clientes") return "Abrir Pendências"
+    return "Abrir"
+  }
+
   return (
     <div className="assistente-dia-page">
-      <style>{`
-        .assistente-dia-page { color: white; }
-        .hero-dia {
-          background: linear-gradient(135deg, rgba(0,168,255,.18), rgba(55,255,116,.11));
-          border: 1px solid rgba(55,255,116,.24);
-          border-radius: 24px;
-          padding: 24px;
-          margin-bottom: 22px;
-        }
-        .hero-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 18px;
-          flex-wrap: wrap;
-        }
-        .title { margin: 0; font-size: 31px; font-weight: 900; }
-        .subtitle { color: #a9b8cc; margin: 8px 0 0; line-height: 1.45; }
-        .refresh-dia {
-          border: none;
-          border-radius: 14px;
-          padding: 12px 18px;
-          background: linear-gradient(90deg, #00a8ff, #37ff74);
-          color: #00112b;
-          font-weight: 900;
-          cursor: pointer;
-        }
-        .resumo-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-          gap: 12px;
-          margin-top: 20px;
-        }
-        .resumo-card {
-          background: #061f47;
-          border: 1px solid rgba(255,255,255,.10);
-          border-radius: 16px;
-          padding: 16px;
-        }
-        .resumo-label { color: #a9b8cc; font-size: 12px; margin-bottom: 7px; }
-        .resumo-value { font-size: 25px; font-weight: 900; }
-        .bar-wrap {
-          background: #061f47;
-          border-radius: 999px;
-          overflow: hidden;
-          height: 11px;
-          margin-top: 18px;
-        }
-        .bar { height: 100%; background: linear-gradient(90deg, #00a8ff, #37ff74); }
-        .fila { display: grid; gap: 18px; }
-        .cliente-card {
-          background: rgba(255,255,255,.06);
-          border: 1px solid rgba(255,255,255,.10);
-          border-radius: 22px;
-          padding: 22px;
-        }
-        .cliente-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 16px;
-          flex-wrap: wrap;
-          margin-bottom: 16px;
-        }
-        .cliente-pos { color: #a9b8cc; font-size: 13px; margin-bottom: 6px; }
-        .cliente-nome { font-size: 25px; font-weight: 900; margin: 0 0 8px; }
-        .nivel { font-weight: 900; }
-        .indice { color: #37ff74; font-weight: 900; margin-left: 6px; }
-        .btn-atender {
-          border: none;
-          border-radius: 14px;
-          padding: 12px 18px;
-          background: linear-gradient(90deg, #00a8ff, #37ff74);
-          color: #00112b;
-          font-weight: 900;
-          cursor: pointer;
-        }
-        .motivos {
-          background: #061f47;
-          border: 1px solid rgba(255,255,255,.08);
-          border-radius: 16px;
-          padding: 16px;
-          margin-bottom: 14px;
-        }
-        .motivos strong, .acoes-title { display: block; margin-bottom: 10px; }
-        .motivos ul { margin: 0; padding-left: 18px; color: #dce8f8; line-height: 1.8; }
-        .acoes-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-          gap: 12px;
-        }
-        .acao-card {
-          background: #061f47;
-          border: 1px solid rgba(255,255,255,.10);
-          border-radius: 16px;
-          padding: 14px;
-          color: white;
-          text-align: left;
-          cursor: pointer;
-          min-height: 116px;
-        }
-        .acao-card:hover { border-color: rgba(55,255,116,.35); transform: translateY(-1px); transition: .2s; }
-        .acao-modulo { color: #37ff74; font-weight: 900; font-size: 12px; margin-bottom: 8px; }
-        .acao-titulo { font-weight: 900; margin-bottom: 6px; }
-        .acao-desc { color: #a9b8cc; font-size: 12px; line-height: 1.35; }
-        .empty {
-          background: #061f47;
-          border: 1px solid rgba(255,255,255,.10);
-          border-radius: 18px;
-          padding: 22px;
-          color: #a9b8cc;
-        }
-      `}</style>
+      <style>{css}</style>
 
       <section className="hero-dia">
         <div className="hero-top">
           <div>
             <h1 className="title">☀️ Assistente do Dia</h1>
             <p className="subtitle">
-              Fila operacional montada com dados reais do Fiscal, Financeiro, Documentos e Atendimento.
+              Fluxo inteligente com checklist, progresso salvo e próximo cliente automático.
             </p>
           </div>
 
-          <button type="button" className="refresh-dia" onClick={carregarDados}>
-            Atualizar fila
-          </button>
+          <div className="hero-actions">
+            <button type="button" className="btn-secondary" onClick={carregarDados}>Atualizar fila</button>
+            <button type="button" className="btn-danger" onClick={reiniciarDia}>Reiniciar dia</button>
+          </div>
         </div>
 
-        <div className="bar-wrap">
-          <div className="bar" style={{ width: `${resumo.progresso}%` }} />
-        </div>
+        <div className="bar-wrap"><div className="bar" style={{ width: `${resumo.progresso}%` }} /></div>
 
         <div className="resumo-grid">
           <Resumo label="Clientes na fila" value={resumo.clientes} />
+          <Resumo label="Concluídos" value={`${progresso.clientesConcluidos}/${fila.length}`} success />
+          <Resumo label="Ações concluídas" value={`${progresso.concluidas}/${progresso.totalAcoes}`} blue />
           <Resumo label="Urgentes" value={resumo.urgentes} danger />
           <Resumo label="Atenção" value={resumo.atencao} warning />
-          <Resumo label="Programados" value={resumo.programados} success />
-          <Resumo label="Ações" value={resumo.acoes} blue />
         </div>
       </section>
 
@@ -234,57 +307,105 @@ export default function AssistenteDoDia({ setPage }) {
         <div className="empty">Carregando fila do dia...</div>
       ) : fila.length === 0 ? (
         <div className="empty">Nenhuma ação real encontrada para hoje. O escritório está sem pendências críticas no momento.</div>
-      ) : (
-        <div className="fila">
-          {fila.map((cliente, index) => (
-            <section className="cliente-card" key={cliente.id || cliente.cliente}>
-              <div className="cliente-top">
-                <div>
-                  <div className="cliente-pos">Cliente {index + 1} de {fila.length}</div>
-                  <h2 className="cliente-nome">{cliente.cliente}</h2>
-                  <div className="nivel">
-                    {nivelTexto(cliente.nivel)}
-                    <span className="indice">• Índice {cliente.prioridade}</span>
-                  </div>
-                </div>
+      ) : expedienteConcluido ? (
+        <ResumoFinal fila={fila} progresso={progresso} historicoDia={historicoDia} inicioDia={inicioDia} />
+      ) : atendimentoAtivo && clienteAtual ? (
+        <section className="atendimento-card">
+          <div className="cliente-top">
+            <div>
+              <div className="cliente-pos">Cliente {clienteAtualIndex + 1} de {fila.length}</div>
+              <h2 className="cliente-nome">{clienteAtual.cliente}</h2>
+              <div className="nivel">{nivelTexto(clienteAtual.nivel)} <span className="indice">• Índice {clienteAtual.prioridade}</span></div>
+            </div>
 
-                <button
-                  type="button"
-                  className="btn-atender"
-                  onClick={() => abrirDestino(cliente.acoes[0])}
-                >
-                  Iniciar atendimento
-                </button>
-              </div>
+            <button type="button" className="btn-secondary" onClick={() => setAtendimentoAtivo(false)}>
+              Ver fila completa
+            </button>
+          </div>
 
-              <div className="motivos">
-                <strong>Motivos</strong>
-                <ul>
-                  {cliente.motivos.map((motivo) => (
-                    <li key={motivo}>{motivo}</li>
-                  ))}
-                </ul>
-              </div>
+          <ProgressoCliente progresso={progressoCliente(clienteAtual)} />
 
-              <strong className="acoes-title">Ações reais previstas</strong>
-              <div className="acoes-grid">
-                {cliente.acoes.map((acao) => (
-                  <button
-                    type="button"
-                    className="acao-card"
-                    key={acao.id}
-                    onClick={() => abrirDestino(acao)}
-                    title="Abrir módulo relacionado"
-                  >
+          <div className="checklist">
+            {clienteAtual.acoes.map((acao) => {
+              const concluida = Boolean(acoesConcluidas[acao.id])
+
+              return (
+                <div className={`check-item ${concluida ? "concluida" : ""}`} key={acao.id}>
+                  <button type="button" className="check-toggle" onClick={() => alternarAcao(acao)}>
+                    {concluida ? "✅" : "☐"}
+                  </button>
+
+                  <div className="check-info">
                     <div className="acao-modulo">{acao.modulo}</div>
                     <div className="acao-titulo">{acao.titulo}</div>
                     <div className="acao-desc">{acao.descricao}</div>
+                  </div>
+
+                  <button type="button" className="btn-action" onClick={() => executarAcao(acao)}>
+                    {concluida ? "Abrir novamente" : textoBotaoAcao(acao)}
                   </button>
-                ))}
-              </div>
-            </section>
-          ))}
+                </div>
+              )
+            })}
+          </div>
+
+          {progressoCliente(clienteAtual).concluido && (
+            <div className="cliente-concluido">
+              <strong>✅ Cliente concluído</strong>
+              <p>Todas as ações deste cliente foram finalizadas.</p>
+              <button type="button" className="btn-primary" onClick={irProximoCliente}>Próximo cliente</button>
+            </div>
+          )}
+        </section>
+      ) : (
+        <div className="fila-wrap">
+          <div className="fila-header">
+            <div>
+              <h2>Fila inteligente do dia</h2>
+              <p>Clientes ordenados pelo índice de atenção.</p>
+            </div>
+            <button type="button" className="btn-primary" onClick={() => iniciarDia(0)}>☀️ Iniciar o dia</button>
+          </div>
+
+          <div className="fila">
+            {fila.map((cliente, index) => {
+              const pc = progressoCliente(cliente)
+
+              return (
+                <section className={`cliente-card ${pc.concluido ? "cliente-ok" : ""}`} key={cliente.id || cliente.cliente}>
+                  <div className="cliente-top">
+                    <div>
+                      <div className="cliente-pos">Cliente {index + 1} de {fila.length}</div>
+                      <h2 className="cliente-nome">{cliente.cliente}</h2>
+                      <div className="nivel">{nivelTexto(cliente.nivel)} <span className="indice">• Índice {cliente.prioridade}</span></div>
+                    </div>
+
+                    <button type="button" className="btn-atender" onClick={() => iniciarDia(index)}>
+                      {pc.concluido ? "Revisar" : "Iniciar atendimento"}
+                    </button>
+                  </div>
+
+                  <div className="mini-progress"><div style={{ width: `${pc.percentual}%` }} /></div>
+                  <div className="mini-text">{pc.concluidas} de {pc.total} ações concluídas</div>
+
+                  <div className="motivos">
+                    <strong>Motivos</strong>
+                    <ul>{cliente.motivos.map((motivo) => <li key={motivo}>{motivo}</li>)}</ul>
+                  </div>
+                </section>
+              )
+            })}
+          </div>
         </div>
+      )}
+
+      {historicoDia.length > 0 && !expedienteConcluido && (
+        <section className="historico-box">
+          <h3>Histórico do dia</h3>
+          {historicoDia.slice(0, 6).map((evento) => (
+            <div className="evento" key={evento.id}><span>{evento.hora}</span>{evento.texto}</div>
+          ))}
+        </section>
       )}
     </div>
   )
@@ -300,3 +421,105 @@ function Resumo({ label, value, danger, warning, success, blue }) {
     </div>
   )
 }
+
+function ProgressoCliente({ progresso }) {
+  return (
+    <div className="progresso-cliente">
+      <div className="progresso-texto">
+        <strong>Progresso do cliente</strong>
+        <span>{progresso.concluidas} de {progresso.total} ações • {progresso.percentual}%</span>
+      </div>
+      <div className="bar-wrap"><div className="bar" style={{ width: `${progresso.percentual}%` }} /></div>
+    </div>
+  )
+}
+
+function ResumoFinal({ fila, progresso, historicoDia, inicioDia }) {
+  const inicio = inicioDia ? new Date(inicioDia) : null
+  const minutos = inicio ? Math.max(1, Math.round((Date.now() - inicio.getTime()) / 60000)) : 0
+
+  return (
+    <section className="final-box">
+      <div className="final-icon">🎉</div>
+      <h2>Expediente concluído</h2>
+      <p>Todas as ações encontradas para hoje foram finalizadas.</p>
+
+      <div className="resumo-grid final-grid">
+        <Resumo label="Clientes" value={fila.length} />
+        <Resumo label="Ações" value={progresso.totalAcoes} blue />
+        <Resumo label="Progresso" value="100%" success />
+        <Resumo label="Tempo estimado" value={`${minutos} min`} warning />
+      </div>
+
+      {historicoDia.length > 0 && (
+        <div className="historico-box final-history">
+          <h3>Últimas ações</h3>
+          {historicoDia.slice(0, 8).map((evento) => (
+            <div className="evento" key={evento.id}><span>{evento.hora}</span>{evento.texto}</div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+const css = `
+  .assistente-dia-page { color: white; }
+  .hero-dia, .atendimento-card, .cliente-card, .fila-wrap, .historico-box, .final-box {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 24px;
+    padding: 24px;
+    margin-bottom: 22px;
+  }
+  .hero-dia { background: linear-gradient(135deg, rgba(0,168,255,.18), rgba(55,255,116,.11)); border-color: rgba(55,255,116,.24); }
+  .hero-top, .cliente-top, .fila-header, .progresso-texto {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap;
+  }
+  .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .title { margin: 0; font-size: 31px; font-weight: 900; }
+  .subtitle, .fila-header p, .final-box p { color: #a9b8cc; margin: 8px 0 0; line-height: 1.45; }
+  .resumo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
+  .resumo-card { background: #061f47; border: 1px solid rgba(255,255,255,.10); border-radius: 16px; padding: 16px; }
+  .resumo-label { color: #a9b8cc; font-size: 12px; margin-bottom: 7px; }
+  .resumo-value { font-size: 25px; font-weight: 900; }
+  .bar-wrap, .mini-progress { background: #061f47; border-radius: 999px; overflow: hidden; height: 11px; margin-top: 18px; }
+  .bar, .mini-progress div { height: 100%; background: linear-gradient(90deg, #00a8ff, #37ff74); }
+  .fila { display: grid; gap: 18px; }
+  .cliente-card.cliente-ok { border-color: rgba(55,255,116,.35); background: rgba(55,255,116,.08); }
+  .cliente-pos, .mini-text { color: #a9b8cc; font-size: 13px; margin-bottom: 6px; }
+  .cliente-nome { font-size: 25px; font-weight: 900; margin: 0 0 8px; }
+  .nivel { font-weight: 900; }
+  .indice { color: #37ff74; font-weight: 900; margin-left: 6px; }
+  .btn-primary, .btn-atender, .btn-action, .btn-secondary, .btn-danger {
+    border: none; border-radius: 14px; padding: 12px 18px; font-weight: 900; cursor: pointer;
+  }
+  .btn-primary, .btn-atender, .btn-action { background: linear-gradient(90deg, #00a8ff, #37ff74); color: #00112b; }
+  .btn-secondary { background: #061f47; border: 1px solid rgba(255,255,255,.14); color: white; }
+  .btn-danger { background: rgba(255,77,79,.14); border: 1px solid rgba(255,77,79,.30); color: #ffb3b3; }
+  .motivos { background: #061f47; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 16px; margin-top: 14px; }
+  .motivos strong { display: block; margin-bottom: 10px; }
+  .motivos ul { margin: 0; padding-left: 18px; color: #dce8f8; line-height: 1.8; }
+  .progresso-cliente { background: #061f47; border-radius: 18px; padding: 18px; margin: 18px 0; }
+  .progresso-texto span { color: #a9b8cc; }
+  .checklist { display: grid; gap: 12px; }
+  .check-item { display: grid; grid-template-columns: 46px 1fr auto; gap: 14px; align-items: center; background: #061f47; border: 1px solid rgba(255,255,255,.10); border-radius: 16px; padding: 14px; }
+  .check-item.concluida { background: rgba(55,255,116,.10); border-color: rgba(55,255,116,.35); }
+  .check-toggle { background: transparent; border: none; color: white; font-size: 25px; cursor: pointer; }
+  .acao-modulo { color: #37ff74; font-weight: 900; font-size: 12px; margin-bottom: 6px; }
+  .acao-titulo { font-weight: 900; margin-bottom: 5px; }
+  .acao-desc { color: #a9b8cc; font-size: 12px; line-height: 1.35; }
+  .cliente-concluido { margin-top: 18px; background: rgba(55,255,116,.10); border: 1px solid rgba(55,255,116,.28); border-radius: 18px; padding: 18px; }
+  .cliente-concluido p { color: #dce8f8; }
+  .empty { background: #061f47; border: 1px solid rgba(255,255,255,.10); border-radius: 18px; padding: 22px; color: #a9b8cc; }
+  .historico-box h3 { margin-top: 0; }
+  .evento { display: flex; gap: 12px; border-top: 1px solid rgba(255,255,255,.08); padding: 10px 0; color: #dce8f8; }
+  .evento span { color: #37ff74; font-weight: 900; min-width: 48px; }
+  .final-box { text-align: center; background: linear-gradient(135deg, rgba(55,255,116,.14), rgba(0,168,255,.10)); }
+  .final-icon { font-size: 52px; }
+  .final-grid, .final-history { text-align: left; }
+  @media (max-width: 720px) {
+    .check-item { grid-template-columns: 40px 1fr; }
+    .btn-action { grid-column: 1 / -1; }
+  }
+`
