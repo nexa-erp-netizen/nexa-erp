@@ -11,6 +11,7 @@ import {
   FaChartPie,
   FaCog,
   FaBell,
+  FaFlask,
 } from "react-icons/fa"
 
 const API_URL = "https://nexa-erp-api.onrender.com"
@@ -82,6 +83,11 @@ export default function Sidebar({ page, setPage, usuario }) {
       titulo: "Atendimento",
       icon: <FaGlobe />,
       itens: ["Pendências Clientes", "Documentos Digitais", "WhatsApp Inteligente", "Assistente do Dia"],
+    },
+    {
+      titulo: "Ferramentas",
+      icon: <FaFlask />,
+      itens: ["Laboratório Tributário"],
     },
     {
       titulo: "Configurações",

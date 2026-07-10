@@ -30,3 +30,10 @@
 - Criado cálculo da folha matemática necessária para atingir 28%, com alertas profissionais.
 - Criada comparação estimativa entre os Anexos III e V para a receita do período.
 - Incluídas memória de cálculo, explicação e recomendações revisáveis pelo contador.
+
+## v3.4.4.1 — Sprint 04.1: Laboratório Tributário
+- Nova tela administrativa para simulações tributárias.
+- Cálculo integrado de Fator R e alíquota efetiva.
+- Estimativa simplificada do DAS do período.
+- Comparação Anexo III x Anexo V.
+- Explicação e memória do cálculo.
