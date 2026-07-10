@@ -288,9 +288,12 @@ export default function DocumentosDigitais() {
                         <a
                           key={index}
                           href={
-                            arquivo.caminho?.startsWith("http")
+                            arquivo.url ||
+                            (arquivo.caminho?.startsWith("http")
                               ? arquivo.caminho
-                              : `https://nexa-erp-api.onrender.com${arquivo.caminho}`
+                              : `https://nexa-erp-api.onrender.com/${String(
+                                  arquivo.caminho || ""
+                                ).replace(/^\/+/, "")}`)
                           }
                           target="_blank"
                           rel="noreferrer"

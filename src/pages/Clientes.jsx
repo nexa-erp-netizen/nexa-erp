@@ -13,6 +13,14 @@ export default function Clientes({ setPage }) {
   const [email, setEmail] = useState("")
   const [cnpj, setCnpj] = useState("")
   const [regime, setRegime] = useState("")
+  const [ramoAtividade, setRamoAtividade] = useState("")
+  const [anexoSimples, setAnexoSimples] = useState("")
+  const [utilizaFatorR, setUtilizaFatorR] = useState("")
+  const [aliquotaIss, setAliquotaIss] = useState("")
+  const [dataOpcaoRegime, setDataOpcaoRegime] = useState("")
+  const [dataInicioAtividades, setDataInicioAtividades] = useState("")
+  const [situacaoEmpresa, setSituacaoEmpresa] = useState("Ativa")
+  const [observacoesTributarias, setObservacoesTributarias] = useState("")
   const [cep, setCep] = useState("")
   const [endereco, setEndereco] = useState("")
   const [numero, setNumero] = useState("")
@@ -44,6 +52,10 @@ export default function Clientes({ setPage }) {
     "Lucro Presumido",
     "Lucro Real",
   ]
+
+  const ramosAtividade = ["Serviços", "Comércio", "Indústria", "Misto"]
+  const anexosSimples = ["I", "II", "III", "IV", "V"]
+  const situacoesEmpresa = ["Ativa", "Inapta", "Baixada", "Suspensa", "Em Constituição"]
 
   const estados = [
     "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO",
@@ -193,6 +205,14 @@ export default function Clientes({ setPage }) {
       email,
       cnpj,
       regime,
+      ramoAtividade,
+      anexoSimples: regime === "Simples Nacional" ? anexoSimples : "",
+      utilizaFatorR: regime === "Simples Nacional" ? utilizaFatorR : "",
+      aliquotaIss,
+      dataOpcaoRegime,
+      dataInicioAtividades,
+      situacaoEmpresa,
+      observacoesTributarias,
       cep,
       endereco,
       numero,
@@ -299,6 +319,14 @@ export default function Clientes({ setPage }) {
     setEmail(clienteSelecionado.email || "")
     setCnpj(clienteSelecionado.cnpj || "")
     setRegime(clienteSelecionado.regime || "")
+    setRamoAtividade(clienteSelecionado.ramoAtividade || "")
+    setAnexoSimples(clienteSelecionado.anexoSimples || "")
+    setUtilizaFatorR(clienteSelecionado.utilizaFatorR || "")
+    setAliquotaIss(clienteSelecionado.aliquotaIss || "")
+    setDataOpcaoRegime(clienteSelecionado.dataOpcaoRegime || "")
+    setDataInicioAtividades(clienteSelecionado.dataInicioAtividades || "")
+    setSituacaoEmpresa(clienteSelecionado.situacaoEmpresa || "Ativa")
+    setObservacoesTributarias(clienteSelecionado.observacoesTributarias || "")
     setCep(clienteSelecionado.cep || "")
     setEndereco(clienteSelecionado.endereco || "")
     setNumero(clienteSelecionado.numero || "")
@@ -620,6 +648,14 @@ export default function Clientes({ setPage }) {
     setEmail("")
     setCnpj("")
     setRegime("")
+    setRamoAtividade("")
+    setAnexoSimples("")
+    setUtilizaFatorR("")
+    setAliquotaIss("")
+    setDataOpcaoRegime("")
+    setDataInicioAtividades("")
+    setSituacaoEmpresa("Ativa")
+    setObservacoesTributarias("")
     setCep("")
     setEndereco("")
     setNumero("")
@@ -905,7 +941,14 @@ export default function Clientes({ setPage }) {
             <select
               style={input}
               value={regime}
-              onChange={(e) => setRegime(e.target.value)}
+              onChange={(e) => {
+                const novoRegime = e.target.value
+                setRegime(novoRegime)
+                if (novoRegime !== "Simples Nacional") {
+                  setAnexoSimples("")
+                  setUtilizaFatorR("")
+                }
+              }}
             >
               <option value="">Selecione o regime</option>
 
@@ -915,6 +958,64 @@ export default function Clientes({ setPage }) {
                 </option>
               ))}
             </select>
+
+            <div style={secaoFormTitulo}>🧠 DNA Tributário</div>
+
+            <select style={input} value={ramoAtividade} onChange={(e) => setRamoAtividade(e.target.value)}>
+              <option value="">Selecione o ramo de atividade</option>
+              {ramosAtividade.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+
+            <select style={input} value={situacaoEmpresa} onChange={(e) => setSituacaoEmpresa(e.target.value)}>
+              {situacoesEmpresa.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+
+            {regime === "Simples Nacional" && (
+              <>
+                <select style={input} value={anexoSimples} onChange={(e) => setAnexoSimples(e.target.value)}>
+                  <option value="">Selecione o Anexo</option>
+                  {anexosSimples.map((item) => <option key={item} value={item}>Anexo {item}</option>)}
+                </select>
+
+                <select style={input} value={utilizaFatorR} onChange={(e) => setUtilizaFatorR(e.target.value)}>
+                  <option value="">Utiliza Fator R?</option>
+                  <option value="Sim">Sim</option>
+                  <option value="Não">Não</option>
+                </select>
+              </>
+            )}
+
+            {(ramoAtividade === "Serviços" || ramoAtividade === "Misto") && (
+              <input
+                style={input}
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                placeholder="Alíquota ISS (%)"
+                value={aliquotaIss}
+                onChange={(e) => setAliquotaIss(e.target.value)}
+              />
+            )}
+
+            <div style={dateBox}>
+              <span style={dateLabel}>Data da opção pelo regime</span>
+              <input style={input} type="date" value={dataOpcaoRegime} onChange={(e) => setDataOpcaoRegime(e.target.value)} />
+            </div>
+
+            <div style={dateBox}>
+              <span style={dateLabel}>Início das atividades</span>
+              <input style={input} type="date" value={dataInicioAtividades} onChange={(e) => setDataInicioAtividades(e.target.value)} />
+            </div>
+
+            <textarea
+              style={textarea}
+              placeholder="Observações tributárias, riscos ou particularidades da empresa"
+              value={observacoesTributarias}
+              onChange={(e) => setObservacoesTributarias(e.target.value)}
+            />
+
+            <div style={secaoFormTitulo}>📍 Dados cadastrais e endereço</div>
 
             <input
               style={input}
@@ -1457,6 +1558,17 @@ export default function Clientes({ setPage }) {
               <Info label="E-mail" value={clienteSelecionado.email} />
               <Info label="CNPJ" value={clienteSelecionado.cnpj} />
               <Info label="Regime" value={clienteSelecionado.regime} />
+              <Info label="Ramo de atividade" value={clienteSelecionado.ramoAtividade} />
+              <Info label="Situação da empresa" value={clienteSelecionado.situacaoEmpresa} />
+              {clienteSelecionado.regime === "Simples Nacional" && (
+                <>
+                  <Info label="Anexo" value={clienteSelecionado.anexoSimples ? `Anexo ${clienteSelecionado.anexoSimples}` : ""} />
+                  <Info label="Fator R" value={clienteSelecionado.utilizaFatorR} />
+                </>
+              )}
+              <Info label="ISS" value={clienteSelecionado.aliquotaIss ? `${clienteSelecionado.aliquotaIss}%` : ""} />
+              <Info label="Data da opção" value={formatarDataBR(clienteSelecionado.dataOpcaoRegime)} />
+              <Info label="Início das atividades" value={formatarDataBR(clienteSelecionado.dataInicioAtividades)} />
               <Info label="CEP" value={clienteSelecionado.cep} />
               <Info label="Endereço" value={clienteSelecionado.endereco} />
               <Info label="Número" value={clienteSelecionado.numero} />
@@ -1473,6 +1585,11 @@ export default function Clientes({ setPage }) {
               <Info label="Inscrição Estadual" value={clienteSelecionado.inscricaoEstadual} />
               <Info label="Alvará" value={clienteSelecionado.alvara} />
             </div>
+          </div>
+
+          <div style={observacaoBox}>
+            <span style={infoLabel}>Observações Tributárias</span>
+            <p style={observacaoTexto}>{clienteSelecionado.observacoesTributarias || "Não informado"}</p>
           </div>
 
           <div style={observacaoBox}>
@@ -2104,4 +2221,16 @@ const deleteButton = {
   padding: "6px 10px",
   cursor: "pointer",
   fontSize: "16px",
+}
+
+
+const secaoFormTitulo = {
+  gridColumn: "1 / -1",
+  marginTop: "8px",
+  padding: "13px 16px",
+  borderRadius: "12px",
+  background: "linear-gradient(90deg, rgba(0,168,255,.18), rgba(55,255,116,.12))",
+  border: "1px solid rgba(55,255,116,.20)",
+  color: "#37ff74",
+  fontWeight: "bold",
 }
