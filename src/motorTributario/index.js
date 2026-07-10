@@ -23,6 +23,12 @@ export {
 export { buscarAnexoSimples, normalizarCodigoAnexo } from "./simples/buscarAnexo"
 export { buscarFaixaSimples } from "./simples/buscarFaixa"
 export { calcularAliquotaEfetivaSimples } from "./simples/calcularAliquotaEfetiva"
+export {
+  LIMITE_FATOR_R,
+  MODOS_FATOR_R,
+  calcularFatorR,
+  compararAnexosFatorR,
+} from "./simples/calcularFatorR"
 
 export function normalizarDnaTributario(cliente = {}) {
   const simples = cliente.regime === "Simples Nacional"

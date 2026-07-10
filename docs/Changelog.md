@@ -21,3 +21,12 @@
 - Incluídas validações para RBT12 igual ou inferior a zero e resultados inválidos.
 - Mantida separação entre cálculo da alíquota e futuro cálculo do DAS.
 - Documentadas limitações para início de atividade, Fator R, segregações e sublimites.
+
+## v3.4.4 — Sprint 04: Fator R e Consultoria Tributária
+- Criado cálculo centralizado do Fator R para a regra geral, mês de abertura e início de atividade.
+- Implementadas as situações especiais de folha ou receita iguais a zero.
+- Aplicado o critério do PGDAS-D de duas casas decimais sem arredondamento.
+- Adicionada indicação técnica entre Anexo III e Anexo V para atividades sujeitas ao Fator R.
+- Criado cálculo da folha matemática necessária para atingir 28%, com alertas profissionais.
+- Criada comparação estimativa entre os Anexos III e V para a receita do período.
+- Incluídas memória de cálculo, explicação e recomendações revisáveis pelo contador.
