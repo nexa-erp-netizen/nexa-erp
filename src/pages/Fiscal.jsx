@@ -11,6 +11,13 @@ export default function Fiscal() {
   const [status, setStatus] = useState("")
   const [valor, setValor] = useState("")
   const [observacao, setObservacao] = useState("")
+  const [parcelamento, setParcelamento] = useState({
+    orgao: "Receita Federal",
+    descricao: "Parcelamento",
+    parcelaAtual: "",
+    totalParcelas: "",
+    diaVencimento: "",
+  })
   const [anexos, setAnexos] = useState([])
   const [editandoId, setEditandoId] = useState(null)
   const [arquivoAberto, setArquivoAberto] = useState(null)
@@ -94,6 +101,113 @@ export default function Fiscal() {
     return valor
   }
 
+
+  function atualizarCampoParcelamento(campo, valorCampo) {
+    setParcelamento((atual) => ({
+      ...atual,
+      [campo]: valorCampo,
+    }))
+  }
+
+  function limparNumeroInteiro(valorCampo) {
+    return String(valorCampo || "").replace(/\D/g, "")
+  }
+
+  function montarObservacaoParcelamento() {
+    if (obrigacao !== "Parcelamento") return observacao
+
+    const atual = limparNumeroInteiro(parcelamento.parcelaAtual)
+    const total = limparNumeroInteiro(parcelamento.totalParcelas)
+    const dia = limparNumeroInteiro(parcelamento.diaVencimento)
+    const orgao = parcelamento.orgao || "Não informado"
+    const descricao = parcelamento.descricao || "Parcelamento"
+
+    const linhasParcelamento = [
+      "[PARCELAMENTO]",
+      `Órgão: ${orgao}`,
+      `Descrição: ${descricao}`,
+      `Parcela: ${atual || "-"}/${total || "-"}`,
+      `Vencimento recorrente: dia ${dia || "-"}`,
+      "[/PARCELAMENTO]",
+    ]
+
+    const observacaoSemBloco = String(observacao || "")
+      .replace(/\[PARCELAMENTO\][\s\S]*?\[\/PARCELAMENTO\]/g, "")
+      .trim()
+
+    return [linhasParcelamento.join("\n"), observacaoSemBloco]
+      .filter(Boolean)
+      .join("\n\n")
+  }
+
+  function obterDadosParcelamento(item = {}) {
+    if (item.parcelamento && typeof item.parcelamento === "object") {
+      return item.parcelamento
+    }
+
+    const texto = String(item.observacao || "")
+    const bloco = texto.match(/\[PARCELAMENTO\]([\s\S]*?)\[\/PARCELAMENTO\]/)
+
+    if (!bloco) {
+      return {
+        orgao: "Receita Federal",
+        descricao: item.obrigacao === "Parcelamento" ? "Parcelamento" : "",
+        parcelaAtual: "",
+        totalParcelas: "",
+        diaVencimento: "",
+      }
+    }
+
+    const conteudo = bloco[1]
+    const parcela = conteudo.match(/Parcela:\s*(\d+|-)\/(\d+|-)/i)
+    const dia = conteudo.match(/Vencimento recorrente:\s*dia\s*(\d+|-)/i)
+    const orgao = conteudo.match(/Órgão:\s*(.*)/i)
+    const descricao = conteudo.match(/Descrição:\s*(.*)/i)
+
+    return {
+      orgao: orgao?.[1]?.trim() || "Receita Federal",
+      descricao: descricao?.[1]?.trim() || "Parcelamento",
+      parcelaAtual: parcela?.[1] === "-" ? "" : parcela?.[1] || "",
+      totalParcelas: parcela?.[2] === "-" ? "" : parcela?.[2] || "",
+      diaVencimento: dia?.[1] === "-" ? "" : dia?.[1] || "",
+    }
+  }
+
+  function removerBlocoParcelamento(texto) {
+    return String(texto || "")
+      .replace(/\[PARCELAMENTO\][\s\S]*?\[\/PARCELAMENTO\]/g, "")
+      .trim()
+  }
+
+  function calcularProximoVencimento(dataAtual, diaRecorrente) {
+    if (!dataAtual) return ""
+
+    const data = new Date(`${String(dataAtual).slice(0, 10)}T00:00:00`)
+    if (Number.isNaN(data.getTime())) return ""
+
+    const dia = Number(limparNumeroInteiro(diaRecorrente)) || data.getDate()
+    const proxima = new Date(data.getFullYear(), data.getMonth() + 1, 1)
+    const ultimoDiaMes = new Date(proxima.getFullYear(), proxima.getMonth() + 1, 0).getDate()
+    proxima.setDate(Math.min(dia, ultimoDiaMes))
+
+    return proxima.toISOString().slice(0, 10)
+  }
+
+  function proximaCompetencia(competenciaAtual) {
+    const partes = String(competenciaAtual || "").split("/")
+    if (partes.length !== 2) return competenciaAtual
+
+    const mes = Number(partes[0])
+    const ano = Number(partes[1])
+
+    if (!mes || !ano) return competenciaAtual
+
+    const proximoMes = mes === 12 ? 1 : mes + 1
+    const proximoAno = mes === 12 ? ano + 1 : ano
+
+    return `${String(proximoMes).padStart(2, "0")}/${proximoAno}`
+  }
+
   async function obterUrlAnexo(item) {
     if (!item.anexos || item.anexos.length === 0) return ""
 
@@ -158,6 +272,13 @@ export default function Fiscal() {
       return
     }
 
+    if (obrigacao === "Parcelamento") {
+      if (!parcelamento.parcelaAtual || !parcelamento.totalParcelas || !parcelamento.diaVencimento) {
+        alert("Informe parcela atual, total de parcelas e dia de vencimento do parcelamento.")
+        return
+      }
+    }
+
     const novaObrigacao = {
       cliente,
       obrigacao,
@@ -165,7 +286,8 @@ export default function Fiscal() {
       vencimento,
       status,
       valor,
-      observacao,
+      observacao: montarObservacaoParcelamento(),
+      parcelamento: obrigacao === "Parcelamento" ? parcelamento : null,
       anexos,
     }
 
@@ -191,7 +313,8 @@ export default function Fiscal() {
     setVencimento(item.vencimento || "")
     setStatus(item.status || "")
     setValor(item.valor || "")
-    setObservacao(item.observacao || "")
+    setParcelamento(obterDadosParcelamento(item))
+    setObservacao(removerBlocoParcelamento(item.observacao || ""))
     setAnexos(Array.isArray(item.anexos) ? item.anexos : [])
     setEditandoId(item.id)
 
@@ -199,13 +322,56 @@ export default function Fiscal() {
   }
 
   async function concluirObrigacao(item) {
-    const confirmar = window.confirm(
-      "Deseja concluir esta obrigação e gerar lançamento contábil automático?"
-    )
+    const isParcelamento = item.obrigacao === "Parcelamento"
+    const dadosParcelamento = obterDadosParcelamento(item)
+    const parcelaAtual = Number(limparNumeroInteiro(dadosParcelamento.parcelaAtual))
+    const totalParcelas = Number(limparNumeroInteiro(dadosParcelamento.totalParcelas))
+    const temProximaParcela = isParcelamento && parcelaAtual > 0 && totalParcelas > 0 && parcelaAtual < totalParcelas
+
+    const mensagemConfirmacao = isParcelamento
+      ? `Confirmar envio/conclusão da parcela ${parcelaAtual || "-"}/${totalParcelas || "-"}?${temProximaParcela ? "\n\nO Nexa já criará a próxima parcela automaticamente." : "\n\nEsta é a última parcela ou o total não foi informado."}`
+      : "Deseja concluir esta obrigação e gerar lançamento contábil automático?"
+
+    const confirmar = window.confirm(mensagemConfirmacao)
 
     if (!confirmar) return
 
     try {
+      if (temProximaParcela) {
+        const proximoParcelamento = {
+          ...dadosParcelamento,
+          parcelaAtual: String(parcelaAtual + 1),
+          totalParcelas: String(totalParcelas),
+        }
+
+        const observacaoAtualizada = String(item.observacao || "")
+          .replace(/\[PARCELAMENTO\][\s\S]*?\[\/PARCELAMENTO\]/g, "")
+          .trim()
+
+        const linhasParcelamento = [
+          "[PARCELAMENTO]",
+          `Órgão: ${proximoParcelamento.orgao || "Receita Federal"}`,
+          `Descrição: ${proximoParcelamento.descricao || "Parcelamento"}`,
+          `Parcela: ${proximoParcelamento.parcelaAtual}/${proximoParcelamento.totalParcelas}`,
+          `Vencimento recorrente: dia ${proximoParcelamento.diaVencimento || "-"}`,
+          "[/PARCELAMENTO]",
+        ]
+
+        await api.post("/fiscal", {
+          cliente: item.cliente,
+          obrigacao: "Parcelamento",
+          competencia: proximaCompetencia(item.competencia),
+          vencimento: calcularProximoVencimento(item.vencimento, proximoParcelamento.diaVencimento),
+          status: "Pendente",
+          valor: item.valor || "",
+          observacao: [linhasParcelamento.join("\n"), observacaoAtualizada]
+            .filter(Boolean)
+            .join("\n\n"),
+          parcelamento: proximoParcelamento,
+          anexos: [],
+        })
+      }
+
       await api.patch(`/fiscal/${item.id}/concluir`)
       await carregarObrigacoes()
     } catch (error) {
@@ -242,6 +408,13 @@ export default function Fiscal() {
     setStatus("")
     setValor("")
     setObservacao("")
+    setParcelamento({
+      orgao: "Receita Federal",
+      descricao: "Parcelamento",
+      parcelaAtual: "",
+      totalParcelas: "",
+      diaVencimento: "",
+    })
     setAnexos([])
     setEditandoId(null)
   }
@@ -379,6 +552,7 @@ export default function Fiscal() {
             <option value="">Obrigação</option>
             <option value="DAS">DAS</option>
             <option value="Honorários Contábeis">Honorários Contábeis</option>
+            <option value="Parcelamento">Parcelamento</option>
             <option value="DCTFWeb">DCTFWeb</option>
             <option value="SPED Fiscal">SPED Fiscal</option>
             <option value="DEFIS">DEFIS</option>
@@ -406,6 +580,52 @@ export default function Fiscal() {
           </select>
 
           <input style={input} placeholder="R$ 0,00" value={valor} onChange={(e) => setValor(formatarValor(e.target.value))} />
+
+          {obrigacao === "Parcelamento" && (
+            <div style={parcelamentoBox}>
+              <div style={parcelamentoHeader}>
+                <strong>Controle de Parcelamento</strong>
+                <span>O Nexa controla a parcela atual e já prepara a próxima ao concluir.</span>
+              </div>
+
+              <div style={parcelamentoGrid}>
+                <input
+                  style={input}
+                  placeholder="Órgão. Ex: Receita Federal"
+                  value={parcelamento.orgao}
+                  onChange={(e) => atualizarCampoParcelamento("orgao", e.target.value)}
+                />
+
+                <input
+                  style={input}
+                  placeholder="Descrição. Ex: Parcelamento Simples Nacional"
+                  value={parcelamento.descricao}
+                  onChange={(e) => atualizarCampoParcelamento("descricao", e.target.value)}
+                />
+
+                <input
+                  style={input}
+                  placeholder="Parcela atual. Ex: 10"
+                  value={parcelamento.parcelaAtual}
+                  onChange={(e) => atualizarCampoParcelamento("parcelaAtual", limparNumeroInteiro(e.target.value))}
+                />
+
+                <input
+                  style={input}
+                  placeholder="Total de parcelas. Ex: 60"
+                  value={parcelamento.totalParcelas}
+                  onChange={(e) => atualizarCampoParcelamento("totalParcelas", limparNumeroInteiro(e.target.value))}
+                />
+
+                <input
+                  style={input}
+                  placeholder="Dia de vencimento mensal. Ex: 28"
+                  value={parcelamento.diaVencimento}
+                  onChange={(e) => atualizarCampoParcelamento("diaVencimento", limparNumeroInteiro(e.target.value).slice(0, 2))}
+                />
+              </div>
+            </div>
+          )}
 
           <textarea style={textarea} placeholder="Observação" value={observacao} onChange={(e) => setObservacao(e.target.value)} />
 
@@ -481,7 +701,18 @@ export default function Fiscal() {
             {obrigacoesVisiveis.map((item) => (
               <tr key={item.id}>
                 <td style={td}>{item.cliente}</td>
-                <td style={td}>{item.obrigacao}</td>
+                <td style={td}>
+                  <strong>{item.obrigacao}</strong>
+                  {item.obrigacao === "Parcelamento" && (() => {
+                    const dados = obterDadosParcelamento(item)
+                    return (
+                      <div style={parcelamentoResumoTabela}>
+                        Parcela {dados.parcelaAtual || "-"}/{dados.totalParcelas || "-"}
+                        {dados.orgao ? ` • ${dados.orgao}` : ""}
+                      </div>
+                    )
+                  })()}
+                </td>
                 <td style={td}>{item.competencia}</td>
                 <td style={td}>{item.vencimento}</td>
 
@@ -753,6 +984,35 @@ const badgeBlue = { background: "#00a8ff", color: "white" }
 const badgeDanger = { background: "#ff4d4f", color: "white" }
 const badgeWarning = { background: "#ffc107", color: "#00112b" }
 const badgeSuccess = { background: "#37ff74", color: "#00112b" }
+
+const parcelamentoBox = {
+  gridColumn: "1 / -1",
+  background: "rgba(55,255,116,.08)",
+  border: "1px solid rgba(55,255,116,.24)",
+  borderRadius: "18px",
+  padding: "18px",
+}
+
+const parcelamentoHeader = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "5px",
+  marginBottom: "14px",
+  color: "white",
+}
+
+const parcelamentoGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+  gap: "12px",
+}
+
+const parcelamentoResumoTabela = {
+  marginTop: "6px",
+  color: "#37ff74",
+  fontSize: "12px",
+  fontWeight: "bold",
+}
 
 const modalBg = {
   position: "fixed",

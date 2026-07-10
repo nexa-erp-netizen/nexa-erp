@@ -32,6 +32,50 @@ function normalizarTexto(valor) {
   return String(valor || "").trim().toLowerCase()
 }
 
+function obterDadosParcelamento(item = {}) {
+  if (item.parcelamento && typeof item.parcelamento === "object") {
+    return item.parcelamento
+  }
+
+  const texto = String(item.observacao || "")
+  const bloco = texto.match(/\[PARCELAMENTO\]([\s\S]*?)\[\/PARCELAMENTO\]/)
+
+  if (!bloco) return null
+
+  const conteudo = bloco[1]
+  const parcela = conteudo.match(/Parcela:\s*(\d+|-)\/(\d+|-)/i)
+  const dia = conteudo.match(/Vencimento recorrente:\s*dia\s*(\d+|-)/i)
+  const orgao = conteudo.match(/Órgão:\s*(.*)/i)
+  const descricao = conteudo.match(/Descrição:\s*(.*)/i)
+
+  return {
+    orgao: orgao?.[1]?.trim() || "Receita Federal",
+    descricao: descricao?.[1]?.trim() || "Parcelamento",
+    parcelaAtual: parcela?.[1] === "-" ? "" : parcela?.[1] || "",
+    totalParcelas: parcela?.[2] === "-" ? "" : parcela?.[2] || "",
+    diaVencimento: dia?.[1] === "-" ? "" : dia?.[1] || "",
+  }
+}
+
+function tituloObrigacaoFiscal(item, obrigacao) {
+  if (obrigacao !== "Parcelamento") return obrigacao
+
+  const dados = obterDadosParcelamento(item)
+  if (!dados) return "Parcelamento"
+
+  return `Parcelamento ${dados.parcelaAtual || "-"}/${dados.totalParcelas || "-"}`
+}
+
+function descricaoObrigacaoFiscal(item, textoBase) {
+  if (item?.obrigacao !== "Parcelamento") return textoBase
+
+  const dados = obterDadosParcelamento(item)
+  if (!dados) return textoBase
+
+  const orgao = dados.orgao ? `${dados.orgao} • ` : ""
+  return `${orgao}Parcela ${dados.parcelaAtual || "-"}/${dados.totalParcelas || "-"} ${textoMinusculoPrazo(item.vencimento)}.`
+}
+
 function obterNomeCliente(cliente) {
   return (
     cliente?.nome ||
@@ -159,7 +203,8 @@ export function montarAcoesDoDia({
     const clienteCadastro = localizarCliente(mapaClientes, item.cliente)
     const cliente = item.cliente || obterNomeCliente(clienteCadastro)
     const clienteId = obterClienteId(clienteCadastro) || item.clienteId || item.cliente_id
-    const obrigacao = item.obrigacao || item.tipo || "Obrigação fiscal"
+    const obrigacaoOriginal = item.obrigacao || item.tipo || "Obrigação fiscal"
+    const obrigacao = tituloObrigacaoFiscal(item, obrigacaoOriginal)
     const dias = diferencaDias(item.vencimento)
     const status = normalizarTexto(item.status)
     const valor = Number(String(item.valor || 0).replace(".", "").replace(",", ".")) || 0
@@ -171,8 +216,8 @@ export function montarAcoesDoDia({
         clienteId,
         clienteDados: clienteCadastro,
         modulo: "Fiscal",
-        titulo: `Resolver ${obrigacao}`,
-        descricao: `${obrigacao} ${textoPrazo(dias).toLowerCase()}.`,
+        titulo: item.obrigacao === "Parcelamento" ? `Enviar ${obrigacao}` : `Resolver ${obrigacao}`,
+        descricao: descricaoObrigacaoFiscal(item, `${obrigacao} ${textoPrazo(dias).toLowerCase()}.`),
         prioridade: 100 + Math.min(Math.abs(dias) * 5, 80),
         destino: "Fiscal",
         referenciaId: item.id,
@@ -187,7 +232,9 @@ export function montarAcoesDoDia({
         clienteDados: clienteCadastro,
         modulo: "WhatsApp",
         titulo: "Avisar cliente pelo WhatsApp",
-        descricao: `Enviar lembrete sobre ${obrigacao} ${textoMinusculoPrazo(item.vencimento)}.`,
+        descricao: item.obrigacao === "Parcelamento"
+          ? `Enviar WhatsApp sobre ${obrigacao} ${textoMinusculoPrazo(item.vencimento)}.`
+          : `Enviar lembrete sobre ${obrigacao} ${textoMinusculoPrazo(item.vencimento)}.`,
         prioridade: 95 + Math.min(Math.abs(dias) * 3, 50),
         destino: "WhatsApp Inteligente",
         referenciaId: item.id,
@@ -205,8 +252,10 @@ export function montarAcoesDoDia({
         clienteId,
         clienteDados: clienteCadastro,
         modulo: "Fiscal",
-        titulo: `Acompanhar vencimento de ${obrigacao}`,
-        descricao: `${obrigacao} vence hoje${valor ? ` no valor de R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""}.`,
+        titulo: item.obrigacao === "Parcelamento" ? `Acompanhar ${obrigacao}` : `Acompanhar vencimento de ${obrigacao}`,
+        descricao: item.obrigacao === "Parcelamento"
+          ? descricaoObrigacaoFiscal(item, `${obrigacao} vence hoje.`)
+          : `${obrigacao} vence hoje${valor ? ` no valor de R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""}.`,
         prioridade: 90,
         destino: "Fiscal",
         referenciaId: item.id,
@@ -239,8 +288,8 @@ export function montarAcoesDoDia({
         clienteId,
         clienteDados: clienteCadastro,
         modulo: "Fiscal",
-        titulo: `Preparar aviso de ${obrigacao}`,
-        descricao: `${obrigacao} ${textoPrazo(dias).toLowerCase()}.`,
+        titulo: item.obrigacao === "Parcelamento" ? `Preparar ${obrigacao}` : `Preparar aviso de ${obrigacao}`,
+        descricao: descricaoObrigacaoFiscal(item, `${obrigacao} ${textoPrazo(dias).toLowerCase()}.`),
         prioridade: 70 - dias,
         destino: "Fiscal",
         referenciaId: item.id,
@@ -272,8 +321,10 @@ export function montarAcoesDoDia({
         clienteId,
         clienteDados: clienteCadastro,
         modulo: "Fiscal",
-        titulo: `Conferir ${obrigacao}`,
-        descricao: `${obrigacao} está pendente no fiscal.`,
+        titulo: item.obrigacao === "Parcelamento" ? `Conferir ${obrigacao}` : `Conferir ${obrigacao}`,
+        descricao: item.obrigacao === "Parcelamento"
+          ? descricaoObrigacaoFiscal(item, `${obrigacao} está pendente no fiscal.`)
+          : `${obrigacao} está pendente no fiscal.`,
         prioridade: 55,
         destino: "Fiscal",
         referenciaId: item.id,
