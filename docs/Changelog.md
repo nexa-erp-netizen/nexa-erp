@@ -13,3 +13,11 @@
 - Criada localização da faixa pela RBT12.
 - Adicionadas validações para anexo inválido, RBT12 negativa e receita acima do limite geral.
 - Biblioteca versionada e documentada; sem cálculo de DAS nesta Sprint.
+
+## v3.4.3 — Sprint 03: Alíquota Efetiva
+- Criada função centralizada para cálculo da alíquota efetiva do Simples Nacional.
+- Aplicada a fórmula legal com RBT12, alíquota nominal e parcela a deduzir.
+- Adicionada memória de cálculo completa e explicação textual do resultado.
+- Incluídas validações para RBT12 igual ou inferior a zero e resultados inválidos.
+- Mantida separação entre cálculo da alíquota e futuro cálculo do DAS.
+- Documentadas limitações para início de atividade, Fator R, segregações e sublimites.
