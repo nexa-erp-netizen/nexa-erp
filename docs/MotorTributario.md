@@ -95,3 +95,9 @@ const comparacao = compararAnexosFatorR({
 ### Limites da simulação
 
 A função não decide se um CNAE está sujeito ao Fator R e não recomenda automaticamente aumento de pró-labore ou salários. Qualquer cenário deve considerar encargos, caixa, legislação trabalhista, substância econômica e validação profissional.
+
+## Sprint 05 — Motor do DAS
+
+O Nexa Core passou a calcular o **DAS-base estimado** pela aplicação da alíquota efetiva sobre a receita tributável do período.
+
+A função não substitui o PGDAS-D. O valor definitivo depende da segregação das receitas e das regras específicas da operação, do estabelecimento, do estado e do município.

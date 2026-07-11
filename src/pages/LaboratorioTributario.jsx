@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import {
   MODOS_FATOR_R,
   calcularAliquotaEfetivaSimples,
+  calcularDasSimples,
   calcularFatorR,
   compararAnexosFatorR,
 } from "../motorTributario"
@@ -84,7 +85,11 @@ export default function LaboratorioTributario() {
       }
 
       const aliquota = calcularAliquotaEfetivaSimples(anexoAplicado, valores.rbt12)
-      const dasEstimado = valores.receitaPeriodo * aliquota.aliquotaEfetiva
+      const das = calcularDasSimples({
+        anexo: anexoAplicado,
+        rbt12: valores.rbt12,
+        receitaPeriodo: valores.receitaPeriodo,
+      })
       const comparacao = form.atividadeFatorR
         ? compararAnexosFatorR({
             rbt12: valores.rbt12,
@@ -95,7 +100,7 @@ export default function LaboratorioTributario() {
       setResultado({
         fatorR,
         aliquota,
-        dasEstimado,
+        das,
         comparacao,
         anexoAplicado,
         receitaPeriodo: valores.receitaPeriodo,
@@ -279,7 +284,7 @@ function Campo({ label, required, children }) {
 }
 
 function ResultadoAnalise({ resultado }) {
-  const { fatorR, aliquota, dasEstimado, comparacao, anexoAplicado, receitaPeriodo } = resultado
+  const { fatorR, aliquota, das, comparacao, anexoAplicado, receitaPeriodo } = resultado
 
   return (
     <section style={styles.resultSection}>
@@ -296,7 +301,7 @@ function ResultadoAnalise({ resultado }) {
         <Metrica label="Faixa" value={`${aliquota.faixa}ª faixa`} detail={`Anexo ${aliquota.anexo}`} />
         <Metrica label="Alíquota nominal" value={formatarPercentual(aliquota.aliquotaNominalPercentual)} detail={`Dedução: ${formatarMoeda(aliquota.parcelaDeduzir)}`} />
         <Metrica label="Alíquota efetiva" value={formatarPercentual(aliquota.aliquotaEfetivaPercentual, 4)} detail="Antes das segregações do PGDAS-D" />
-        <Metrica label="DAS estimado" value={formatarMoeda(dasEstimado)} detail={`Sobre ${formatarMoeda(receitaPeriodo)}`} destaque />
+        <Metrica label="DAS-base estimado" value={formatarMoeda(das.valorDasBase)} detail={`Sobre ${formatarMoeda(receitaPeriodo)}`} destaque />
       </div>
 
       <div style={styles.resultGrid}>
@@ -311,6 +316,9 @@ function ResultadoAnalise({ resultado }) {
             <strong>Alíquota efetiva:</strong> [(RBT12 × alíquota nominal) − parcela a deduzir] ÷ RBT12.
           </p>
           <p style={styles.analysisText}>{aliquota.explicacao}</p>
+          <p style={styles.analysisText}>
+            <strong>DAS-base:</strong> {das.formula}. {das.explicacao}
+          </p>
         </article>
 
         {fatorR && (
@@ -341,7 +349,7 @@ function ResultadoAnalise({ resultado }) {
       )}
 
       <div style={styles.disclaimer}>
-        <strong>Revisão obrigatória do contador.</strong> Este resultado é uma simulação interna. O enquadramento final depende da atividade, CNAE, receitas segregadas e regras aplicáveis no PGDAS-D.
+        <strong>Revisão obrigatória do contador.</strong> Este é um DAS-base estimado. O valor definitivo depende das receitas segregadas e das regras aplicáveis no PGDAS-D. No Anexo IV, a contribuição previdenciária patronal é apurada fora do DAS.
       </div>
     </section>
   )

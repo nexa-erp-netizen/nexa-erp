@@ -37,3 +37,11 @@
 - Estimativa simplificada do DAS do período.
 - Comparação Anexo III x Anexo V.
 - Explicação e memória do cálculo.
+
+## v3.4.5 — Sprint 05: Motor do DAS
+
+- Criado o cálculo centralizado do DAS-base estimado.
+- Adicionada memória completa do cálculo.
+- Integrado o Motor do DAS ao Laboratório Tributário.
+- Adicionadas explicações e alertas sobre as limitações da simulação.
+- Corrigida opção duplicada no seletor do Laboratório Tributário.

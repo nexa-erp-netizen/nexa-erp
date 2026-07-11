@@ -23,6 +23,7 @@ export {
 export { buscarAnexoSimples, normalizarCodigoAnexo } from "./simples/buscarAnexo"
 export { buscarFaixaSimples } from "./simples/buscarFaixa"
 export { calcularAliquotaEfetivaSimples } from "./simples/calcularAliquotaEfetiva"
+export { calcularDasSimples } from "./simples/calcularDasSimples"
 export {
   LIMITE_FATOR_R,
   MODOS_FATOR_R,
