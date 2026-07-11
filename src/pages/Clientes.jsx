@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
 import WhatsAppMenu from "../components/WhatsAppMenu"
+import { analisarPlanejamentoTributario } from "../motorTributario"
 
 export default function Clientes({ setPage }) {
   const [tela, setTela] = useState("lista")
@@ -809,6 +810,37 @@ export default function Clientes({ setPage }) {
 
   const financeiroSituacao = financeiroDoCliente.length === 0 ? "Sem lançamentos" : financeiroSaldoAtual >= 0 ? "Em dia" : "Atenção"
 
+  const hojeSaudeTributaria = new Date()
+  const inicioRbt12 = new Date(hojeSaudeTributaria.getFullYear(), hojeSaudeTributaria.getMonth() - 11, 1)
+
+  const rbt12Estimada = financeiroDoCliente
+    .filter((item) => {
+      if (!ehReceitaFinanceira(item)) return false
+      const data = new Date(dataFinanceira(item) || 0)
+      return Number.isFinite(data.getTime()) && data >= inicioRbt12 && data <= hojeSaudeTributaria
+    })
+    .reduce((total, item) => total + valorNumerico(item.valor), 0)
+
+  let saudeTributaria = null
+  let erroSaudeTributaria = ""
+
+  if (clienteSelecionado?.regime === "Simples Nacional" && rbt12Estimada > 0) {
+    try {
+      saudeTributaria = analisarPlanejamentoTributario({
+        rbt12: rbt12Estimada,
+        receitaPeriodo: financeiroCreditos,
+      })
+    } catch (error) {
+      erroSaudeTributaria = error?.message || "Não foi possível analisar este cenário."
+    }
+  }
+
+  const corSaudeTributaria = saudeTributaria?.pontuacao >= 85
+    ? "#37ff74"
+    : saudeTributaria?.pontuacao >= 65
+      ? "#ffd54a"
+      : "#ff5f65"
+
   const obrigacoesDoCliente = fiscalObrigacoes.filter((item) =>
     mesmoCliente(item.cliente, clienteSelecionado?.nome)
   )
@@ -835,6 +867,18 @@ export default function Clientes({ setPage }) {
     if (!clienteSelecionado?.nome) return
     localStorage.setItem("nexaFiltroFiscalCliente", clienteSelecionado.nome)
     if (typeof setPage === "function") setPage("Fiscal")
+  }
+
+  function abrirAnaliseTributariaCliente() {
+    localStorage.setItem("nexaLaboratorioCliente", JSON.stringify({
+      clienteId: clienteSelecionado?.id || null,
+      cliente: clienteSelecionado?.nome || "",
+      rbt12: rbt12Estimada,
+      receitaPeriodo: financeiroCreditos,
+      anexo: clienteSelecionado?.anexoSimples || "III",
+    }))
+
+    if (typeof setPage === "function") setPage("Laboratório Tributário")
   }
 
   return (
@@ -1510,6 +1554,77 @@ export default function Clientes({ setPage }) {
               </div>
             ) : (
               <p style={observacaoTexto}>Nenhum lançamento financeiro encontrado para este cliente.</p>
+            )}
+          </div>
+
+          <div id="central-saude-tributaria" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Saúde Tributária</span>
+                <p style={secaoDescricao}>Análise consultiva da Nexa com base no regime e nos lançamentos disponíveis.</p>
+              </div>
+
+              <button style={button} onClick={abrirAnaliseTributariaCliente}>
+                Ver análise completa
+              </button>
+            </div>
+
+            {clienteSelecionado.regime !== "Simples Nacional" ? (
+              <div style={saudeTributariaVazia}>
+                <strong>Disponível inicialmente para empresas do Simples Nacional.</strong>
+                <span>Regime atual: {clienteSelecionado.regime || "não informado"}.</span>
+              </div>
+            ) : erroSaudeTributaria ? (
+              <div style={saudeTributariaVazia}>
+                <strong>Não foi possível concluir a análise.</strong>
+                <span>{erroSaudeTributaria}</span>
+              </div>
+            ) : !saudeTributaria ? (
+              <div style={saudeTributariaVazia}>
+                <strong>Dados financeiros insuficientes.</strong>
+                <span>Lance receitas do cliente para a Nexa estimar a RBT12 e gerar a nota tributária.</span>
+              </div>
+            ) : (
+              <>
+                <div style={saudeTributariaGrid}>
+                  <div style={{ ...saudeTributariaNota, borderColor: corSaudeTributaria }}>
+                    <span style={saudeTributariaRotulo}>Índice Nexa</span>
+                    <strong style={{ ...saudeTributariaNumero, color: corSaudeTributaria }}>
+                      {saudeTributaria.pontuacao}/100
+                    </strong>
+                    <span style={{ ...saudeTributariaClassificacao, color: corSaudeTributaria }}>
+                      {saudeTributaria.classificacao}
+                    </span>
+                  </div>
+
+                  <div style={saudeTributariaResumo}>
+                    <Info label="RBT12 estimada" value={formatarMoeda(rbt12Estimada)} />
+                    <Info label="Risco" value={saudeTributaria.nivelRisco} />
+                    <Info label="Alertas" value={saudeTributaria.alertas.length} />
+                    <Info label="Oportunidades" value={saudeTributaria.oportunidades.length} />
+                  </div>
+                </div>
+
+                <div style={parecerNexaBox}>
+                  <strong>Parecer da Nexa</strong>
+                  <span>{saudeTributaria.parecer}</span>
+                </div>
+
+                {saudeTributaria.alertas.length > 0 && (
+                  <div style={listaAnaliseTributaria}>
+                    {saudeTributaria.alertas.slice(0, 2).map((alerta) => (
+                      <div key={`${alerta.tipo}-${alerta.titulo}`} style={alertaTributarioItem}>
+                        <strong>⚠ {alerta.titulo}</strong>
+                        <span>{alerta.descricao}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <small style={avisoEstimativaTributaria}>
+                  A RBT12 acima é estimada pelos créditos registrados na movimentação do cliente e deve ser conferida antes de qualquer decisão tributária.
+                </small>
+              </>
             )}
           </div>
 
@@ -2223,6 +2338,94 @@ const deleteButton = {
   fontSize: "16px",
 }
 
+
+const saudeTributariaGrid = {
+  display: "grid",
+  gridTemplateColumns: "220px 1fr",
+  gap: "16px",
+  alignItems: "stretch",
+  marginBottom: "16px",
+}
+
+const saudeTributariaNota = {
+  background: "rgba(255,255,255,.05)",
+  border: "1px solid",
+  borderRadius: "16px",
+  padding: "18px",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  textAlign: "center",
+}
+
+const saudeTributariaRotulo = {
+  color: "#a9b8cc",
+  fontSize: "13px",
+  marginBottom: "8px",
+}
+
+const saudeTributariaNumero = {
+  fontSize: "36px",
+  lineHeight: 1.1,
+}
+
+const saudeTributariaClassificacao = {
+  fontWeight: "bold",
+  marginTop: "8px",
+}
+
+const saudeTributariaResumo = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+  gap: "12px",
+}
+
+const parecerNexaBox = {
+  background: "rgba(0,168,255,.09)",
+  border: "1px solid rgba(0,168,255,.22)",
+  borderRadius: "14px",
+  padding: "15px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "7px",
+  marginBottom: "14px",
+  color: "white",
+}
+
+const listaAnaliseTributaria = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: "12px",
+  marginBottom: "12px",
+}
+
+const alertaTributarioItem = {
+  background: "rgba(255,213,74,.08)",
+  border: "1px solid rgba(255,213,74,.22)",
+  borderRadius: "12px",
+  padding: "13px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "6px",
+  color: "#f6f8fc",
+}
+
+const avisoEstimativaTributaria = {
+  display: "block",
+  color: "#a9b8cc",
+  lineHeight: 1.5,
+}
+
+const saudeTributariaVazia = {
+  background: "rgba(255,255,255,.05)",
+  border: "1px solid rgba(255,255,255,.10)",
+  borderRadius: "14px",
+  padding: "16px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "7px",
+  color: "#dce8f8",
+}
 
 const secaoFormTitulo = {
   gridColumn: "1 / -1",

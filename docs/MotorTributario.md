@@ -101,3 +101,6 @@ A função não decide se um CNAE está sujeito ao Fator R e não recomenda auto
 O Nexa Core passou a calcular o **DAS-base estimado** pela aplicação da alíquota efetiva sobre a receita tributável do período.
 
 A função não substitui o PGDAS-D. O valor definitivo depende da segregação das receitas e das regras específicas da operação, do estabelecimento, do estado e do município.
+
+## Planejamento Tributário Inteligente
+O módulo `analisarPlanejamentoTributario` transforma os resultados técnicos do Simples Nacional em alertas, oportunidades, pontuação e parecer consultivo. Ele não substitui a validação profissional nem determina automaticamente o regime ou anexo.

@@ -3,6 +3,7 @@ import {
   MODOS_FATOR_R,
   calcularAliquotaEfetivaSimples,
   calcularDasSimples,
+  analisarPlanejamentoTributario,
   calcularFatorR,
   compararAnexosFatorR,
 } from "../motorTributario"
@@ -97,11 +98,20 @@ export default function LaboratorioTributario() {
           })
         : null
 
+      const planejamento = analisarPlanejamentoTributario({
+        rbt12: valores.rbt12,
+        receitaPeriodo: valores.receitaPeriodo,
+        fatorR,
+        comparacaoAnexos: comparacao,
+        das,
+      })
+
       setResultado({
         fatorR,
         aliquota,
         das,
         comparacao,
+        planejamento,
         anexoAplicado,
         receitaPeriodo: valores.receitaPeriodo,
       })
@@ -284,7 +294,7 @@ function Campo({ label, required, children }) {
 }
 
 function ResultadoAnalise({ resultado }) {
-  const { fatorR, aliquota, das, comparacao, anexoAplicado, receitaPeriodo } = resultado
+  const { fatorR, aliquota, das, comparacao, planejamento, anexoAplicado, receitaPeriodo } = resultado
 
   return (
     <section style={styles.resultSection}>
@@ -333,6 +343,56 @@ function ResultadoAnalise({ resultado }) {
           </article>
         )}
       </div>
+
+      {planejamento && (
+        <article style={styles.planningCard}>
+          <div style={styles.planningHeader}>
+            <div>
+              <span style={styles.label}>Radar Tributário</span>
+              <h3 style={styles.analysisTitle}>Planejamento da Nexa</h3>
+            </div>
+            <div style={{ ...styles.scoreBadge, ...(planejamento.nivelRisco === "alto" ? styles.scoreHigh : planejamento.nivelRisco === "medio" ? styles.scoreMedium : styles.scoreLow) }}>
+              <strong>{planejamento.pontuacao}/100</strong>
+              <span>{planejamento.classificacao}</span>
+            </div>
+          </div>
+
+          <p style={styles.analysisText}><strong>Parecer:</strong> {planejamento.parecer}</p>
+
+          {planejamento.alertas.length > 0 && (
+            <div style={styles.planningList}>
+              <h4 style={styles.planningSubtitle}>Pontos de atenção</h4>
+              {planejamento.alertas.map((item) => (
+                <div key={`${item.tipo}-${item.titulo}`} style={styles.planningItem}>
+                  <strong>{item.titulo}</strong>
+                  <span>{item.descricao}</span>
+                  <small>{item.recomendacao}</small>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {planejamento.oportunidades.length > 0 && (
+            <div style={styles.planningList}>
+              <h4 style={styles.planningSubtitle}>Oportunidades para simulação</h4>
+              {planejamento.oportunidades.map((item) => (
+                <div key={`${item.tipo}-${item.titulo}`} style={styles.opportunityItem}>
+                  <strong>{item.titulo}</strong>
+                  <span>{item.descricao}</span>
+                  <small>{item.ressalva}</small>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {planejamento.pontosPositivos.length > 0 && (
+            <div style={styles.positiveBox}>
+              <strong>Pontos positivos</strong>
+              {planejamento.pontosPositivos.map((item) => <span key={item}>✓ {item}</span>)}
+            </div>
+          )}
+        </article>
+      )}
 
       {comparacao && (
         <article style={styles.comparisonCard}>
@@ -408,5 +468,16 @@ const styles = {
   recommendationValue: { marginTop: "12px", color: "#37ff74", fontSize: "14px" },
   comparisonCard: { marginTop: "14px", background: "rgba(0,168,255,.07)", border: "1px solid rgba(0,168,255,.22)", borderRadius: "16px", padding: "18px" },
   comparisonGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "12px", marginTop: "12px" },
+  planningCard: { marginTop: "18px", background: "linear-gradient(135deg, rgba(0,168,255,.10), rgba(55,255,116,.07))", border: "1px solid rgba(55,255,116,.24)", borderRadius: "18px", padding: "18px" },
+  planningHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "14px", flexWrap: "wrap", marginBottom: "12px" },
+  scoreBadge: { minWidth: "110px", borderRadius: "14px", padding: "12px 15px", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", color: "#00112b" },
+  scoreLow: { background: "#37ff74" },
+  scoreMedium: { background: "#ffd166" },
+  scoreHigh: { background: "#ff7b7b" },
+  planningList: { display: "grid", gap: "10px", marginTop: "15px" },
+  planningSubtitle: { margin: 0, color: "white", fontSize: "15px" },
+  planningItem: { display: "flex", flexDirection: "column", gap: "5px", padding: "13px", borderRadius: "13px", background: "rgba(255,193,7,.09)", border: "1px solid rgba(255,193,7,.22)", color: "#f7e8b0" },
+  opportunityItem: { display: "flex", flexDirection: "column", gap: "5px", padding: "13px", borderRadius: "13px", background: "rgba(0,168,255,.09)", border: "1px solid rgba(0,168,255,.24)", color: "#dcefff" },
+  positiveBox: { display: "flex", flexDirection: "column", gap: "6px", marginTop: "15px", padding: "13px", borderRadius: "13px", background: "rgba(55,255,116,.08)", border: "1px solid rgba(55,255,116,.20)", color: "#dfffe8" },
   disclaimer: { marginTop: "14px", padding: "14px", borderRadius: "14px", background: "rgba(255,255,255,.06)", color: "#cbd9ea", lineHeight: 1.5, fontSize: "13px" },
 }

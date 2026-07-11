@@ -45,3 +45,10 @@
 - Integrado o Motor do DAS ao Laboratório Tributário.
 - Adicionadas explicações e alertas sobre as limitações da simulação.
 - Corrigida opção duplicada no seletor do Laboratório Tributário.
+
+## v3.4.6 — Sprint 06 — Planejamento Tributário Inteligente
+- Radar Tributário com pontuação e classificação de risco.
+- Alertas para limite do Simples, mudança de faixa e Fator R.
+- Oportunidades de simulação entre Anexos III e V.
+- Parecer consultivo e explicável da Nexa.
+- Integração com o Laboratório Tributário.
