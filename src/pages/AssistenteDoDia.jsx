@@ -7,13 +7,16 @@ import {
 import { textoClassificacaoPrioridade } from "../services/priorizacaoService"
 import { garantirPlanejamentoAnual } from "../services/planejamentoAnualService"
 import {
+  carregarJornadaDia,
+  limparJornadaDia,
+  salvarJornadaDia,
+} from "../services/jornadaDiaService"
+import {
   abrirWhatsAppWeb,
   montarMensagemWhatsApp,
   obterModeloWhatsApp,
   registrarHistoricoWhatsApp,
 } from "../services/whatsappService"
-
-const CHAVE_PROGRESSO = `nexa_assistente_dia_${new Date().toISOString().slice(0, 10)}`
 
 export default function AssistenteDoDia({ setPage }) {
   const [clientes, setClientes] = useState([])
@@ -69,18 +72,13 @@ export default function AssistenteDoDia({ setPage }) {
   }
 
   function restaurarProgresso() {
-    try {
-      const salvo = JSON.parse(localStorage.getItem(CHAVE_PROGRESSO) || "null")
-      if (!salvo) return
+    const salvo = carregarJornadaDia()
 
-      setAtendimentoAtivo(Boolean(salvo.atendimentoAtivo))
-      setClienteAtualIndex(Number(salvo.clienteAtualIndex || 0))
-      setAcoesConcluidas(salvo.acoesConcluidas || {})
-      setHistoricoDia(Array.isArray(salvo.historicoDia) ? salvo.historicoDia : [])
-      setInicioDia(salvo.inicioDia || null)
-    } catch (error) {
-      console.warn("Não foi possível restaurar o progresso do Assistente do Dia", error)
-    }
+    setAtendimentoAtivo(salvo.atendimentoAtivo)
+    setClienteAtualIndex(salvo.clienteAtualIndex)
+    setAcoesConcluidas(salvo.acoesConcluidas)
+    setHistoricoDia(salvo.historicoDia)
+    setInicioDia(salvo.inicioDia)
   }
 
   const fila = useMemo(() => {
@@ -149,20 +147,13 @@ export default function AssistenteDoDia({ setPage }) {
   }, [atendimentoAtivo, clienteAtualIndex, acoesConcluidas, historicoDia, inicioDia])
 
   function salvarProgresso() {
-    try {
-      localStorage.setItem(
-        CHAVE_PROGRESSO,
-        JSON.stringify({
-          atendimentoAtivo,
-          clienteAtualIndex,
-          acoesConcluidas,
-          historicoDia,
-          inicioDia,
-        })
-      )
-    } catch (error) {
-      console.warn("Não foi possível salvar o progresso do Assistente do Dia", error)
-    }
+    salvarJornadaDia({
+      atendimentoAtivo,
+      clienteAtualIndex,
+      acoesConcluidas,
+      historicoDia,
+      inicioDia,
+    })
   }
 
   function registrarEvento(texto) {
@@ -185,7 +176,7 @@ export default function AssistenteDoDia({ setPage }) {
   function reiniciarDia() {
     if (!confirm("Deseja reiniciar o progresso do Assistente do Dia?")) return
 
-    localStorage.removeItem(CHAVE_PROGRESSO)
+    limparJornadaDia()
     setAtendimentoAtivo(false)
     setClienteAtualIndex(0)
     setAcoesConcluidas({})

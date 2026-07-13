@@ -89,3 +89,11 @@
 - Criado o resumo diário inteligente no Dashboard.
 - Integrados progresso do expediente e última ação salva.
 - Adicionados indicadores operacionais e recomendação do próximo cliente.
+
+## v3.6.7 — Módulo 2 / Etapa 7 — Revisão e Integração Final
+
+- Centralizado o salvamento e a leitura da jornada diária em um serviço único.
+- Corrigida a geração da chave diária para usar a data local e evitar troca indevida de dia pelo UTC.
+- Sincronizado o progresso do Assistente do Dia com o Dashboard em tempo real.
+- Padronizados restauração, salvamento e reinício do expediente.
+- Consolidada a integração final do Módulo 2 — Agenda Inteligente.

@@ -7,6 +7,7 @@ import {
   registrarHistoricoWhatsApp,
 } from "../services/whatsappService"
 import { montarFilaAssistenteDia, montarResumoAssistenteDia } from "../services/assistenteDiaService"
+import { carregarJornadaDia, EVENTO_JORNADA_ATUALIZADA } from "../services/jornadaDiaService"
 import Calendar from "react-calendar"
 import "react-calendar/dist/Calendar.css"
 import {
@@ -44,23 +45,22 @@ export default function Dashboard({ setPage }) {
 
     const atualizarAoVoltar = () => carregarProgressoDia()
     window.addEventListener("focus", atualizarAoVoltar)
+    window.addEventListener(EVENTO_JORNADA_ATUALIZADA, atualizarAoVoltar)
 
-    return () => window.removeEventListener("focus", atualizarAoVoltar)
+    return () => {
+      window.removeEventListener("focus", atualizarAoVoltar)
+      window.removeEventListener(EVENTO_JORNADA_ATUALIZADA, atualizarAoVoltar)
+    }
   }, [])
 
   function carregarProgressoDia() {
-    try {
-      const chave = `nexa_assistente_dia_${new Date().toISOString().slice(0, 10)}`
-      const salvo = JSON.parse(localStorage.getItem(chave) || "null")
+    const salvo = carregarJornadaDia()
 
-      setProgressoDiaSalvo({
-        acoesConcluidas: salvo?.acoesConcluidas || {},
-        historicoDia: Array.isArray(salvo?.historicoDia) ? salvo.historicoDia : [],
-        inicioDia: salvo?.inicioDia || null,
-      })
-    } catch (error) {
-      console.warn("Não foi possível ler o progresso diário", error)
-    }
+    setProgressoDiaSalvo({
+      acoesConcluidas: salvo.acoesConcluidas,
+      historicoDia: salvo.historicoDia,
+      inicioDia: salvo.inicioDia,
+    })
   }
 
   async function carregarDashboard() {
