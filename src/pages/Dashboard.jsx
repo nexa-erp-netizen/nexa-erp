@@ -32,10 +32,36 @@ export default function Dashboard({ setPage }) {
   const [notificacoes, setNotificacoes] = useState(0)
   const [mostrarCalendario, setMostrarCalendario] = useState(false)
   const [dataSelecionada, setDataSelecionada] = useState(new Date())
+  const [progressoDiaSalvo, setProgressoDiaSalvo] = useState({
+    acoesConcluidas: {},
+    historicoDia: [],
+    inicioDia: null,
+  })
 
   useEffect(() => {
     carregarDashboard()
+    carregarProgressoDia()
+
+    const atualizarAoVoltar = () => carregarProgressoDia()
+    window.addEventListener("focus", atualizarAoVoltar)
+
+    return () => window.removeEventListener("focus", atualizarAoVoltar)
   }, [])
+
+  function carregarProgressoDia() {
+    try {
+      const chave = `nexa_assistente_dia_${new Date().toISOString().slice(0, 10)}`
+      const salvo = JSON.parse(localStorage.getItem(chave) || "null")
+
+      setProgressoDiaSalvo({
+        acoesConcluidas: salvo?.acoesConcluidas || {},
+        historicoDia: Array.isArray(salvo?.historicoDia) ? salvo.historicoDia : [],
+        inicioDia: salvo?.inicioDia || null,
+      })
+    } catch (error) {
+      console.warn("Não foi possível ler o progresso diário", error)
+    }
+  }
 
   async function carregarDashboard() {
     try {
@@ -562,8 +588,60 @@ export default function Dashboard({ setPage }) {
   }, [clientes, fiscal, pendencias, documentos])
 
   const resumoAssistenteDia = useMemo(() => {
-    return montarResumoAssistenteDia(filaAssistenteDia)
-  }, [filaAssistenteDia])
+    const base = montarResumoAssistenteDia(filaAssistenteDia)
+    const totalAcoes = filaAssistenteDia.reduce((total, cliente) => total + cliente.acoes.length, 0)
+    const concluidas = filaAssistenteDia.reduce(
+      (total, cliente) =>
+        total + cliente.acoes.filter((acao) => progressoDiaSalvo.acoesConcluidas?.[acao.id]).length,
+      0
+    )
+
+    return {
+      ...base,
+      concluidas,
+      progresso: totalAcoes ? Math.round((concluidas / totalAcoes) * 100) : 0,
+    }
+  }, [filaAssistenteDia, progressoDiaSalvo])
+
+  const painelDiario = useMemo(() => {
+    const dasProximos = fiscal.filter((item) => {
+      const obrigacao = String(item.obrigacao || item.tipo || "").toLowerCase()
+      const dias = diferencaDias(item.vencimento)
+      return obrigacao.includes("das") && dias !== null && dias >= 0 && dias <= 3 && fiscalAguardandoPagamento(item)
+    }).length
+
+    const honorariosPendentes = fiscal.filter((item) => {
+      const obrigacao = String(item.obrigacao || item.tipo || "").toLowerCase()
+      return obrigacao.includes("honor") && fiscalAguardandoPagamento(item)
+    }).length
+
+    const parcelamentos = fiscal.filter((item) => {
+      const obrigacao = String(item.obrigacao || item.tipo || "").toLowerCase()
+      const dias = diferencaDias(item.vencimento)
+      return obrigacao.includes("parcel") && dias !== null && dias <= 3 && fiscalAguardandoPagamento(item)
+    }).length
+
+    const oportunidades = clientes.filter((cliente) => {
+      const nota = Number(cliente.saudeTributaria || cliente.indiceSaudeTributaria || 100)
+      const fatorR = Number(cliente.fatorRAtual || cliente.fatorR || 100)
+      return nota < 75 || (fatorR > 0 && fatorR < 28)
+    }).length
+
+    const primeiro = filaAssistenteDia[0] || null
+
+    return {
+      criticos: resumoAssistenteDia.urgentes,
+      hoje: filaAssistenteDia.filter((cliente) =>
+        cliente.acoes.some((acao) => diferencaDias(acao.data) === 0)
+      ).length,
+      dasProximos,
+      honorariosPendentes,
+      documentosPendentes: resumo.documentosPendentes,
+      parcelamentos,
+      oportunidades,
+      primeiro,
+    }
+  }, [clientes, fiscal, filaAssistenteDia, resumoAssistenteDia, resumo.documentosPendentes])
 
   const eventosCalendario = useMemo(() => {
     const eventos = {}
@@ -923,6 +1001,36 @@ export default function Dashboard({ setPage }) {
         .bg-neutral { background: rgba(255,255,255,.14); color: white; }
         .bg-document { background: #b388ff; color: #00112b; }
 
+        .nexa-daily-panel {
+          margin-bottom: 24px;
+          background: linear-gradient(135deg, #071f48 0%, #0c3970 58%, rgba(55,255,116,.14) 100%);
+          border: 1px solid rgba(55,255,116,.28);
+          border-radius: 26px;
+          padding: 25px;
+          box-shadow: 0 18px 45px rgba(0,0,0,.22);
+        }
+
+        .nexa-daily-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 18px;
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+
+        .nexa-kicker { color: #37ff74; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+        .nexa-daily-title { margin: 7px 0 5px; font-size: 25px; font-weight: 900; }
+        .nexa-daily-copy { color: #c8d7eb; max-width: 720px; line-height: 1.45; margin: 0; }
+        .nexa-daily-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 11px; margin-top: 20px; }
+        .nexa-daily-metric { background: rgba(1,17,43,.68); border: 1px solid rgba(255,255,255,.10); border-radius: 16px; padding: 14px; }
+        .nexa-daily-metric span { display: block; color: #9fb2ca; font-size: 12px; margin-bottom: 6px; }
+        .nexa-daily-metric strong { font-size: 23px; font-weight: 900; }
+        .nexa-recommendation { margin-top: 15px; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; background: rgba(1,17,43,.72); border-radius: 17px; padding: 15px; border: 1px solid rgba(255,255,255,.10); }
+        .nexa-recommendation small { display: block; color: #9fb2ca; margin-bottom: 5px; }
+        .nexa-recommendation strong { display: block; font-size: 16px; }
+        .nexa-progress-line { margin-top: 17px; }
+        .nexa-progress-label { display: flex; justify-content: space-between; color: #c8d7eb; font-size: 12px; margin-bottom: 7px; }
+
         .dia-box {
           margin-bottom: 24px;
           background: linear-gradient(135deg, rgba(0,168,255,.18), rgba(55,255,116,.10));
@@ -1176,6 +1284,58 @@ export default function Dashboard({ setPage }) {
           </button>
         </div>
       </div>
+
+      <section className="nexa-daily-panel">
+        <div className="nexa-daily-head">
+          <div>
+            <div className="nexa-kicker">Painel Diário da Nexa</div>
+            <h2 className="nexa-daily-title">Eu já organizei as prioridades do escritório.</h2>
+            <p className="nexa-daily-copy">
+              {painelDiario.criticos > 0
+                ? `Encontrei ${painelDiario.criticos} cliente(s) que exigem atenção imediata.`
+                : "Não encontrei pendências críticas. Podemos seguir a fila planejada com tranquilidade."}
+            </p>
+          </div>
+
+          <button type="button" className="dia-action" onClick={() => setPage("Assistente do Dia")}>
+            {resumoAssistenteDia.progresso > 0 ? "Continuar meu dia" : "Começar atendimento"}
+          </button>
+        </div>
+
+        <div className="nexa-daily-grid">
+          <div className="nexa-daily-metric"><span>Clientes críticos</span><strong className="danger">{painelDiario.criticos}</strong></div>
+          <div className="nexa-daily-metric"><span>Atendimentos hoje</span><strong className="warning">{painelDiario.hoje}</strong></div>
+          <div className="nexa-daily-metric"><span>DAS em até 3 dias</span><strong className="blue">{painelDiario.dasProximos}</strong></div>
+          <div className="nexa-daily-metric"><span>Honorários pendentes</span><strong className="warning">{painelDiario.honorariosPendentes}</strong></div>
+          <div className="nexa-daily-metric"><span>Documentos pendentes</span><strong className="success">{painelDiario.documentosPendentes}</strong></div>
+          <div className="nexa-daily-metric"><span>Parcelamentos próximos</span><strong className="blue">{painelDiario.parcelamentos}</strong></div>
+          <div className="nexa-daily-metric"><span>Radar tributário</span><strong className="success">{painelDiario.oportunidades}</strong></div>
+        </div>
+
+        <div className="nexa-progress-line">
+          <div className="nexa-progress-label">
+            <span>Progresso do expediente</span>
+            <strong>{resumoAssistenteDia.concluidas || 0}/{resumoAssistenteDia.acoes || 0} ações • {resumoAssistenteDia.progresso}%</strong>
+          </div>
+          <div className="dia-progress">
+            <div className="dia-progress-bar" style={{ width: `${resumoAssistenteDia.progresso}%` }} />
+          </div>
+        </div>
+
+        <div className="nexa-recommendation">
+          <div>
+            <small>Próximo cliente recomendado</small>
+            <strong>
+              {painelDiario.primeiro
+                ? `${painelDiario.primeiro.cliente} — ${painelDiario.primeiro.motivos?.[0] || "atendimento prioritário"}`
+                : "Nenhum atendimento pendente no momento."}
+            </strong>
+          </div>
+          {progressoDiaSalvo.historicoDia?.[0] && (
+            <small>Última ação: {progressoDiaSalvo.historicoDia[0].hora} • {progressoDiaSalvo.historicoDia[0].texto}</small>
+          )}
+        </div>
+      </section>
 
       <div className="cards">
         <ResumoCard icon={<FaUsers />} label="Clientes Ativos" value={resumo.clientes} color="blue" />

@@ -83,3 +83,9 @@
 - Modelos automáticos por tipo de ação.
 - Prévia editável antes da abertura.
 - Registro de histórico e conclusão da ação.
+
+## v3.6.6 — Módulo 2 / Etapa 6 — Painel Diário da Nexa
+
+- Criado o resumo diário inteligente no Dashboard.
+- Integrados progresso do expediente e última ação salva.
+- Adicionados indicadores operacionais e recomendação do próximo cliente.
