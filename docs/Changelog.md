@@ -60,3 +60,11 @@
 - Validação de sequência de parcelamentos.
 - Verificação de recibo de honorários e registro documental.
 - Mantida a regra de gerar ações somente a partir de dados reais.
+
+## v3.6.3 — Módulo 2 / Etapa 3
+
+- Priorização automática dos clientes do Assistente do Dia.
+- Score de 0 a 100.
+- Classificação Crítico, Alto, Médio e Baixo.
+- Motivos objetivos da prioridade.
+- Ordenação da fila e abertura do cliente mais prioritário ao iniciar o dia.

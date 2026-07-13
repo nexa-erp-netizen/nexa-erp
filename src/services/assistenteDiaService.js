@@ -1,3 +1,5 @@
+import { aplicarPriorizacaoFila } from "./priorizacaoService"
+
 function hojeBase() {
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
@@ -606,21 +608,14 @@ export function montarFilaAssistenteDia(dados = {}) {
     }
   })
 
-  const fila = Array.from(mapa.values())
-    .map((item) => {
-      const urgente = item.prioridade >= 140
-      const atencao = item.prioridade >= 70 && item.prioridade < 140
+  const filaBase = Array.from(mapa.values())
+    .map((item) => ({
+      ...item,
+      acoes: complementarChecklistCliente(item),
+      motivos: Array.from(new Set(item.motivos)),
+    }))
 
-      return {
-        ...item,
-        nivel: urgente ? "urgente" : atencao ? "atencao" : "programado",
-        acoes: complementarChecklistCliente(item),
-        motivos: Array.from(new Set(item.motivos)),
-      }
-    })
-    .sort((a, b) => b.prioridade - a.prioridade)
-
-  return fila
+  return aplicarPriorizacaoFila(filaBase)
 }
 
 export function montarResumoAssistenteDia(fila = []) {

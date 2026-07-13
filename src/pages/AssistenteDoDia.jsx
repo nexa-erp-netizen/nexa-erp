@@ -4,6 +4,7 @@ import {
   montarFilaAssistenteDia,
   montarResumoAssistenteDia,
 } from "../services/assistenteDiaService"
+import { textoClassificacaoPrioridade } from "../services/priorizacaoService"
 import {
   abrirWhatsAppWeb,
   montarMensagemWhatsApp,
@@ -505,7 +506,10 @@ function GrupoFila({ titulo, descricao, itens, filaTotal, progressoCliente, inic
                 <div>
                   <div className="cliente-pos">Cliente {cliente.index + 1} de {filaTotal}</div>
                   <h2 className="cliente-nome">{cliente.cliente}</h2>
-                  <div className="nivel">{nivelTexto(cliente.nivel)} <span className="indice">• Índice {cliente.prioridade}</span></div>
+                  <div className="nivel">
+                    {textoClassificacaoPrioridade(cliente.classificacao)}
+                    <span className="indice">• Prioridade {cliente.prioridade}/100</span>
+                  </div>
                 </div>
 
                 <button type="button" className="btn-atender" onClick={() => iniciarDia(cliente.index)}>
@@ -517,7 +521,7 @@ function GrupoFila({ titulo, descricao, itens, filaTotal, progressoCliente, inic
               <div className="mini-text">{pc.concluidas} de {pc.total} ações concluídas</div>
 
               <div className="motivos">
-                <strong>Motivos</strong>
+                <strong>Motivos da prioridade</strong>
                 <ul>{cliente.motivos.map((motivo) => <li key={motivo}>{motivo}</li>)}</ul>
               </div>
             </section>
