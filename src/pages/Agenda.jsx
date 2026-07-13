@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
+import WhatsAppPreviewModal from "../components/WhatsAppPreviewModal"
+import { criarPreviaWhatsAppAgenda, eventoPermiteWhatsApp } from "../services/whatsappAgendaService"
 import {
   atualizarStatusPlanejamento,
   gerarPlanejamentoAnual,
@@ -22,6 +24,7 @@ export default function Agenda() {
   const [filtroCliente, setFiltroCliente] = useState("")
   const [filtroTipo, setFiltroTipo] = useState("")
   const [carregando, setCarregando] = useState(true)
+  const [previaWhatsApp, setPreviaWhatsApp] = useState(null)
 
   const [titulo, setTitulo] = useState("")
   const [cliente, setCliente] = useState("")
@@ -93,6 +96,16 @@ export default function Agenda() {
     setCliente("")
     setData("")
     setTipo("Fiscal")
+  }
+
+  function abrirPreviaWhatsApp(evento) {
+    setPreviaWhatsApp(criarPreviaWhatsAppAgenda(evento))
+  }
+
+  function marcarWhatsAppEnviado(evento) {
+    if (!evento) return
+    const atualizados = atualizarStatusPlanejamento(ano, evento.id, "concluido")
+    setEventos(atualizados)
   }
 
   function alternarStatus(evento) {
@@ -216,18 +229,29 @@ export default function Agenda() {
                     <div style={numeroDia}>{dia}</div>
                     <div style={eventosBox}>
                       {eventosDoDia(dia).map((evento) => (
-                        <button
-                          key={evento.id}
-                          type="button"
-                          onClick={() => alternarStatus(evento)}
-                          style={{
-                            ...eventoItem,
-                            ...(evento.status === "concluido" ? eventoConcluido : {}),
-                          }}
-                          title={`${evento.cliente || "Sem cliente"} • ${evento.detalhes || evento.tipo}`}
-                        >
-                          {evento.status === "concluido" ? "✓ " : ""}{evento.titulo}
-                        </button>
+                        <div key={evento.id} style={eventoLinha}>
+                          <button
+                            type="button"
+                            onClick={() => alternarStatus(evento)}
+                            style={{
+                              ...eventoItem,
+                              ...(evento.status === "concluido" ? eventoConcluido : {}),
+                            }}
+                            title={`${evento.cliente || "Sem cliente"} • ${evento.detalhes || evento.tipo}`}
+                          >
+                            {evento.status === "concluido" ? "✓ " : ""}{evento.titulo}
+                          </button>
+                          {eventoPermiteWhatsApp(evento) && (
+                            <button
+                              type="button"
+                              style={whatsappButton}
+                              onClick={() => abrirPreviaWhatsApp(evento)}
+                              title="Preparar mensagem no WhatsApp"
+                            >
+                              💬
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </>
@@ -237,6 +261,11 @@ export default function Agenda() {
           </div>
         </>
       )}
+      <WhatsAppPreviewModal
+        previa={previaWhatsApp}
+        onClose={() => setPreviaWhatsApp(null)}
+        onEnviado={marcarWhatsAppEnviado}
+      />
     </div>
   )
 }
@@ -265,6 +294,8 @@ const grid = { display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))"
 const diaBox = { minHeight: 125, background: "#061f47", borderRadius: 12, padding: 9, border: "1px solid rgba(255,255,255,.08)", minWidth: 0 }
 const numeroDia = { fontWeight: "bold", marginBottom: 8 }
 const eventosBox = { display: "flex", flexDirection: "column", gap: 5 }
+const eventoLinha = { display: "grid", gridTemplateColumns: "minmax(0, 1fr) 28px", gap: 4, alignItems: "stretch" }
 const eventoItem = { width: "100%", textAlign: "left", background: "#0b70b8", color: "white", padding: "5px 7px", border: "none", borderRadius: 7, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }
 const eventoConcluido = { background: "rgba(55,255,116,.20)", color: "#70ff9b", textDecoration: "line-through" }
+const whatsappButton = { border: "none", borderRadius: 7, background: "rgba(55,255,116,.18)", color: "#70ff9b", cursor: "pointer", fontSize: 13 }
 const vazio = { padding: 24, textAlign: "center", color: "#a9b8cc", background: "rgba(255,255,255,.04)", borderRadius: 14 }

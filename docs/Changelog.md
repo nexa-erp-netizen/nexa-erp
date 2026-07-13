@@ -76,3 +76,10 @@
 - Parcelamentos futuros gerados com sequência de parcelas.
 - Progresso anual e conclusão individual das ações.
 - Integração das ações programadas com o Assistente do Dia.
+
+## v3.6.5 — Módulo 2 Etapa 5
+
+- Integração da Agenda Inteligente com o WhatsApp.
+- Modelos automáticos por tipo de ação.
+- Prévia editável antes da abertura.
+- Registro de histórico e conclusão da ação.
