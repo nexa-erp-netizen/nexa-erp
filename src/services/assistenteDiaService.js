@@ -434,6 +434,149 @@ export function montarAcoesDoDia({
     .sort((a, b) => b.prioridade - a.prioridade)
 }
 
+
+function obterRegimeCliente(cliente = {}) {
+  return String(
+    cliente.regimeTributario ||
+    cliente.regime ||
+    cliente.tipoEmpresa ||
+    ""
+  ).trim()
+}
+
+function criarAcaoChecklist({ clienteItem, sufixo, modulo, titulo, descricao, prioridade = 20, destino = "Clientes" }) {
+  const clienteDados = clienteItem.clienteDados || null
+
+  return criarAcao({
+    id: `checklist-${clienteItem.id || clienteChave(clienteItem.cliente)}-${sufixo}`,
+    cliente: clienteItem.cliente,
+    clienteId: clienteItem.clienteId,
+    clienteDados,
+    modulo,
+    titulo,
+    descricao,
+    prioridade,
+    destino,
+    referenciaId: clienteItem.clienteId,
+    tipo: "checklist",
+  })
+}
+
+function complementarChecklistCliente(clienteItem) {
+  const acoes = [...clienteItem.acoes]
+  const cliente = clienteItem.clienteDados || {}
+  const regime = normalizarTexto(obterRegimeCliente(cliente))
+  const titulos = new Set(acoes.map((acao) => normalizarTexto(acao.titulo)))
+  const modulos = new Set(acoes.map((acao) => normalizarTexto(acao.modulo)))
+  const possuiFiscal = modulos.has("fiscal")
+  const possuiFinanceiro = modulos.has("financeiro")
+  const possuiDocumento = modulos.has("documentos") || modulos.has("atendimento")
+  const possuiParcelamento = acoes.some((acao) => normalizarTexto(`${acao.titulo} ${acao.descricao}`).includes("parcelamento"))
+
+  function adicionar(acao) {
+    if (!acao || titulos.has(normalizarTexto(acao.titulo))) return
+    titulos.add(normalizarTexto(acao.titulo))
+    acoes.push(acao)
+  }
+
+  // Complementos só aparecem quando o cliente já entrou na fila por dados reais.
+  if (possuiFiscal && regime.includes("mei")) {
+    adicionar(criarAcaoChecklist({
+      clienteItem,
+      sufixo: "mei-conferir-competencia",
+      modulo: "Checklist MEI",
+      titulo: "Conferir competência do DAS",
+      descricao: "Validar competência, vencimento e valor antes de concluir o atendimento.",
+      prioridade: 24,
+      destino: "Fiscal",
+    }))
+  }
+
+  if (possuiFiscal && regime.includes("simples")) {
+    adicionar(criarAcaoChecklist({
+      clienteItem,
+      sufixo: "simples-pgdas",
+      modulo: "Checklist Simples Nacional",
+      titulo: "Conferir apuração do PGDAS-D",
+      descricao: "Revisar receita segregada, anexo, faixa e alíquota efetiva antes do DAS.",
+      prioridade: 28,
+      destino: "Fiscal",
+    }))
+
+    adicionar(criarAcaoChecklist({
+      clienteItem,
+      sufixo: "simples-dctfweb",
+      modulo: "Checklist Simples Nacional",
+      titulo: "Verificar obrigação DCTFWeb",
+      descricao: "Confirmar se existe obrigação trabalhista/previdenciária relacionada à competência.",
+      prioridade: 18,
+      destino: "Fiscal",
+    }))
+  }
+
+  if (possuiFiscal && regime.includes("presumido")) {
+    adicionar(criarAcaoChecklist({
+      clienteItem,
+      sufixo: "presumido-apuracoes",
+      modulo: "Checklist Lucro Presumido",
+      titulo: "Revisar apurações do período",
+      descricao: "Conferir PIS, COFINS, ISS/ICMS e, quando aplicável, IRPJ e CSLL.",
+      prioridade: 28,
+      destino: "Fiscal",
+    }))
+  }
+
+  if (possuiFiscal && regime.includes("real")) {
+    adicionar(criarAcaoChecklist({
+      clienteItem,
+      sufixo: "real-apuracoes",
+      modulo: "Checklist Lucro Real",
+      titulo: "Revisar apurações do Lucro Real",
+      descricao: "Conferir bases fiscais, adições, exclusões e tributos do período antes da conclusão.",
+      prioridade: 30,
+      destino: "Fiscal",
+    }))
+  }
+
+  if (possuiParcelamento) {
+    adicionar(criarAcaoChecklist({
+      clienteItem,
+      sufixo: "parcelamento-sequencia",
+      modulo: "Checklist Parcelamento",
+      titulo: "Confirmar sequência da parcela",
+      descricao: "Validar número atual/total de parcelas antes de enviar a guia ao cliente.",
+      prioridade: 26,
+      destino: "Fiscal",
+    }))
+  }
+
+  if (possuiFinanceiro) {
+    adicionar(criarAcaoChecklist({
+      clienteItem,
+      sufixo: "financeiro-recibo",
+      modulo: "Checklist Financeiro",
+      titulo: "Verificar necessidade de recibo",
+      descricao: "Se o honorário estiver pago, preparar e registrar o recibo para envio.",
+      prioridade: 20,
+      destino: "Financeiro",
+    }))
+  }
+
+  if (possuiDocumento) {
+    adicionar(criarAcaoChecklist({
+      clienteItem,
+      sufixo: "documentos-historico",
+      modulo: "Checklist Documental",
+      titulo: "Registrar resultado da conferência",
+      descricao: "Concluir a análise e manter o histórico do cliente atualizado.",
+      prioridade: 16,
+      destino: "Documentos Digitais",
+    }))
+  }
+
+  return acoes.sort((a, b) => b.prioridade - a.prioridade)
+}
+
 export function montarFilaAssistenteDia(dados = {}) {
   const acoes = montarAcoesDoDia(dados)
   const mapa = new Map()
@@ -446,6 +589,7 @@ export function montarFilaAssistenteDia(dados = {}) {
         id: acao.clienteId || chave,
         cliente: acao.cliente,
         clienteId: acao.clienteId,
+        clienteDados: acao.clienteDados || null,
         prioridade: 0,
         nivel: "normal",
         motivos: [],
@@ -470,7 +614,7 @@ export function montarFilaAssistenteDia(dados = {}) {
       return {
         ...item,
         nivel: urgente ? "urgente" : atencao ? "atencao" : "programado",
-        acoes: item.acoes.sort((a, b) => b.prioridade - a.prioridade),
+        acoes: complementarChecklistCliente(item),
         motivos: Array.from(new Set(item.motivos)),
       }
     })

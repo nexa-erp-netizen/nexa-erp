@@ -52,3 +52,11 @@
 - Oportunidades de simulação entre Anexos III e V.
 - Parecer consultivo e explicável da Nexa.
 - Integração com o Laboratório Tributário.
+
+## v3.6.2 — Módulo 2, Etapa 2: Checklist Inteligente
+
+- Checklist operacional complementado conforme o regime tributário do cliente.
+- Conferências específicas para MEI, Simples Nacional, Lucro Presumido e Lucro Real.
+- Validação de sequência de parcelamentos.
+- Verificação de recibo de honorários e registro documental.
+- Mantida a regra de gerar ações somente a partir de dados reais.
