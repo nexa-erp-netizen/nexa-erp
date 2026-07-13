@@ -197,9 +197,36 @@ export function montarAcoesDoDia({
   pendencias = [],
   documentos = [],
   financeiro = [],
+  planejamento = [],
 } = {}) {
   const mapaClientes = montarMapaClientes(clientes)
   const acoes = []
+
+  planejamento
+    .filter((item) => item?.status !== "concluido" && item?.status !== "concluído")
+    .forEach((item) => {
+      const dias = diferencaDias(item.data)
+      if (dias === null || dias < -30 || dias > 7) return
+
+      const clienteCadastro = localizarCliente(mapaClientes, item.cliente) || item.clienteDados || null
+      const prioridadeBase = Number(item.prioridade || 30)
+      const prioridadePrazo = dias < 0 ? 55 + Math.min(Math.abs(dias) * 3, 30) : dias === 0 ? 50 : dias <= 3 ? 35 : 20
+
+      acoes.push(criarAcao({
+        id: `planejamento-${item.id}`,
+        cliente: item.cliente || obterNomeCliente(clienteCadastro),
+        clienteId: obterClienteId(clienteCadastro) || item.clienteId,
+        clienteDados: clienteCadastro,
+        modulo: item.modulo || item.tipo || "Agenda",
+        titulo: item.titulo || "Ação programada",
+        descricao: `${item.detalhes || "Ação prevista no planejamento anual"} • ${textoPrazo(dias)}.`,
+        prioridade: prioridadeBase + prioridadePrazo,
+        destino: item.modulo || "Agenda",
+        referenciaId: item.id,
+        tipo: "planejamento-anual",
+        data: item.data,
+      }))
+    })
 
   fiscal.filter(fiscalAtivo).forEach((item) => {
     const clienteCadastro = localizarCliente(mapaClientes, item.cliente)

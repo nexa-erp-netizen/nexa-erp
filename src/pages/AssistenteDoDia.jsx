@@ -5,6 +5,7 @@ import {
   montarResumoAssistenteDia,
 } from "../services/assistenteDiaService"
 import { textoClassificacaoPrioridade } from "../services/priorizacaoService"
+import { garantirPlanejamentoAnual } from "../services/planejamentoAnualService"
 import {
   abrirWhatsAppWeb,
   montarMensagemWhatsApp,
@@ -20,6 +21,7 @@ export default function AssistenteDoDia({ setPage }) {
   const [pendencias, setPendencias] = useState([])
   const [documentos, setDocumentos] = useState([])
   const [financeiro, setFinanceiro] = useState([])
+  const [planejamento, setPlanejamento] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [atendimentoAtivo, setAtendimentoAtivo] = useState(false)
   const [clienteAtualIndex, setClienteAtualIndex] = useState(0)
@@ -49,7 +51,10 @@ export default function AssistenteDoDia({ setPage }) {
       setFiscal(resultadoArray(fiscalResp))
       setPendencias(resultadoArray(pendenciasResp))
       setDocumentos(resultadoArray(documentosResp))
+      const clientesLista = resultadoArray(clientesResp)
+      const fiscalLista = resultadoArray(fiscalResp)
       setFinanceiro(resultadoArray(financeiroResp))
+      setPlanejamento(garantirPlanejamentoAnual({ clientes: clientesLista, fiscal: fiscalLista }))
     } catch (error) {
       console.error("Erro ao carregar Assistente do Dia", error)
       alert("Erro ao carregar Assistente do Dia")
@@ -85,8 +90,9 @@ export default function AssistenteDoDia({ setPage }) {
       pendencias,
       documentos,
       financeiro,
+      planejamento,
     })
-  }, [clientes, fiscal, pendencias, documentos, financeiro])
+  }, [clientes, fiscal, pendencias, documentos, financeiro, planejamento])
 
   const resumoBase = useMemo(() => montarResumoAssistenteDia(fila), [fila])
 

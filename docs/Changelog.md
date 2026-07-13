@@ -68,3 +68,11 @@
 - Classificação Crítico, Alto, Médio e Baixo.
 - Motivos objetivos da prioridade.
 - Ordenação da fila e abertura do cliente mais prioritário ao iniciar o dia.
+
+## v3.6.4 — Módulo 2, Etapa 4 — Planejamento Anual
+
+- Agenda Inteligente com planejamento anual por cliente.
+- DAS, PGDAS-D, honorários, recibos e documentos mensais.
+- Parcelamentos futuros gerados com sequência de parcelas.
+- Progresso anual e conclusão individual das ações.
+- Integração das ações programadas com o Assistente do Dia.
