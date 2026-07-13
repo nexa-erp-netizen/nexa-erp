@@ -106,6 +106,34 @@ export default function AssistenteDoDia({ setPage }) {
   }, [fila, acoesConcluidas])
 
   const clienteAtual = fila[clienteAtualIndex] || null
+
+  const gruposFila = useMemo(() => {
+    const grupos = {
+      urgente: [],
+      hoje: [],
+      proximos: [],
+    }
+
+    fila.forEach((cliente, index) => {
+      const datas = cliente.acoes
+        .map((acao) => diferencaDiasSegura(acao.data))
+        .filter((dias) => dias !== null)
+      const menorPrazo = datas.length ? Math.min(...datas) : null
+
+      const item = { ...cliente, index }
+
+      if (cliente.nivel === "urgente" || (menorPrazo !== null && menorPrazo < 0)) {
+        grupos.urgente.push(item)
+      } else if (menorPrazo !== null && menorPrazo <= 0) {
+        grupos.hoje.push(item)
+      } else {
+        grupos.proximos.push(item)
+      }
+    })
+
+    return grupos
+  }, [fila])
+
   const resumo = { ...resumoBase, progresso: progresso.percentual }
   const expedienteConcluido = fila.length > 0 && progresso.clientesConcluidos === fila.length
 
@@ -221,6 +249,40 @@ export default function AssistenteDoDia({ setPage }) {
     setPage(acao.destino || "Dashboard")
   }
 
+  function diferencaDiasSegura(data) {
+    if (!data) return null
+    const texto = String(data).slice(0, 10)
+    const alvo = new Date(`${texto}T00:00:00`)
+    if (Number.isNaN(alvo.getTime())) return null
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    return Math.ceil((alvo - hoje) / 86400000)
+  }
+
+  function concluirAtendimentoAtual() {
+    if (!clienteAtual) return
+
+    const novas = { ...acoesConcluidas }
+    clienteAtual.acoes.forEach((acao) => {
+      novas[acao.id] = true
+    })
+
+    setAcoesConcluidas(novas)
+    registrarEvento(`Atendimento concluído: ${clienteAtual.cliente}`)
+
+    setTimeout(() => {
+      const proximoIndex = fila.findIndex((cliente, index) => {
+        if (index <= clienteAtualIndex) return false
+        return !cliente.acoes.every((acao) => novas[acao.id])
+      })
+
+      if (proximoIndex >= 0) {
+        setClienteAtualIndex(proximoIndex)
+        registrarEvento(`Atendimento iniciado: ${fila[proximoIndex].cliente}`)
+      }
+    }, 150)
+  }
+
   function irProximoCliente() {
     const proximoIndex = fila.findIndex((cliente, index) => {
       if (index <= clienteAtualIndex) return false
@@ -282,11 +344,14 @@ export default function AssistenteDoDia({ setPage }) {
           <div>
             <h1 className="title">☀️ Assistente do Dia</h1>
             <p className="subtitle">
-              Fluxo inteligente com checklist, progresso salvo e próximo cliente automático.
+              Central inteligente para organizar prioridades, atendimentos e o progresso do expediente.
             </p>
           </div>
 
           <div className="hero-actions">
+            {!atendimentoAtivo && fila.length > 0 && (
+              <button type="button" className="btn-primary" onClick={() => iniciarDia(0)}>☀️ Iniciar meu dia</button>
+            )}
             <button type="button" className="btn-secondary" onClick={carregarDados}>Atualizar fila</button>
             <button type="button" className="btn-danger" onClick={reiniciarDia}>Reiniciar dia</button>
           </div>
@@ -318,9 +383,14 @@ export default function AssistenteDoDia({ setPage }) {
               <div className="nivel">{nivelTexto(clienteAtual.nivel)} <span className="indice">• Índice {clienteAtual.prioridade}</span></div>
             </div>
 
-            <button type="button" className="btn-secondary" onClick={() => setAtendimentoAtivo(false)}>
-              Ver fila completa
-            </button>
+            <div className="cliente-actions">
+              <button type="button" className="btn-success" onClick={concluirAtendimentoAtual}>
+                ✓ Concluir atendimento
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setAtendimentoAtivo(false)}>
+                Ver fila completa
+              </button>
+            </div>
           </div>
 
           <ProgressoCliente progresso={progressoCliente(clienteAtual)} />
@@ -367,34 +437,34 @@ export default function AssistenteDoDia({ setPage }) {
             <button type="button" className="btn-primary" onClick={() => iniciarDia(0)}>☀️ Iniciar o dia</button>
           </div>
 
-          <div className="fila">
-            {fila.map((cliente, index) => {
-              const pc = progressoCliente(cliente)
-
-              return (
-                <section className={`cliente-card ${pc.concluido ? "cliente-ok" : ""}`} key={cliente.id || cliente.cliente}>
-                  <div className="cliente-top">
-                    <div>
-                      <div className="cliente-pos">Cliente {index + 1} de {fila.length}</div>
-                      <h2 className="cliente-nome">{cliente.cliente}</h2>
-                      <div className="nivel">{nivelTexto(cliente.nivel)} <span className="indice">• Índice {cliente.prioridade}</span></div>
-                    </div>
-
-                    <button type="button" className="btn-atender" onClick={() => iniciarDia(index)}>
-                      {pc.concluido ? "Revisar" : "Iniciar atendimento"}
-                    </button>
-                  </div>
-
-                  <div className="mini-progress"><div style={{ width: `${pc.percentual}%` }} /></div>
-                  <div className="mini-text">{pc.concluidas} de {pc.total} ações concluídas</div>
-
-                  <div className="motivos">
-                    <strong>Motivos</strong>
-                    <ul>{cliente.motivos.map((motivo) => <li key={motivo}>{motivo}</li>)}</ul>
-                  </div>
-                </section>
-              )
-            })}
+          <div className="grupos-fila">
+            <GrupoFila
+              titulo="🔴 Urgente"
+              descricao="Atrasos e situações que exigem atenção imediata."
+              itens={gruposFila.urgente}
+              filaTotal={fila.length}
+              progressoCliente={progressoCliente}
+              iniciarDia={iniciarDia}
+              nivelTexto={nivelTexto}
+            />
+            <GrupoFila
+              titulo="🟡 Hoje"
+              descricao="Atividades com vencimento ou execução prevista para hoje."
+              itens={gruposFila.hoje}
+              filaTotal={fila.length}
+              progressoCliente={progressoCliente}
+              iniciarDia={iniciarDia}
+              nivelTexto={nivelTexto}
+            />
+            <GrupoFila
+              titulo="🔵 Próximos dias"
+              descricao="Ações preventivas e compromissos programados."
+              itens={gruposFila.proximos}
+              filaTotal={fila.length}
+              progressoCliente={progressoCliente}
+              iniciarDia={iniciarDia}
+              nivelTexto={nivelTexto}
+            />
           </div>
         </div>
       )}
@@ -408,6 +478,53 @@ export default function AssistenteDoDia({ setPage }) {
         </section>
       )}
     </div>
+  )
+}
+
+
+function GrupoFila({ titulo, descricao, itens, filaTotal, progressoCliente, iniciarDia, nivelTexto }) {
+  if (!itens.length) return null
+
+  return (
+    <section className="grupo-fila">
+      <div className="grupo-header">
+        <div>
+          <h3>{titulo}</h3>
+          <p>{descricao}</p>
+        </div>
+        <span className="grupo-count">{itens.length}</span>
+      </div>
+
+      <div className="fila">
+        {itens.map((cliente) => {
+          const pc = progressoCliente(cliente)
+
+          return (
+            <section className={`cliente-card ${pc.concluido ? "cliente-ok" : ""}`} key={cliente.id || cliente.cliente}>
+              <div className="cliente-top">
+                <div>
+                  <div className="cliente-pos">Cliente {cliente.index + 1} de {filaTotal}</div>
+                  <h2 className="cliente-nome">{cliente.cliente}</h2>
+                  <div className="nivel">{nivelTexto(cliente.nivel)} <span className="indice">• Índice {cliente.prioridade}</span></div>
+                </div>
+
+                <button type="button" className="btn-atender" onClick={() => iniciarDia(cliente.index)}>
+                  {pc.concluido ? "Revisar" : "Iniciar atendimento"}
+                </button>
+              </div>
+
+              <div className="mini-progress"><div style={{ width: `${pc.percentual}%` }} /></div>
+              <div className="mini-text">{pc.concluidas} de {pc.total} ações concluídas</div>
+
+              <div className="motivos">
+                <strong>Motivos</strong>
+                <ul>{cliente.motivos.map((motivo) => <li key={motivo}>{motivo}</li>)}</ul>
+              </div>
+            </section>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -476,7 +593,7 @@ const css = `
   .hero-top, .cliente-top, .fila-header, .progresso-texto {
     display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap;
   }
-  .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .hero-actions, .cliente-actions { display: flex; gap: 10px; flex-wrap: wrap; }
   .title { margin: 0; font-size: 31px; font-weight: 900; }
   .subtitle, .fila-header p, .final-box p { color: #a9b8cc; margin: 8px 0 0; line-height: 1.45; }
   .resumo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
@@ -485,16 +602,23 @@ const css = `
   .resumo-value { font-size: 25px; font-weight: 900; }
   .bar-wrap, .mini-progress { background: #061f47; border-radius: 999px; overflow: hidden; height: 11px; margin-top: 18px; }
   .bar, .mini-progress div { height: 100%; background: linear-gradient(90deg, #00a8ff, #37ff74); }
+  .grupos-fila { display: grid; gap: 22px; }
+  .grupo-fila { background: rgba(6,31,71,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 20px; padding: 18px; }
+  .grupo-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 15px; }
+  .grupo-header h3 { margin: 0; font-size: 20px; }
+  .grupo-header p { margin: 6px 0 0; color: #a9b8cc; font-size: 13px; }
+  .grupo-count { min-width: 38px; height: 38px; border-radius: 12px; background: #082b5d; display: grid; place-items: center; font-weight: 900; color: #37ff74; }
   .fila { display: grid; gap: 18px; }
   .cliente-card.cliente-ok { border-color: rgba(55,255,116,.35); background: rgba(55,255,116,.08); }
   .cliente-pos, .mini-text { color: #a9b8cc; font-size: 13px; margin-bottom: 6px; }
   .cliente-nome { font-size: 25px; font-weight: 900; margin: 0 0 8px; }
   .nivel { font-weight: 900; }
   .indice { color: #37ff74; font-weight: 900; margin-left: 6px; }
-  .btn-primary, .btn-atender, .btn-action, .btn-secondary, .btn-danger {
+  .btn-primary, .btn-atender, .btn-action, .btn-secondary, .btn-danger, .btn-success {
     border: none; border-radius: 14px; padding: 12px 18px; font-weight: 900; cursor: pointer;
   }
   .btn-primary, .btn-atender, .btn-action { background: linear-gradient(90deg, #00a8ff, #37ff74); color: #00112b; }
+  .btn-success { background: #37ff74; color: #00112b; }
   .btn-secondary { background: #061f47; border: 1px solid rgba(255,255,255,.14); color: white; }
   .btn-danger { background: rgba(255,77,79,.14); border: 1px solid rgba(255,77,79,.30); color: #ffb3b3; }
   .motivos { background: #061f47; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 16px; margin-top: 14px; }
