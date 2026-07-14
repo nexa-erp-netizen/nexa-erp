@@ -1,3 +1,4 @@
+import { montarAlertasIdentidadeDigital } from "./alertasIdentidadeService"
 import { aplicarPriorizacaoFila } from "./priorizacaoService"
 import {
   criarMapaClientesOperacionais,
@@ -186,9 +187,28 @@ export function montarAcoesDoDia({
   documentos = [],
   financeiro = [],
   planejamento = [],
+  certificados = [],
+  procuracoes = [],
 } = {}) {
   const mapaClientes = montarMapaClientes(clientes)
   const acoes = []
+
+  montarAlertasIdentidadeDigital({ clientes, certificados, procuracoes }).forEach((alerta) => {
+    acoes.push(criarAcao({
+      id: `identidade-${alerta.id}`,
+      cliente: alerta.cliente,
+      clienteId: alerta.clienteId,
+      clienteDados: alerta.clienteDados,
+      modulo: "Identidade Digital",
+      titulo: alerta.titulo,
+      descricao: alerta.descricao,
+      prioridade: alerta.prioridade,
+      destino: alerta.destino,
+      referenciaId: alerta.referenciaId,
+      tipo: "identidade-digital",
+      data: alerta.data,
+    }))
+  })
 
   planejamento
     .filter((item) => item?.status !== "concluido" && item?.status !== "concluído")

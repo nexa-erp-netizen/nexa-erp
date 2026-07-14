@@ -1,22 +1,12 @@
 import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
-
-function diasAte(data) {
-  if (!data) return null
-  const hoje = new Date()
-  hoje.setHours(0, 0, 0, 0)
-  const alvo = new Date(`${String(data).slice(0, 10)}T00:00:00`)
-  if (!Number.isFinite(alvo.getTime())) return null
-  return Math.ceil((alvo - hoje) / 86400000)
-}
+import { classificarValidade, montarAlertasIdentidadeDigital, resumirAlertasIdentidade } from "../services/alertasIdentidadeService"
 
 function statusPorValidade(data, ativo = true) {
-  if (!ativo) return { texto: "Inativo", cor: "#a9b8cc", nivel: 3 }
-  const dias = diasAte(data)
-  if (dias === null) return { texto: "Sem validade", cor: "#a9b8cc", nivel: 3 }
-  if (dias < 0) return { texto: `Vencido há ${Math.abs(dias)} dia${Math.abs(dias) === 1 ? "" : "s"}`, cor: "#ff5f65", nivel: 0 }
-  if (dias <= 30) return { texto: `Vence em ${dias} dia${dias === 1 ? "" : "s"}`, cor: "#ffd54a", nivel: 1 }
-  return { texto: "Válido", cor: "#37ff74", nivel: 2 }
+  const status = classificarValidade(data, ativo)
+  const cores = { vencido: "#ff5f65", critico: "#ff7a3d", alto: "#ffb84d", atencao: "#ffd54a", preventivo: "#00a8ff", regular: "#37ff74", incompleto: "#a9b8cc", inativo: "#a9b8cc" }
+  const niveis = { vencido: 0, critico: 1, alto: 1, atencao: 1, preventivo: 2, regular: 3, incompleto: 4, inativo: 4 }
+  return { texto: status.texto, cor: cores[status.nivel] || "#a9b8cc", nivel: niveis[status.nivel] ?? 4 }
 }
 
 function formatarData(data) {
@@ -54,6 +44,9 @@ export default function IdentidadeDigital({ setPage }) {
       setCarregando(false)
     }
   }
+
+  const alertas = useMemo(() => montarAlertasIdentidadeDigital({ clientes, certificados, procuracoes }), [clientes, certificados, procuracoes])
+  const resumoAlertas = useMemo(() => resumirAlertasIdentidade(alertas), [alertas])
 
   const linhas = useMemo(() => {
     const termo = pesquisa.trim().toLowerCase()
@@ -108,6 +101,10 @@ export default function IdentidadeDigital({ setPage }) {
         <Resumo titulo="Regulares" valor={resumo.regulares} cor="#37ff74" />
         <Resumo titulo="Atenção" valor={resumo.atencao} cor="#ffd54a" />
         <Resumo titulo="Vencidos" valor={resumo.vencidos} cor="#ff5f65" />
+        <Resumo titulo="Vencidos" valor={resumoAlertas.vencidos} cor="#ff5f65" />
+        <Resumo titulo="Em até 7 dias" valor={resumoAlertas.em7Dias} cor="#ff7a3d" />
+        <Resumo titulo="Em até 30 dias" valor={resumoAlertas.em15Dias + resumoAlertas.em30Dias} cor="#ffd54a" />
+        <Resumo titulo="Em até 60 dias" valor={resumoAlertas.em60Dias} cor="#00a8ff" />
         <Resumo titulo="Cadastro incompleto" valor={resumo.incompletos} cor="#a9b8cc" />
       </div>
 

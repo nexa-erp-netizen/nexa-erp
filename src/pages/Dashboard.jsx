@@ -8,6 +8,7 @@ import {
 } from "../services/whatsappService"
 import { montarFilaAssistenteDia, montarResumoAssistenteDia } from "../services/assistenteDiaService"
 import { carregarJornadaDia, EVENTO_JORNADA_ATUALIZADA } from "../services/jornadaDiaService"
+import { montarAlertasIdentidadeDigital, resumirAlertasIdentidade } from "../services/alertasIdentidadeService"
 import {
   criarMapaClientesOperacionais,
   filtrarClientesOperacionais,
@@ -24,6 +25,7 @@ import {
   FaSyncAlt,
   FaCalendarAlt,
   FaBolt,
+  FaKey,
 } from "react-icons/fa"
 
 const API_URL = "https://nexa-erp-api.onrender.com"
@@ -35,6 +37,8 @@ export default function Dashboard({ setPage }) {
   const [fiscal, setFiscal] = useState([])
   const [pendencias, setPendencias] = useState([])
   const [documentos, setDocumentos] = useState([])
+  const [certificados, setCertificados] = useState([])
+  const [procuracoes, setProcuracoes] = useState([])
   const [notificacoes, setNotificacoes] = useState(0)
   const [mostrarCalendario, setMostrarCalendario] = useState(false)
   const [dataSelecionada, setDataSelecionada] = useState(new Date())
@@ -73,18 +77,22 @@ export default function Dashboard({ setPage }) {
       const usuarioSalvo = JSON.parse(localStorage.getItem("usuario"))
       const token = localStorage.getItem("token") || usuarioSalvo?.token
 
-      const [clientesResp, fiscalResp, pendenciasResp, documentosResp] =
+      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, certificadosResp, procuracoesResp] =
         await Promise.all([
           api.get("/clientes"),
           api.get("/fiscal"),
           api.get("/solicitacoes-clientes"),
           api.get("/documentos-digitais"),
+          api.get("/certificados-digitais"),
+          api.get("/procuracoes-ecac"),
         ])
 
       setClientes(Array.isArray(clientesResp.data) ? clientesResp.data : [])
       setFiscal(Array.isArray(fiscalResp.data) ? fiscalResp.data : [])
       setPendencias(Array.isArray(pendenciasResp.data) ? pendenciasResp.data : [])
       setDocumentos(Array.isArray(documentosResp.data) ? documentosResp.data : [])
+      setCertificados(Array.isArray(certificadosResp.data) ? certificadosResp.data : [])
+      setProcuracoes(Array.isArray(procuracoesResp.data) ? procuracoesResp.data : [])
 
       if (token) {
         const resposta = await fetch(`${API_URL}/notificacoes/contador`, {
@@ -263,6 +271,14 @@ export default function Dashboard({ setPage }) {
   }
 
   const clientesOperacionais = useMemo(() => filtrarClientesOperacionais(clientes), [clientes])
+
+  const alertasIdentidade = useMemo(() => montarAlertasIdentidadeDigital({
+    clientes,
+    certificados,
+    procuracoes,
+  }), [clientes, certificados, procuracoes])
+
+  const resumoIdentidade = useMemo(() => resumirAlertasIdentidade(alertasIdentidade), [alertasIdentidade])
   const mapaClientesOperacionais = useMemo(() => criarMapaClientesOperacionais(clientes), [clientes])
 
   function pertenceClienteOperacional(item) {
@@ -597,8 +613,10 @@ export default function Dashboard({ setPage }) {
       fiscal,
       pendencias,
       documentos,
+      certificados,
+      procuracoes,
     })
-  }, [clientes, fiscal, pendencias, documentos])
+  }, [clientes, fiscal, pendencias, documentos, certificados, procuracoes])
 
   const resumoAssistenteDia = useMemo(() => {
     const base = montarResumoAssistenteDia(filaAssistenteDia)
@@ -655,9 +673,10 @@ export default function Dashboard({ setPage }) {
       documentosPendentes: resumo.documentosPendentes,
       parcelamentos,
       oportunidades,
+      alertasIdentidade: resumoIdentidade.total,
       primeiro,
     }
-  }, [clientesOperacionais, mapaClientesOperacionais, fiscal, filaAssistenteDia, resumoAssistenteDia, resumo.documentosPendentes])
+  }, [clientesOperacionais, mapaClientesOperacionais, fiscal, filaAssistenteDia, resumoAssistenteDia, resumo.documentosPendentes, resumoIdentidade])
 
   const eventosCalendario = useMemo(() => {
     const eventos = {}
@@ -1326,6 +1345,7 @@ export default function Dashboard({ setPage }) {
           <div className="nexa-daily-metric"><span>Documentos pendentes</span><strong className="success">{painelDiario.documentosPendentes}</strong></div>
           <div className="nexa-daily-metric"><span>Parcelamentos próximos</span><strong className="blue">{painelDiario.parcelamentos}</strong></div>
           <div className="nexa-daily-metric"><span>Radar tributário</span><strong className="success">{painelDiario.oportunidades}</strong></div>
+          <div className="nexa-daily-metric"><span>Identidade digital</span><strong className="warning">{painelDiario.alertasIdentidade}</strong></div>
         </div>
 
         <div className="nexa-progress-line">
@@ -1360,6 +1380,7 @@ export default function Dashboard({ setPage }) {
         <ResumoCard icon={<FaExclamationTriangle />} label="Em Atraso" value={resumo.emAtraso} color="danger" />
         <ResumoCard icon={<FaFileAlt />} label="Documentos Pendentes" value={resumo.documentosPendentes} color="success" />
         <ResumoCard icon={<FaBell />} label="Notificações" value={resumo.notificacoes} color="warning" />
+        <ResumoCard icon={<FaKey />} label="Alertas Digitais" value={resumoIdentidade.total} color="warning" />
       </div>
 
       <section className="box dia-box">

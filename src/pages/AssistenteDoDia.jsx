@@ -25,6 +25,8 @@ export default function AssistenteDoDia({ setPage }) {
   const [documentos, setDocumentos] = useState([])
   const [financeiro, setFinanceiro] = useState([])
   const [planejamento, setPlanejamento] = useState([])
+  const [certificados, setCertificados] = useState([])
+  const [procuracoes, setProcuracoes] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [atendimentoAtivo, setAtendimentoAtivo] = useState(false)
   const [clienteAtualIndex, setClienteAtualIndex] = useState(0)
@@ -41,13 +43,15 @@ export default function AssistenteDoDia({ setPage }) {
     setCarregando(true)
 
     try {
-      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp] =
+      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, certificadosResp, procuracoesResp] =
         await Promise.allSettled([
           api.get("/clientes"),
           api.get("/fiscal"),
           api.get("/solicitacoes-clientes"),
           api.get("/documentos-digitais"),
           api.get("/financeiro"),
+          api.get("/certificados-digitais"),
+          api.get("/procuracoes-ecac"),
         ])
 
       setClientes(resultadoArray(clientesResp))
@@ -57,6 +61,8 @@ export default function AssistenteDoDia({ setPage }) {
       const clientesLista = resultadoArray(clientesResp)
       const fiscalLista = resultadoArray(fiscalResp)
       setFinanceiro(resultadoArray(financeiroResp))
+      setCertificados(resultadoArray(certificadosResp))
+      setProcuracoes(resultadoArray(procuracoesResp))
       setPlanejamento(garantirPlanejamentoAnual({ clientes: clientesLista, fiscal: fiscalLista }))
     } catch (error) {
       console.error("Erro ao carregar Assistente do Dia", error)
@@ -89,8 +95,10 @@ export default function AssistenteDoDia({ setPage }) {
       documentos,
       financeiro,
       planejamento,
+      certificados,
+      procuracoes,
     })
-  }, [clientes, fiscal, pendencias, documentos, financeiro, planejamento])
+  }, [clientes, fiscal, pendencias, documentos, financeiro, planejamento, certificados, procuracoes])
 
   const resumoBase = useMemo(() => montarResumoAssistenteDia(fila), [fila])
 
