@@ -45,6 +45,7 @@ export default function Clientes({ setPage }) {
   const [vencimentoAcao, setVencimentoAcao] = useState("")
   const [financeiroLancamentos, setFinanceiroLancamentos] = useState([])
   const [fiscalObrigacoes, setFiscalObrigacoes] = useState([])
+  const [certificadosDigitais, setCertificadosDigitais] = useState([])
 
   const regimes = [
     "Avulso",
@@ -70,6 +71,7 @@ export default function Clientes({ setPage }) {
     carregarClientes()
     carregarFinanceiroCliente()
     carregarFiscalCliente()
+    carregarCertificadosDigitais()
   }, [])
 
   async function carregarClientes() {
@@ -99,6 +101,16 @@ export default function Clientes({ setPage }) {
       setFiscalObrigacoes(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
       console.error("Erro ao carregar resumo fiscal do cliente", error)
+    }
+  }
+
+
+  async function carregarCertificadosDigitais() {
+    try {
+      const resposta = await api.get("/certificados-digitais")
+      setCertificadosDigitais(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (error) {
+      console.error("Erro ao carregar certificados digitais", error)
     }
   }
 
@@ -857,6 +869,39 @@ export default function Clientes({ setPage }) {
 
   const fiscalSituacao = obrigacoesPendentes.length > 0 ? "Atenção" : obrigacoesDoCliente.length > 0 ? "Em dia" : "Sem obrigações"
 
+  const certificadosDoCliente = certificadosDigitais.filter((item) =>
+    String(item.clienteId) === String(clienteSelecionado?.id) || mesmoCliente(item.cliente, clienteSelecionado?.nome)
+  )
+
+  const certificadoPrincipal = certificadosDoCliente
+    .filter((item) => item.ativo !== false)
+    .slice()
+    .sort((a, b) => String(a.dataValidade || "9999-12-31").localeCompare(String(b.dataValidade || "9999-12-31")))[0]
+
+  function diasAteValidade(data) {
+    if (!data) return null
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    const alvo = new Date(`${String(data).slice(0, 10)}T00:00:00`)
+    return Number.isFinite(alvo.getTime()) ? Math.ceil((alvo - hoje) / 86400000) : null
+  }
+
+  const diasCertificado = diasAteValidade(certificadoPrincipal?.dataValidade)
+  const situacaoCertificado = !certificadoPrincipal
+    ? "Não cadastrado"
+    : diasCertificado < 0
+      ? "Vencido"
+      : diasCertificado <= 30
+        ? `Vence em ${diasCertificado} dias`
+        : "Válido"
+
+  function abrirCertificadosCliente() {
+    if (clienteSelecionado?.id) {
+      localStorage.setItem("nexaCertificadoClienteId", String(clienteSelecionado.id))
+    }
+    if (typeof setPage === "function") setPage("Certificados Digitais")
+  }
+
   function abrirFinanceiroCliente() {
     if (!clienteSelecionado?.nome) return
     localStorage.setItem("nexaFiltroMovimentosCliente", clienteSelecionado.nome)
@@ -1287,6 +1332,7 @@ export default function Clientes({ setPage }) {
             <button title="Dados" style={centralMenuBotao} onClick={() => rolarParaSecao("dados")}>📋</button>
             <button title="Financeiro do Cliente" style={centralMenuBotao} onClick={() => rolarParaSecao("financeiro")}>💰</button>
             <button title="Fiscal" style={centralMenuBotao} onClick={() => rolarParaSecao("fiscal")}>🏛</button>
+            <button title="Identidade Digital" style={centralMenuBotao} onClick={() => rolarParaSecao("certificados")}>🔐</button>
             <button title="WhatsApp" style={centralMenuBotao} onClick={() => rolarParaSecao("whatsapp")}>💬</button>
           </div>
 
@@ -1368,6 +1414,17 @@ export default function Clientes({ setPage }) {
               status={obrigacoesPendentes.length > 0 ? "atencao" : obrigacoesDoCliente.length > 0 ? "ok" : "neutro"}
               acao="Ver fiscal"
               onClick={() => rolarParaSecao("fiscal")}
+            />
+
+
+            <ResumoCard
+              icone="🔐"
+              titulo="Identidade Digital"
+              valor={certificadosDoCliente.length}
+              detalhe={certificadoPrincipal?.dataValidade ? `${situacaoCertificado} • ${formatarDataBR(certificadoPrincipal.dataValidade)}` : situacaoCertificado}
+              status={!certificadoPrincipal ? "neutro" : diasCertificado < 0 ? "atencao" : diasCertificado <= 30 ? "atencao" : "ok"}
+              acao="Ver certificado"
+              onClick={() => rolarParaSecao("certificados")}
             />
 
             <ResumoCard
@@ -1625,6 +1682,37 @@ export default function Clientes({ setPage }) {
                   A RBT12 acima é estimada pelos créditos registrados na movimentação do cliente e deve ser conferida antes de qualquer decisão tributária.
                 </small>
               </>
+            )}
+          </div>
+
+
+          <div id="central-certificados" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Identidade Digital</span>
+                <p style={secaoDescricao}>Controle dos certificados digitais vinculados ao cliente.</p>
+              </div>
+
+              <button style={button} onClick={abrirCertificadosCliente}>
+                Abrir Central de Certificados
+              </button>
+            </div>
+
+            <div style={miniResumoGrid}>
+              <Info label="Certificados" value={certificadosDoCliente.length} />
+              <Info label="Situação" value={situacaoCertificado} />
+              <Info label="Tipo" value={certificadoPrincipal?.tipo || "-"} />
+              <Info label="Validade" value={certificadoPrincipal?.dataValidade ? formatarDataBR(certificadoPrincipal.dataValidade) : "Não informada"} />
+            </div>
+
+            {certificadoPrincipal ? (
+              <div style={resumoLinhaDestaque}>
+                <strong>{certificadoPrincipal.autoridadeCertificadora || "Certificado A1"}</strong>
+                <span>Local: {certificadoPrincipal.localArquivo || "não informado"}</span>
+                <small>Responsável: {certificadoPrincipal.responsavel || "não informado"}</small>
+              </div>
+            ) : (
+              <p style={observacaoTexto}>Nenhum certificado cadastrado para este cliente.</p>
             )}
           </div>
 

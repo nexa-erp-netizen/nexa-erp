@@ -31,6 +31,7 @@ import ObrigacoesCliente from "./pages/ObrigacoesCliente"
 import WhatsAppInteligente from "./pages/WhatsAppInteligente"
 import AssistenteDoDia from "./pages/AssistenteDoDia"
 import LaboratorioTributario from "./pages/LaboratorioTributario"
+import CertificadosDigitais from "./pages/CertificadosDigitais"
 import SobreNexa from "./pages/SobreNexa"
 
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
       "WhatsApp Inteligente",
       "Assistente do Dia",
       "Laboratório Tributário",
+      "Certificados Digitais",
       "Relatórios",
       "Usuários",
       "Backup Sistema",
@@ -80,6 +82,7 @@ export default function App() {
       "WhatsApp Inteligente",
       "Assistente do Dia",
       "Laboratório Tributário",
+      "Certificados Digitais",
       "Relatórios",
       "Calculadora IRPF MEI",
       "Agenda",
@@ -190,6 +193,9 @@ export default function App() {
 
       case "Laboratório Tributário":
         return <LaboratorioTributario />
+
+      case "Certificados Digitais":
+        return <CertificadosDigitais />
 
       case "Movimentos Clientes":
         return <MovimentosClientesEscritorio />

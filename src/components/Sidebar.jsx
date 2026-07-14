@@ -87,7 +87,7 @@ export default function Sidebar({ page, setPage, usuario }) {
     {
       titulo: "Ferramentas",
       icon: <FaFlask />,
-      itens: ["Laboratório Tributário"],
+      itens: ["Laboratório Tributário", "Certificados Digitais"],
     },
     {
       titulo: "Configurações",
