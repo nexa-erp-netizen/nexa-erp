@@ -32,6 +32,8 @@ import WhatsAppInteligente from "./pages/WhatsAppInteligente"
 import AssistenteDoDia from "./pages/AssistenteDoDia"
 import LaboratorioTributario from "./pages/LaboratorioTributario"
 import CertificadosDigitais from "./pages/CertificadosDigitais"
+import ProcuracoesEcac from "./pages/ProcuracoesEcac"
+import IdentidadeDigital from "./pages/IdentidadeDigital"
 import SobreNexa from "./pages/SobreNexa"
 
 export default function App() {
@@ -58,6 +60,8 @@ export default function App() {
       "Assistente do Dia",
       "Laboratório Tributário",
       "Certificados Digitais",
+      "Procurações e-CAC",
+      "Identidade Digital",
       "Relatórios",
       "Usuários",
       "Backup Sistema",
@@ -83,6 +87,8 @@ export default function App() {
       "Assistente do Dia",
       "Laboratório Tributário",
       "Certificados Digitais",
+      "Procurações e-CAC",
+      "Identidade Digital",
       "Relatórios",
       "Calculadora IRPF MEI",
       "Agenda",
@@ -196,6 +202,12 @@ export default function App() {
 
       case "Certificados Digitais":
         return <CertificadosDigitais />
+
+      case "Procurações e-CAC":
+        return <ProcuracoesEcac />
+
+      case "Identidade Digital":
+        return <IdentidadeDigital setPage={setPage} />
 
       case "Movimentos Clientes":
         return <MovimentosClientesEscritorio />

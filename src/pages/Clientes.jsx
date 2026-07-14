@@ -46,6 +46,7 @@ export default function Clientes({ setPage }) {
   const [financeiroLancamentos, setFinanceiroLancamentos] = useState([])
   const [fiscalObrigacoes, setFiscalObrigacoes] = useState([])
   const [certificadosDigitais, setCertificadosDigitais] = useState([])
+  const [procuracoesEcac, setProcuracoesEcac] = useState([])
 
   const regimes = [
     "Avulso",
@@ -72,6 +73,7 @@ export default function Clientes({ setPage }) {
     carregarFinanceiroCliente()
     carregarFiscalCliente()
     carregarCertificadosDigitais()
+    carregarProcuracoesEcac()
   }, [])
 
   async function carregarClientes() {
@@ -104,6 +106,15 @@ export default function Clientes({ setPage }) {
     }
   }
 
+
+  async function carregarProcuracoesEcac() {
+    try {
+      const resposta = await api.get("/procuracoes-ecac")
+      setProcuracoesEcac(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (error) {
+      console.error("Erro ao carregar procurações e-CAC", error)
+    }
+  }
 
   async function carregarCertificadosDigitais() {
     try {
@@ -895,6 +906,31 @@ export default function Clientes({ setPage }) {
         ? `Vence em ${diasCertificado} dias`
         : "Válido"
 
+  const procuracoesDoCliente = procuracoesEcac.filter((item) =>
+    String(item.clienteId) === String(clienteSelecionado?.id) || mesmoCliente(item.cliente, clienteSelecionado?.nome)
+  )
+
+  const procuracaoPrincipal = procuracoesDoCliente
+    .filter((item) => item.ativa !== false)
+    .slice()
+    .sort((a, b) => String(a.dataValidade || "9999-12-31").localeCompare(String(b.dataValidade || "9999-12-31")))[0]
+
+  const diasProcuracao = diasAteValidade(procuracaoPrincipal?.dataValidade)
+  const situacaoProcuracao = !procuracaoPrincipal
+    ? "Não cadastrada"
+    : diasProcuracao < 0
+      ? "Vencida"
+      : diasProcuracao <= 30
+        ? `Vence em ${diasProcuracao} dias`
+        : "Ativa"
+
+  function abrirProcuracoesCliente() {
+    if (clienteSelecionado?.id) {
+      localStorage.setItem("nexaProcuracaoClienteId", String(clienteSelecionado.id))
+    }
+    if (typeof setPage === "function") setPage("Procurações e-CAC")
+  }
+
   function abrirCertificadosCliente() {
     if (clienteSelecionado?.id) {
       localStorage.setItem("nexaCertificadoClienteId", String(clienteSelecionado.id))
@@ -1333,6 +1369,7 @@ export default function Clientes({ setPage }) {
             <button title="Financeiro do Cliente" style={centralMenuBotao} onClick={() => rolarParaSecao("financeiro")}>💰</button>
             <button title="Fiscal" style={centralMenuBotao} onClick={() => rolarParaSecao("fiscal")}>🏛</button>
             <button title="Identidade Digital" style={centralMenuBotao} onClick={() => rolarParaSecao("certificados")}>🔐</button>
+            <button title="Procurações e-CAC" style={centralMenuBotao} onClick={() => rolarParaSecao("procuracoes")}>🪪</button>
             <button title="WhatsApp" style={centralMenuBotao} onClick={() => rolarParaSecao("whatsapp")}>💬</button>
           </div>
 
@@ -1425,6 +1462,17 @@ export default function Clientes({ setPage }) {
               status={!certificadoPrincipal ? "neutro" : diasCertificado < 0 ? "atencao" : diasCertificado <= 30 ? "atencao" : "ok"}
               acao="Ver certificado"
               onClick={() => rolarParaSecao("certificados")}
+            />
+
+
+            <ResumoCard
+              icone="🪪"
+              titulo="Procuração e-CAC"
+              valor={procuracoesDoCliente.length}
+              detalhe={procuracaoPrincipal?.dataValidade ? `${situacaoProcuracao} • ${formatarDataBR(procuracaoPrincipal.dataValidade)}` : situacaoProcuracao}
+              status={!procuracaoPrincipal ? "neutro" : diasProcuracao < 0 ? "atencao" : diasProcuracao <= 30 ? "atencao" : "ok"}
+              acao="Ver procuração"
+              onClick={() => rolarParaSecao("procuracoes")}
             />
 
             <ResumoCard
@@ -1713,6 +1761,37 @@ export default function Clientes({ setPage }) {
               </div>
             ) : (
               <p style={observacaoTexto}>Nenhum certificado cadastrado para este cliente.</p>
+            )}
+          </div>
+
+
+          <div id="central-procuracoes" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Procurações e-CAC</span>
+                <p style={secaoDescricao}>Controle das procurações digitais e autorizações vinculadas ao cliente.</p>
+              </div>
+
+              <button style={button} onClick={abrirProcuracoesCliente}>
+                Abrir Central de Procurações
+              </button>
+            </div>
+
+            <div style={miniResumoGrid}>
+              <Info label="Procurações" value={procuracoesDoCliente.length} />
+              <Info label="Situação" value={situacaoProcuracao} />
+              <Info label="Tipo" value={procuracaoPrincipal?.tipo || "-"} />
+              <Info label="Validade" value={procuracaoPrincipal?.dataValidade ? formatarDataBR(procuracaoPrincipal.dataValidade) : "Não informada"} />
+            </div>
+
+            {procuracaoPrincipal ? (
+              <div style={resumoLinhaDestaque}>
+                <strong>{procuracaoPrincipal.tipo || "Procuração e-CAC"}</strong>
+                <span>Outorgado: {procuracaoPrincipal.outorgado || "não informado"}</span>
+                <small>Responsável: {procuracaoPrincipal.responsavel || "não informado"}</small>
+              </div>
+            ) : (
+              <p style={observacaoTexto}>Nenhuma procuração cadastrada para este cliente.</p>
             )}
           </div>
 
