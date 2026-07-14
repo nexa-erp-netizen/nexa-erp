@@ -34,6 +34,7 @@ import LaboratorioTributario from "./pages/LaboratorioTributario"
 import CertificadosDigitais from "./pages/CertificadosDigitais"
 import ProcuracoesEcac from "./pages/ProcuracoesEcac"
 import IdentidadeDigital from "./pages/IdentidadeDigital"
+import CentralEcac from "./pages/CentralEcac"
 import SobreNexa from "./pages/SobreNexa"
 
 export default function App() {
@@ -62,6 +63,7 @@ export default function App() {
       "Certificados Digitais",
       "Procurações e-CAC",
       "Identidade Digital",
+      "Central e-CAC",
       "Relatórios",
       "Usuários",
       "Backup Sistema",
@@ -89,6 +91,7 @@ export default function App() {
       "Certificados Digitais",
       "Procurações e-CAC",
       "Identidade Digital",
+      "Central e-CAC",
       "Relatórios",
       "Calculadora IRPF MEI",
       "Agenda",
@@ -208,6 +211,9 @@ export default function App() {
 
       case "Identidade Digital":
         return <IdentidadeDigital setPage={setPage} />
+
+      case "Central e-CAC":
+        return <CentralEcac />
 
       case "Movimentos Clientes":
         return <MovimentosClientesEscritorio />
