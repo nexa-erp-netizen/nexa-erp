@@ -1,3 +1,5 @@
+import { filtrarClientesOperacionais } from "./clienteOperacionalService"
+
 const PREFIXO_CHAVE = "nexa_planejamento_anual"
 
 function texto(valor) {
@@ -177,7 +179,7 @@ function eventosMensaisCliente(cliente, ano, configuracao = {}) {
 
 function eventosParcelamentos(fiscal = [], clientes = [], ano) {
   const clientesPorNome = new Map()
-  clientes.forEach((cliente) => {
+  filtrarClientesOperacionais(clientes).forEach((cliente) => {
     const nomes = [cliente.nome, cliente.cliente, cliente.razaoSocial, cliente.nomeFantasia, cliente.empresa]
     nomes.forEach((nome) => {
       const chave = normalizar(nome)
@@ -238,9 +240,11 @@ export function gerarPlanejamentoAnual({ clientes = [], fiscal = [], ano = new D
   const existentes = lerPlanejamento(ano)
   const statusPorId = new Map(existentes.map((item) => [item.id, item.status]))
 
+  const clientesOperacionais = filtrarClientesOperacionais(clientes)
+
   const gerados = [
-    ...clientes.flatMap((cliente) => eventosMensaisCliente(cliente, ano, configuracao)),
-    ...eventosParcelamentos(fiscal, clientes, ano),
+    ...clientesOperacionais.flatMap((cliente) => eventosMensaisCliente(cliente, ano, configuracao)),
+    ...eventosParcelamentos(fiscal, clientesOperacionais, ano),
   ]
 
   const unicos = Array.from(new Map(gerados.map((item) => [item.id, item])).values())
@@ -255,8 +259,6 @@ export function obterPlanejamentoAnual(ano = new Date().getFullYear()) {
 }
 
 export function garantirPlanejamentoAnual({ clientes = [], fiscal = [], ano = new Date().getFullYear(), configuracao = {} } = {}) {
-  const atual = lerPlanejamento(ano)
-  if (atual.length) return atual
   return gerarPlanejamentoAnual({ clientes, fiscal, ano, configuracao })
 }
 

@@ -8,6 +8,11 @@ import {
 } from "../services/whatsappService"
 import { montarFilaAssistenteDia, montarResumoAssistenteDia } from "../services/assistenteDiaService"
 import { carregarJornadaDia, EVENTO_JORNADA_ATUALIZADA } from "../services/jornadaDiaService"
+import {
+  criarMapaClientesOperacionais,
+  filtrarClientesOperacionais,
+  localizarClienteOperacional,
+} from "../services/clienteOperacionalService"
 import Calendar from "react-calendar"
 import "react-calendar/dist/Calendar.css"
 import {
@@ -257,8 +262,15 @@ export default function Dashboard({ setPage }) {
     )
   }
 
+  const clientesOperacionais = useMemo(() => filtrarClientesOperacionais(clientes), [clientes])
+  const mapaClientesOperacionais = useMemo(() => criarMapaClientesOperacionais(clientes), [clientes])
+
+  function pertenceClienteOperacional(item) {
+    return Boolean(localizarClienteOperacional(mapaClientesOperacionais, item?.cliente))
+  }
+
   const resumo = useMemo(() => {
-    const fiscalAtivo = fiscal.filter((item) => item.status !== "Concluído")
+    const fiscalAtivo = fiscal.filter((item) => item.status !== "Concluído" && pertenceClienteOperacional(item))
 
     const obrigacoesPendentes = fiscalAtivo.filter(
       (item) => item.status === "Pendente" || item.status === "Em andamento"
@@ -273,28 +285,28 @@ export default function Dashboard({ setPage }) {
       return dias !== null && dias < 0
     }).length
 
-    const documentosPendentes = documentos.filter(documentoPendente).length
+    const documentosPendentes = documentos.filter((item) => documentoPendente(item) && pertenceClienteOperacional(item)).length
 
     const aguardandoAcao =
       aguardandoConferencia +
       documentosPendentes +
-      pendencias.filter((item) => item.status !== "Concluída").length
+      pendencias.filter((item) => item.status !== "Concluída" && pertenceClienteOperacional(item)).length
 
     return {
-      clientes: clientes.length,
+      clientes: clientesOperacionais.length,
       obrigacoesPendentes,
       aguardandoAcao,
       emAtraso,
       documentosPendentes,
       notificacoes,
     }
-  }, [clientes, fiscal, pendencias, documentos, notificacoes])
+  }, [clientesOperacionais, mapaClientesOperacionais, fiscal, pendencias, documentos, notificacoes])
 
   const prioridades = useMemo(() => {
     const lista = []
 
     fiscal
-      .filter((item) => item.status !== "Concluído")
+      .filter((item) => item.status !== "Concluído" && pertenceClienteOperacional(item))
       .forEach((item) => {
         const dias = diferencaDias(item.vencimento)
 
@@ -352,7 +364,7 @@ export default function Dashboard({ setPage }) {
       })
 
     pendencias
-      .filter((item) => item.status !== "Concluída")
+      .filter((item) => item.status !== "Concluída" && pertenceClienteOperacional(item))
       .forEach((item) => {
         const data = item.vencimento || item.prazo
         const dias = diferencaDias(data)
@@ -373,7 +385,7 @@ export default function Dashboard({ setPage }) {
       })
 
     documentos
-      .filter(documentoPendente)
+      .filter((item) => documentoPendente(item) && pertenceClienteOperacional(item))
       .forEach((item) => {
         lista.push({
           id: `documento-${item.id}`,
@@ -395,7 +407,7 @@ export default function Dashboard({ setPage }) {
     const lista = []
 
     documentos
-      .filter(documentoPendente)
+      .filter((item) => documentoPendente(item) && pertenceClienteOperacional(item))
       .forEach((item) => {
         lista.push({
           id: `atendimento-doc-${item.id}`,
@@ -410,7 +422,8 @@ export default function Dashboard({ setPage }) {
 
     pendencias
       .filter((item) =>
-        ["Respondida", "Visualizada", "Em análise"].includes(item.status)
+        ["Respondida", "Visualizada", "Em análise"].includes(item.status) &&
+        pertenceClienteOperacional(item)
       )
       .slice(0, 4)
       .forEach((item) => {
@@ -433,7 +446,7 @@ export default function Dashboard({ setPage }) {
 
   const proximosVencimentos = useMemo(() => {
     return fiscal
-      .filter(fiscalAguardandoPagamento)
+      .filter((item) => fiscalAguardandoPagamento(item) && pertenceClienteOperacional(item))
       .map((item) => ({
         ...item,
         dias: diferencaDias(item.vencimento),
@@ -448,7 +461,7 @@ export default function Dashboard({ setPage }) {
 
   const documentosRecebidos = useMemo(() => {
     return documentos
-      .filter(documentoPendente)
+      .filter((item) => documentoPendente(item) && pertenceClienteOperacional(item))
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 6)
       .map((item) => ({
@@ -463,7 +476,7 @@ export default function Dashboard({ setPage }) {
     const lista = []
 
     fiscal
-      .filter(fiscalAguardandoPagamento)
+      .filter((item) => fiscalAguardandoPagamento(item) && pertenceClienteOperacional(item))
       .forEach((item) => {
         const dias = diferencaDias(item.vencimento)
         const cliente = localizarClientePorNome(item.cliente)
@@ -523,7 +536,7 @@ export default function Dashboard({ setPage }) {
       })
 
     documentos
-      .filter(documentoPendente)
+      .filter((item) => documentoPendente(item) && pertenceClienteOperacional(item))
       .forEach((item) => {
         const cliente = localizarClientePorNome(item.cliente)
 
@@ -544,7 +557,7 @@ export default function Dashboard({ setPage }) {
       })
 
     pendencias
-      .filter((item) => item.status !== "Concluída")
+      .filter((item) => item.status !== "Concluída" && pertenceClienteOperacional(item))
       .forEach((item) => {
         const cliente = localizarClientePorNome(item.cliente)
 
@@ -605,23 +618,26 @@ export default function Dashboard({ setPage }) {
 
   const painelDiario = useMemo(() => {
     const dasProximos = fiscal.filter((item) => {
+      if (!pertenceClienteOperacional(item)) return false
       const obrigacao = String(item.obrigacao || item.tipo || "").toLowerCase()
       const dias = diferencaDias(item.vencimento)
       return obrigacao.includes("das") && dias !== null && dias >= 0 && dias <= 3 && fiscalAguardandoPagamento(item)
     }).length
 
     const honorariosPendentes = fiscal.filter((item) => {
+      if (!pertenceClienteOperacional(item)) return false
       const obrigacao = String(item.obrigacao || item.tipo || "").toLowerCase()
       return obrigacao.includes("honor") && fiscalAguardandoPagamento(item)
     }).length
 
     const parcelamentos = fiscal.filter((item) => {
+      if (!pertenceClienteOperacional(item)) return false
       const obrigacao = String(item.obrigacao || item.tipo || "").toLowerCase()
       const dias = diferencaDias(item.vencimento)
       return obrigacao.includes("parcel") && dias !== null && dias <= 3 && fiscalAguardandoPagamento(item)
     }).length
 
-    const oportunidades = clientes.filter((cliente) => {
+    const oportunidades = clientesOperacionais.filter((cliente) => {
       const nota = Number(cliente.saudeTributaria || cliente.indiceSaudeTributaria || 100)
       const fatorR = Number(cliente.fatorRAtual || cliente.fatorR || 100)
       return nota < 75 || (fatorR > 0 && fatorR < 28)
@@ -641,7 +657,7 @@ export default function Dashboard({ setPage }) {
       oportunidades,
       primeiro,
     }
-  }, [clientes, fiscal, filaAssistenteDia, resumoAssistenteDia, resumo.documentosPendentes])
+  }, [clientesOperacionais, mapaClientesOperacionais, fiscal, filaAssistenteDia, resumoAssistenteDia, resumo.documentosPendentes])
 
   const eventosCalendario = useMemo(() => {
     const eventos = {}
@@ -657,7 +673,7 @@ export default function Dashboard({ setPage }) {
     }
 
     fiscal.forEach((item) => {
-      if (!item.vencimento) return
+      if (!pertenceClienteOperacional(item) || !item.vencimento) return
 
       const dias = diferencaDias(item.vencimento)
 
@@ -674,7 +690,7 @@ export default function Dashboard({ setPage }) {
     })
 
     documentos
-      .filter(documentoPendente)
+      .filter((item) => documentoPendente(item) && pertenceClienteOperacional(item))
       .forEach((item) => {
         const data = String(item.createdAt || "").slice(0, 10)
 

@@ -97,3 +97,11 @@
 - Sincronizado o progresso do Assistente do Dia com o Dashboard em tempo real.
 - Padronizados restauração, salvamento e reinício do expediente.
 - Consolidada a integração final do Módulo 2 — Agenda Inteligente.
+
+## v3.6.8 — Filtro de Empresas Ativas
+
+- Assistente do Dia limitado a empresas operacionais ativas.
+- Clientes do regime Avulso removidos das rotinas automáticas.
+- Empresas inaptas, baixadas, suspensas ou em constituição não geram prioridades automáticas.
+- Planejamento anual passa a ser gerado apenas para empresas ativas.
+- Dashboard, WhatsApp e vencimentos seguem a mesma regra centralizada.

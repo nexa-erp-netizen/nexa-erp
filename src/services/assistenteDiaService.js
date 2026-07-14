@@ -1,4 +1,9 @@
 import { aplicarPriorizacaoFila } from "./priorizacaoService"
+import {
+  criarMapaClientesOperacionais,
+  localizarClienteOperacional,
+  clienteOperacionalAtivo,
+} from "./clienteOperacionalService"
 
 function hojeBase() {
   const hoje = new Date()
@@ -98,28 +103,11 @@ function clienteChave(nome) {
 }
 
 function montarMapaClientes(clientes = []) {
-  const mapa = new Map()
-
-  clientes.forEach((cliente) => {
-    const nomes = [
-      cliente?.nome,
-      cliente?.cliente,
-      cliente?.razaoSocial,
-      cliente?.nomeFantasia,
-      cliente?.empresa,
-    ]
-
-    nomes.forEach((nome) => {
-      const chave = clienteChave(nome)
-      if (chave && !mapa.has(chave)) mapa.set(chave, cliente)
-    })
-  })
-
-  return mapa
+  return criarMapaClientesOperacionais(clientes)
 }
 
 function localizarCliente(mapaClientes, nome) {
-  return mapaClientes.get(clienteChave(nome)) || null
+  return localizarClienteOperacional(mapaClientes, nome)
 }
 
 function criarAcao({
@@ -209,6 +197,7 @@ export function montarAcoesDoDia({
       if (dias === null || dias < -30 || dias > 7) return
 
       const clienteCadastro = localizarCliente(mapaClientes, item.cliente) || item.clienteDados || null
+      if (!clienteOperacionalAtivo(clienteCadastro)) return
       const prioridadeBase = Number(item.prioridade || 30)
       const prioridadePrazo = dias < 0 ? 55 + Math.min(Math.abs(dias) * 3, 30) : dias === 0 ? 50 : dias <= 3 ? 35 : 20
 
@@ -230,6 +219,7 @@ export function montarAcoesDoDia({
 
   fiscal.filter(fiscalAtivo).forEach((item) => {
     const clienteCadastro = localizarCliente(mapaClientes, item.cliente)
+    if (!clienteCadastro) return
     const cliente = item.cliente || obterNomeCliente(clienteCadastro)
     const clienteId = obterClienteId(clienteCadastro) || item.clienteId || item.cliente_id
     const obrigacaoOriginal = item.obrigacao || item.tipo || "Obrigação fiscal"
@@ -381,6 +371,7 @@ export function montarAcoesDoDia({
 
   pendencias.filter(pendenciaAberta).forEach((item) => {
     const clienteCadastro = localizarCliente(mapaClientes, item.cliente)
+    if (!clienteCadastro) return
     const cliente = item.cliente || obterNomeCliente(clienteCadastro)
     const clienteId = obterClienteId(clienteCadastro) || item.clienteId || item.cliente_id
     const prazo = item.vencimento || item.prazo
@@ -405,6 +396,7 @@ export function montarAcoesDoDia({
 
   documentos.filter(documentoPendente).forEach((item) => {
     const clienteCadastro = localizarCliente(mapaClientes, item.cliente)
+    if (!clienteCadastro) return
     const cliente = item.cliente || obterNomeCliente(clienteCadastro)
     const clienteId = obterClienteId(clienteCadastro) || item.clienteId || item.cliente_id
     const tipo = item.tipo || "Documento"
@@ -429,6 +421,7 @@ export function montarAcoesDoDia({
     const status = normalizarTexto(item.status)
     const tipo = normalizarTexto(item.tipo || item.categoria || item.descricao)
     const clienteCadastro = localizarCliente(mapaClientes, item.cliente)
+    if (!clienteCadastro) return
     const cliente = item.cliente || obterNomeCliente(clienteCadastro)
     const clienteId = obterClienteId(clienteCadastro) || item.clienteId || item.cliente_id
     const vencimento = item.vencimento || item.dataVencimento || item.data
