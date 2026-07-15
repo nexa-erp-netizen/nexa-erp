@@ -35,6 +35,7 @@ import CertificadosDigitais from "./pages/CertificadosDigitais"
 import ProcuracoesEcac from "./pages/ProcuracoesEcac"
 import IdentidadeDigital from "./pages/IdentidadeDigital"
 import CentralEcac from "./pages/CentralEcac"
+import MemoriaNexa from "./pages/MemoriaNexa"
 import SobreNexa from "./pages/SobreNexa"
 
 export default function App() {
@@ -64,6 +65,7 @@ export default function App() {
       "Procurações e-CAC",
       "Identidade Digital",
       "Central e-CAC",
+      "Memória da Nexa",
       "Relatórios",
       "Usuários",
       "Backup Sistema",
@@ -92,6 +94,7 @@ export default function App() {
       "Procurações e-CAC",
       "Identidade Digital",
       "Central e-CAC",
+      "Memória da Nexa",
       "Relatórios",
       "Calculadora IRPF MEI",
       "Agenda",
@@ -214,6 +217,9 @@ export default function App() {
 
       case "Central e-CAC":
         return <CentralEcac />
+
+      case "Memória da Nexa":
+        return <MemoriaNexa />
 
       case "Movimentos Clientes":
         return <MovimentosClientesEscritorio />
