@@ -87,7 +87,7 @@ export default function Sidebar({ page, setPage, usuario }) {
     {
       titulo: "Ferramentas",
       icon: <FaFlask />,
-      itens: ["Laboratório Tributário", "Memória da Nexa", "Segundo Contador", "Identidade Digital", "Central e-CAC", "Certificados Digitais", "Procurações e-CAC"],
+      itens: ["Laboratório Tributário", "Memória da Nexa", "Segundo Contador", "Consultora Tributária", "Identidade Digital", "Central e-CAC", "Certificados Digitais", "Procurações e-CAC"],
     },
     {
       titulo: "Configurações",

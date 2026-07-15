@@ -105,3 +105,10 @@
 - Empresas inaptas, baixadas, suspensas ou em constituição não geram prioridades automáticas.
 - Planejamento anual passa a ser gerado apenas para empresas ativas.
 - Dashboard, WhatsApp e vencimentos seguem a mesma regra centralizada.
+
+## v3.8.2 — Módulo 4, Etapa 3 — Consultora Tributária
+- Criado painel de simulação tributária por cliente.
+- Integrado o Motor do Simples Nacional e o Fator R.
+- Adicionada comparação preliminar com cenários alternativos informados pelo contador.
+- Incluídos parecer, riscos, oportunidades e memória do cálculo.
+- Reforçado que a decisão final pertence ao contador.

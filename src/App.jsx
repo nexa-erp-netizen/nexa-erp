@@ -37,6 +37,7 @@ import IdentidadeDigital from "./pages/IdentidadeDigital"
 import CentralEcac from "./pages/CentralEcac"
 import MemoriaNexa from "./pages/MemoriaNexa"
 import SegundoContador from "./pages/SegundoContador"
+import ConsultoraTributaria from "./pages/ConsultoraTributaria"
 import SobreNexa from "./pages/SobreNexa"
 
 export default function App() {
@@ -68,6 +69,7 @@ export default function App() {
       "Central e-CAC",
       "Memória da Nexa",
       "Segundo Contador",
+      "Consultora Tributária",
       "Relatórios",
       "Usuários",
       "Backup Sistema",
@@ -98,6 +100,7 @@ export default function App() {
       "Central e-CAC",
       "Memória da Nexa",
       "Segundo Contador",
+      "Consultora Tributária",
       "Relatórios",
       "Calculadora IRPF MEI",
       "Agenda",
@@ -226,6 +229,9 @@ export default function App() {
 
       case "Segundo Contador":
         return <SegundoContador />
+
+      case "Consultora Tributária":
+        return <ConsultoraTributaria />
 
       case "Movimentos Clientes":
         return <MovimentosClientesEscritorio />
