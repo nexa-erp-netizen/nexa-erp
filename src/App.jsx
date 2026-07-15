@@ -39,6 +39,7 @@ import MemoriaNexa from "./pages/MemoriaNexa"
 import SegundoContador from "./pages/SegundoContador"
 import ConsultoraTributaria from "./pages/ConsultoraTributaria"
 import ConversaNexa from "./pages/ConversaNexa"
+import RadarInteligente from "./pages/RadarInteligente"
 import SobreNexa from "./pages/SobreNexa"
 
 export default function App() {
@@ -72,6 +73,7 @@ export default function App() {
       "Segundo Contador",
       "Consultora Tributária",
       "Conversa com a Nexa",
+      "Radar Inteligente",
       "Relatórios",
       "Usuários",
       "Backup Sistema",
@@ -104,6 +106,7 @@ export default function App() {
       "Segundo Contador",
       "Consultora Tributária",
       "Conversa com a Nexa",
+      "Radar Inteligente",
       "Relatórios",
       "Calculadora IRPF MEI",
       "Agenda",
@@ -237,7 +240,10 @@ export default function App() {
         return <ConsultoraTributaria />
 
       case "Conversa com a Nexa":
-        return <ConversaNexa />
+        return <ConversaNexa usuario={usuario} setPage={setPage} />
+
+      case "Radar Inteligente":
+        return <RadarInteligente usuario={usuario} setPage={setPage} />
 
       case "Movimentos Clientes":
         return <MovimentosClientesEscritorio />

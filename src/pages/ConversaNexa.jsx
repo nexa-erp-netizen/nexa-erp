@@ -9,7 +9,7 @@ const SUGESTOES = [
   "O que você recomenda fazer agora?",
 ]
 
-export default function ConversaNexa() {
+export default function ConversaNexa({ usuario }) {
   const [clientes, setClientes] = useState([])
   const [clienteId, setClienteId] = useState("")
   const [mensagem, setMensagem] = useState("")
@@ -73,7 +73,7 @@ export default function ConversaNexa() {
       setErro(error.response?.data?.message || "Não consegui concluir a análise agora.")
       setConversa((atual) => [...atual, {
         id: `e-${Date.now()}`, autor: "Nexa",
-        texto: "William, encontrei um problema ao consultar os dados. Vamos tentar novamente em alguns instantes.",
+        texto: `${usuario?.nome || "Administrador"}, encontrei um problema ao consultar os dados. Vamos tentar novamente em alguns instantes.`,
         data: new Date().toISOString(), erro: true,
       }])
     } finally {
@@ -160,7 +160,7 @@ export default function ConversaNexa() {
 function boasVindas() {
   return {
     id: "boas-vindas", autor: "Nexa",
-    texto: "Bom dia, William. Estou pronta para analisar o escritório ou um cliente específico. Pode conversar comigo naturalmente.",
+    texto: `Olá, ${usuario?.nome || JSON.parse(localStorage.getItem("usuario") || "{}").nome || "Administrador"}. Estou pronta para analisar o escritório ou um cliente específico. Pode conversar comigo naturalmente.`,
     data: new Date().toISOString(),
   }
 }
