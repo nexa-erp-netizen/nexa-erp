@@ -58,7 +58,11 @@ export default function ConversaNexa({ usuario }) {
     setEnviando(true)
 
     try {
-      const resposta = await conversarComNexa({ mensagem: pergunta, clienteId: clienteId || null })
+      const resposta = await conversarComNexa({
+        mensagem: pergunta,
+        clienteId: clienteId || null,
+        historico: conversa,
+      })
       setConversa((atual) => [...atual, {
         id: `n-${Date.now()}`,
         autor: "Nexa",
@@ -91,9 +95,9 @@ export default function ConversaNexa({ usuario }) {
     <div style={styles.page}>
       <header style={styles.hero}>
         <div>
-          <span style={styles.badge}>Módulo 4 • Etapa 4</span>
+          <span style={styles.badge}>Nexa Assist • Etapa 4.1</span>
           <h2 style={styles.title}>Conversa com a Nexa</h2>
-          <p style={styles.subtitle}>Pergunte naturalmente. A Nexa consulta os dados reais e explica sua análise.</p>
+          <p style={styles.subtitle}>Conversa generativa baseada nos dados reais da Nexa. Cada resposta é criada para a sua pergunta e para o contexto atual.</p>
         </div>
         <button style={styles.clear} onClick={limpar}>Nova conversa</button>
       </header>
@@ -128,7 +132,7 @@ export default function ConversaNexa({ usuario }) {
             {!!item.fundamentos?.length && <details style={styles.details}><summary>Por que a Nexa respondeu assim?</summary><ul style={styles.list}>{item.fundamentos.map((f) => <li key={f}>{f}</li>)}</ul></details>}
           </article>
         ))}
-        {enviando && <div style={styles.typing}>A Nexa está analisando o contexto...</div>}
+        {enviando && <div style={styles.typing}>A Nexa está consultando os dados e preparando uma resposta...</div>}
         <div ref={fimRef} />
       </section>
 
@@ -152,7 +156,7 @@ export default function ConversaNexa({ usuario }) {
           {enviando ? "Analisando..." : "Enviar"}
         </button>
       </section>
-      <p style={styles.notice}>A Nexa oferece apoio técnico. Decisões tributárias e operacionais continuam sob responsabilidade do contador.</p>
+      <p style={styles.notice}>A Nexa usa IA generativa e os dados disponíveis no sistema. Decisões tributárias e ações que alterem dados continuam sob responsabilidade do contador.</p>
     </div>
   )
 }
