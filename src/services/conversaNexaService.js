@@ -14,10 +14,10 @@ function normalizarHistorico(historico) {
   if (!Array.isArray(historico)) return []
 
   return historico
-    .slice(-3)
+    .slice(-8)
     .map((item) => ({
       autor: item?.autor === "Você" ? "usuario" : "nexa",
-      texto: String(item?.texto || "").slice(0, 350),
+      texto: String(item?.texto || "").slice(0, 1200),
     }))
     .filter((item) => item.texto)
 }
@@ -136,12 +136,14 @@ async function gerarComOllama({ prompt }) {
       recomendacao: "",
       fundamentos: [],
       modo: "ollama-local-generate",
+      provedor: "ollama",
       modelo,
+      fallback: true,
       respondidoEm: new Date().toISOString(),
     }
   } catch (error) {
     if (error?.name === "AbortError") {
-      throw new Error("O Ollama demorou mais de 3 minutos para responder. Confirme se o modelo está carregado e se a aceleração Vulkan continua desativada.")
+      throw new Error("O Ollama demorou mais de 3 minutos para responder. Confirme se o modelo está carregado.")
     }
 
     if (String(error?.message || "").includes("Failed to fetch")) {
@@ -154,17 +156,51 @@ async function gerarComOllama({ prompt }) {
   }
 }
 
+function permiteFallbackLocal(error) {
+  const status = Number(error?.response?.status || 0)
+  const falhaProvedor = Boolean(error?.response?.data?.providerFailure)
+  return !status || falhaProvedor || [429, 500, 502, 503, 504].includes(status)
+}
+
 export async function conversarComNexa({ mensagem, clienteId = null, historico = [] }) {
-  const contextoResposta = await buscarContexto({ mensagem, clienteId, historico })
+  let erroGroq = null
 
-  const prompt = montarPrompt({
-    instrucoes: contextoResposta.instrucoes,
-    contexto: contextoResposta.contexto,
-    mensagem,
-    historico: contextoResposta.historico || historico,
-  })
+  try {
+    const resposta = await api.post("/conversa", {
+      mensagem,
+      clienteId,
+      historico: normalizarHistorico(historico),
+    })
 
-  return gerarComOllama({ prompt })
+    return {
+      ...resposta.data,
+      provedor: resposta.data?.provedor || "groq",
+      fallback: false,
+    }
+  } catch (error) {
+    if (!permiteFallbackLocal(error)) throw error
+    erroGroq = error
+    console.warn("[Nexa/Groq] Provedor online indisponível. Tentando Ollama local.", error)
+  }
+
+  try {
+    const contextoResposta = await buscarContexto({ mensagem, clienteId, historico })
+    const prompt = montarPrompt({
+      instrucoes: contextoResposta.instrucoes,
+      contexto: contextoResposta.contexto,
+      mensagem,
+      historico: contextoResposta.historico || historico,
+    })
+
+    return {
+      ...(await gerarComOllama({ prompt })),
+      avisoFallback: "A Groq ficou indisponível e a resposta foi gerada pelo Ollama local.",
+    }
+  } catch (erroOllama) {
+    const mensagemGroq = erroGroq?.response?.data?.message || erroGroq?.message || "Groq indisponível"
+    const mensagemOllama = erroOllama?.message || "Ollama indisponível"
+    throw new Error(`Não foi possível usar a Groq nem o Ollama. Groq: ${mensagemGroq}. Ollama: ${mensagemOllama}`)
+  }
 }
 
 export async function verificarOllama() {
@@ -188,4 +224,21 @@ export async function verificarOllama() {
   } finally {
     clearTimeout(timeout)
   }
+}
+
+export async function verificarProvedores() {
+  const [groqResultado, ollamaResultado] = await Promise.allSettled([
+    api.get("/conversa/status"),
+    verificarOllama(),
+  ])
+
+  const groq = groqResultado.status === "fulfilled"
+    ? groqResultado.value.data?.groq || {}
+    : { configurada: false, online: false, modelo: "", mensagem: "Não foi possível verificar a Groq" }
+
+  const ollama = ollamaResultado.status === "fulfilled"
+    ? ollamaResultado.value
+    : { online: false, instalado: false, modelo: configuracaoLocal().modelo, modelos: [] }
+
+  return { groq, ollama }
 }

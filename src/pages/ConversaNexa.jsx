@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import api from "../services/api"
-import { conversarComNexa, verificarOllama } from "../services/conversaNexaService"
+import { conversarComNexa, verificarProvedores } from "../services/conversaNexaService"
 
 const SUGESTOES = [
   "Como está o escritório hoje?",
@@ -9,13 +9,19 @@ const SUGESTOES = [
   "O que você recomenda fazer agora?",
 ]
 
+const STATUS_INICIAL = {
+  verificando: true,
+  groq: { configurada: false, online: false, modelo: "" },
+  ollama: { online: false, instalado: false, modelo: "" },
+}
+
 export default function ConversaNexa({ usuario }) {
   const [clientes, setClientes] = useState([])
   const [clienteId, setClienteId] = useState("")
   const [mensagem, setMensagem] = useState("")
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState("")
-  const [ollama, setOllama] = useState({ verificando: true, online: false, instalado: false, modelo: "" })
+  const [provedores, setProvedores] = useState(STATUS_INICIAL)
   const [conversa, setConversa] = useState(() => {
     try {
       const salva = JSON.parse(localStorage.getItem("nexaConversaNatural") || "[]")
@@ -26,18 +32,15 @@ export default function ConversaNexa({ usuario }) {
   })
   const fimRef = useRef(null)
 
-
   useEffect(() => {
     let ativo = true
 
-    verificarOllama()
+    verificarProvedores()
       .then((status) => {
-        if (ativo) setOllama({ verificando: false, ...status })
+        if (ativo) setProvedores({ verificando: false, ...status })
       })
       .catch(() => {
-        if (ativo) {
-          setOllama({ verificando: false, online: false, instalado: false, modelo: "" })
-        }
+        if (ativo) setProvedores({ ...STATUS_INICIAL, verificando: false })
       })
 
     return () => {
@@ -67,6 +70,8 @@ export default function ConversaNexa({ usuario }) {
     [clientes, clienteId]
   )
 
+  const algumProvedorDisponivel = provedores.groq.online || (provedores.ollama.online && provedores.ollama.instalado)
+
   async function enviar(texto = mensagem) {
     const pergunta = String(texto || "").trim()
     if (!pergunta || enviando) return
@@ -90,15 +95,21 @@ export default function ConversaNexa({ usuario }) {
         pontos: resposta.pontos || [],
         recomendacao: resposta.recomendacao || "",
         fundamentos: resposta.fundamentos || [],
+        provedor: resposta.provedor || "groq",
+        modelo: resposta.modelo || "",
+        fallback: Boolean(resposta.fallback),
         data: resposta.respondidoEm || new Date().toISOString(),
       }])
     } catch (error) {
       console.error(error)
-      setErro(error.response?.data?.message || "Não consegui concluir a análise agora.")
+      const mensagemErro = error.response?.data?.message || error.message || "Não consegui concluir a análise agora."
+      setErro(mensagemErro)
       setConversa((atual) => [...atual, {
-        id: `e-${Date.now()}`, autor: "Nexa",
-        texto: `${usuario?.nome || "Administrador"}, encontrei um problema ao consultar os dados. Vamos tentar novamente em alguns instantes.`,
-        data: new Date().toISOString(), erro: true,
+        id: `e-${Date.now()}`,
+        autor: "Nexa",
+        texto: `${usuario?.nome || "Administrador"}, não consegui acessar a Groq nem o Ollama neste momento.`,
+        data: new Date().toISOString(),
+        erro: true,
       }])
     } finally {
       setEnviando(false)
@@ -115,33 +126,47 @@ export default function ConversaNexa({ usuario }) {
     <div style={styles.page}>
       <header style={styles.hero}>
         <div>
-          <span style={styles.badge}>Nexa Assist • Etapa 4.1.3 • Ollama local</span>
+          <span style={styles.badge}>Nexa Assist • IA híbrida</span>
           <h2 style={styles.title}>Conversa com a Nexa</h2>
-          <p style={styles.subtitle}>Conversa generativa local usando o modelo llama3.2:3b e os dados reais da Nexa.</p>
+          <p style={styles.subtitle}>Groq online como IA principal, com Ollama local como alternativa automática.</p>
         </div>
         <button style={styles.clear} onClick={limpar}>Nova conversa</button>
       </header>
 
-
-
       <div style={{
         ...styles.providerStatus,
-        ...(ollama.online && ollama.instalado
-          ? styles.providerOnline
-          : styles.providerOffline),
+        ...(algumProvedorDisponivel ? styles.providerOnline : styles.providerOffline),
       }}>
-        <strong>
-          {ollama.verificando
-            ? "Verificando Ollama..."
-            : ollama.online && ollama.instalado
-              ? "Ollama conectado"
-              : "Ollama não disponível"}
-        </strong>
-        <span>
-          {ollama.online && ollama.instalado
-            ? `Modelo ativo: ${ollama.modelo}`
-            : "Abra o Ollama e confirme se o modelo llama3.2:3b está instalado."}
-        </span>
+        <div style={styles.providerItem}>
+          <strong>
+            {provedores.verificando
+              ? "Verificando Groq..."
+              : provedores.groq.online
+                ? "Groq conectada — IA online"
+                : "Groq indisponível"}
+          </strong>
+          <span>
+            {provedores.groq.online
+              ? `Modelo principal: ${provedores.groq.modelo}`
+              : provedores.groq.configurada
+                ? (provedores.groq.mensagem || "A chave está configurada, mas a conexão falhou.")
+                : "A chave da Groq não foi localizada na API."}
+          </span>
+        </div>
+        <div style={styles.providerItem}>
+          <strong>
+            {provedores.verificando
+              ? "Verificando Ollama..."
+              : provedores.ollama.online && provedores.ollama.instalado
+                ? "Ollama pronto — alternativa local"
+                : "Ollama local não disponível"}
+          </strong>
+          <span>
+            {provedores.ollama.online && provedores.ollama.instalado
+              ? `Modelo local: ${provedores.ollama.modelo}`
+              : "Abra o Ollama quando quiser manter a alternativa local disponível."}
+          </span>
+        </div>
       </div>
 
       <section style={styles.context}>
@@ -149,7 +174,7 @@ export default function ConversaNexa({ usuario }) {
           <label style={styles.label}>Contexto do cliente (opcional)</label>
           <select style={styles.select} value={clienteId} onChange={(event) => setClienteId(event.target.value)}>
             <option value="">Escritório inteiro</option>
-            {[...clientes].sort((a,b) => String(a.nome || "").localeCompare(String(b.nome || ""))).map((item) => (
+            {[...clientes].sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""))).map((item) => (
               <option key={item.id} value={item.id}>{item.nome}</option>
             ))}
           </select>
@@ -166,9 +191,10 @@ export default function ConversaNexa({ usuario }) {
           <article key={item.id} style={{ ...styles.message, ...(item.autor === "Você" ? styles.userMessage : styles.nexaMessage), ...(item.erro ? styles.errorMessage : {}) }}>
             <div style={styles.messageHeader}>
               <strong>{item.autor}</strong>
-              <span>{formatarHora(item.data)}</span>
+              <span>{item.provedor ? `${nomeProvedor(item.provedor)} • ` : ""}{formatarHora(item.data)}</span>
             </div>
             <p style={styles.messageText}>{item.texto}</p>
+            {item.fallback && <div style={styles.fallbackNotice}>Groq indisponível nesta resposta; Ollama local utilizado automaticamente.</div>}
             {!!item.pontos?.length && <ul style={styles.list}>{item.pontos.map((ponto) => <li key={ponto}>{ponto}</li>)}</ul>}
             {item.recomendacao && <div style={styles.recommendation}><span>Minha recomendação</span><strong>{item.recomendacao}</strong></div>}
             {!!item.fundamentos?.length && <details style={styles.details}><summary>Por que a Nexa respondeu assim?</summary><ul style={styles.list}>{item.fundamentos.map((f) => <li key={f}>{f}</li>)}</ul></details>}
@@ -198,7 +224,7 @@ export default function ConversaNexa({ usuario }) {
           {enviando ? "Analisando..." : "Enviar"}
         </button>
       </section>
-      <p style={styles.notice}>A Nexa usa IA generativa local pelo Ollama e os dados disponíveis no sistema. Decisões tributárias e ações que alterem dados continuam sob responsabilidade do contador.</p>
+      <p style={styles.notice}>A Nexa usa a Groq online como principal e tenta o Ollama local automaticamente quando necessário. Decisões tributárias e ações que alterem dados continuam sob responsabilidade do contador.</p>
     </div>
   )
 }
@@ -231,6 +257,10 @@ function boasVindas(usuarioRecebido) {
   }
 }
 
+function nomeProvedor(provedor) {
+  return String(provedor).toLowerCase() === "ollama" ? "Ollama local" : "Groq online"
+}
+
 function formatarHora(data) {
   if (!data) return ""
   return new Date(data).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
@@ -243,7 +273,8 @@ const styles = {
   title: { margin: "8px 0", fontSize: "30px" },
   subtitle: { margin: 0, color: "#b8c7dc" },
   clear: { background: "rgba(255,255,255,.08)", color: "white", border: "1px solid rgba(255,255,255,.16)", borderRadius: "10px", padding: "11px 15px", cursor: "pointer" },
-  providerStatus: { borderRadius: "12px", padding: "11px 14px", display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", fontSize: "13px" },
+  providerStatus: { borderRadius: "12px", padding: "12px 14px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: "12px", fontSize: "13px" },
+  providerItem: { display: "flex", flexDirection: "column", gap: "4px" },
   providerOnline: { background: "rgba(55,255,116,.08)", border: "1px solid rgba(55,255,116,.25)", color: "#aaffc2" },
   providerOffline: { background: "rgba(255,184,77,.09)", border: "1px solid rgba(255,184,77,.28)", color: "#ffd298" },
   context: { background: "rgba(255,255,255,.055)", border: "1px solid rgba(255,255,255,.10)", borderRadius: "16px", padding: "16px", display: "grid", gridTemplateColumns: "minmax(230px,360px) 1fr", gap: "14px", alignItems: "end" },
@@ -259,6 +290,7 @@ const styles = {
   errorMessage: { borderColor: "rgba(255,95,101,.5)" },
   messageHeader: { display: "flex", justifyContent: "space-between", gap: "20px", color: "#a9b8cc", fontSize: "12px" },
   messageText: { whiteSpace: "pre-wrap", lineHeight: 1.55, margin: "10px 0 0" },
+  fallbackNotice: { marginTop: "10px", color: "#ffd298", fontSize: "12px" },
   list: { margin: "10px 0 0", paddingLeft: "20px", color: "#dce8f8", lineHeight: 1.65 },
   recommendation: { marginTop: "12px", background: "rgba(55,255,116,.08)", border: "1px solid rgba(55,255,116,.20)", borderRadius: "11px", padding: "11px", display: "flex", flexDirection: "column", gap: "4px" },
   details: { marginTop: "11px", color: "#a9c5df" },
