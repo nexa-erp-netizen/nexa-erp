@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import api from "../services/api"
-import { conversarComNexa } from "../services/conversaNexaService"
+import { conversarComNexa, verificarOllama } from "../services/conversaNexaService"
 
 const SUGESTOES = [
   "Como está o escritório hoje?",
@@ -15,15 +15,35 @@ export default function ConversaNexa({ usuario }) {
   const [mensagem, setMensagem] = useState("")
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState("")
+  const [ollama, setOllama] = useState({ verificando: true, online: false, instalado: false, modelo: "" })
   const [conversa, setConversa] = useState(() => {
     try {
       const salva = JSON.parse(localStorage.getItem("nexaConversaNatural") || "[]")
-      return Array.isArray(salva) && salva.length ? salva : [boasVindas()]
+      return Array.isArray(salva) && salva.length ? salva : [boasVindas(usuario)]
     } catch {
-      return [boasVindas()]
+      return [boasVindas(usuario)]
     }
   })
   const fimRef = useRef(null)
+
+
+  useEffect(() => {
+    let ativo = true
+
+    verificarOllama()
+      .then((status) => {
+        if (ativo) setOllama({ verificando: false, ...status })
+      })
+      .catch(() => {
+        if (ativo) {
+          setOllama({ verificando: false, online: false, instalado: false, modelo: "" })
+        }
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [])
 
   useEffect(() => {
     async function carregarClientes() {
@@ -86,7 +106,7 @@ export default function ConversaNexa({ usuario }) {
   }
 
   function limpar() {
-    const inicial = [boasVindas()]
+    const inicial = [boasVindas(usuario)]
     setConversa(inicial)
     localStorage.setItem("nexaConversaNatural", JSON.stringify(inicial))
   }
@@ -95,12 +115,34 @@ export default function ConversaNexa({ usuario }) {
     <div style={styles.page}>
       <header style={styles.hero}>
         <div>
-          <span style={styles.badge}>Nexa Assist • Etapa 4.1</span>
+          <span style={styles.badge}>Nexa Assist • Etapa 4.1.3 • Ollama local</span>
           <h2 style={styles.title}>Conversa com a Nexa</h2>
-          <p style={styles.subtitle}>Conversa generativa baseada nos dados reais da Nexa. Cada resposta é criada para a sua pergunta e para o contexto atual.</p>
+          <p style={styles.subtitle}>Conversa generativa local usando o modelo llama3.2:3b e os dados reais da Nexa.</p>
         </div>
         <button style={styles.clear} onClick={limpar}>Nova conversa</button>
       </header>
+
+
+
+      <div style={{
+        ...styles.providerStatus,
+        ...(ollama.online && ollama.instalado
+          ? styles.providerOnline
+          : styles.providerOffline),
+      }}>
+        <strong>
+          {ollama.verificando
+            ? "Verificando Ollama..."
+            : ollama.online && ollama.instalado
+              ? "Ollama conectado"
+              : "Ollama não disponível"}
+        </strong>
+        <span>
+          {ollama.online && ollama.instalado
+            ? `Modelo ativo: ${ollama.modelo}`
+            : "Abra o Ollama e confirme se o modelo llama3.2:3b está instalado."}
+        </span>
+      </div>
 
       <section style={styles.context}>
         <div>
@@ -156,15 +198,35 @@ export default function ConversaNexa({ usuario }) {
           {enviando ? "Analisando..." : "Enviar"}
         </button>
       </section>
-      <p style={styles.notice}>A Nexa usa IA generativa e os dados disponíveis no sistema. Decisões tributárias e ações que alterem dados continuam sob responsabilidade do contador.</p>
+      <p style={styles.notice}>A Nexa usa IA generativa local pelo Ollama e os dados disponíveis no sistema. Decisões tributárias e ações que alterem dados continuam sob responsabilidade do contador.</p>
     </div>
   )
 }
 
-function boasVindas() {
+function boasVindas(usuarioRecebido) {
+  let usuarioSalvo = {}
+
+  try {
+    usuarioSalvo = JSON.parse(
+      localStorage.getItem("usuario") ||
+      localStorage.getItem("user") ||
+      "{}"
+    )
+  } catch {
+    usuarioSalvo = {}
+  }
+
+  const nomeUsuario =
+    usuarioRecebido?.nome ||
+    usuarioRecebido?.name ||
+    usuarioSalvo?.nome ||
+    usuarioSalvo?.name ||
+    "Administrador"
+
   return {
-    id: "boas-vindas", autor: "Nexa",
-    texto: `Olá, ${usuario?.nome || JSON.parse(localStorage.getItem("usuario") || "{}").nome || "Administrador"}. Estou pronta para analisar o escritório ou um cliente específico. Pode conversar comigo naturalmente.`,
+    id: "boas-vindas",
+    autor: "Nexa",
+    texto: `Olá, ${nomeUsuario}. Estou pronta para analisar o escritório ou um cliente específico. Pode conversar comigo naturalmente.`,
     data: new Date().toISOString(),
   }
 }
@@ -181,6 +243,9 @@ const styles = {
   title: { margin: "8px 0", fontSize: "30px" },
   subtitle: { margin: 0, color: "#b8c7dc" },
   clear: { background: "rgba(255,255,255,.08)", color: "white", border: "1px solid rgba(255,255,255,.16)", borderRadius: "10px", padding: "11px 15px", cursor: "pointer" },
+  providerStatus: { borderRadius: "12px", padding: "11px 14px", display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", fontSize: "13px" },
+  providerOnline: { background: "rgba(55,255,116,.08)", border: "1px solid rgba(55,255,116,.25)", color: "#aaffc2" },
+  providerOffline: { background: "rgba(255,184,77,.09)", border: "1px solid rgba(255,184,77,.28)", color: "#ffd298" },
   context: { background: "rgba(255,255,255,.055)", border: "1px solid rgba(255,255,255,.10)", borderRadius: "16px", padding: "16px", display: "grid", gridTemplateColumns: "minmax(230px,360px) 1fr", gap: "14px", alignItems: "end" },
   label: { display: "block", color: "#a9b8cc", fontSize: "12px", marginBottom: "6px" },
   select: { width: "100%", background: "#061f47", color: "white", border: "1px solid rgba(255,255,255,.18)", borderRadius: "10px", padding: "11px" },
