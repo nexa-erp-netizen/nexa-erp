@@ -3,10 +3,10 @@ import api from "../services/api"
 import { conversarComNexa, verificarProvedores } from "../services/conversaNexaService"
 
 const SUGESTOES = [
+  "Abra a tela de Clientes",
+  "Vá para o Fiscal",
   "Como está o escritório hoje?",
   "Quais clientes precisam de atenção?",
-  "Quais certificados vencem em breve?",
-  "O que você recomenda fazer agora?",
 ]
 
 const STATUS_INICIAL = {
@@ -15,7 +15,7 @@ const STATUS_INICIAL = {
   ollama: { online: false, instalado: false, modelo: "" },
 }
 
-export default function ConversaNexa({ usuario }) {
+export default function ConversaNexa({ usuario, setPage }) {
   const [clientes, setClientes] = useState([])
   const [clienteId, setClienteId] = useState("")
   const [mensagem, setMensagem] = useState("")
@@ -72,6 +72,60 @@ export default function ConversaNexa({ usuario }) {
 
   const algumProvedorDisponivel = provedores.groq.online || (provedores.ollama.online && provedores.ollama.instalado)
 
+  function executarAcaoNexa(acao) {
+    if (!acao || acao.tipo !== "navegar" || typeof setPage !== "function") return
+
+    const pagina = String(acao.pagina || "").trim()
+    const clienteAcao = acao.cliente || null
+    const clienteNome = String(clienteAcao?.nome || "").trim()
+    const clienteAcaoId = clienteAcao?.id ? String(clienteAcao.id) : ""
+
+    if (!pagina) return
+
+    if (acao.alvo === "central-cliente" && clienteAcaoId) {
+      localStorage.setItem("nexaAbrirClienteId", clienteAcaoId)
+      localStorage.setItem("nexaAbrirClienteNome", clienteNome)
+    }
+
+    if (pagina === "Fiscal" && clienteNome) {
+      localStorage.setItem("nexaFiltroFiscalCliente", clienteNome)
+    }
+
+    if (pagina === "Documentos Digitais" && clienteNome) {
+      localStorage.setItem("nexaFiltroDocumentoCliente", clienteNome)
+    }
+
+    if (pagina === "Pendências Clientes" && clienteNome) {
+      localStorage.setItem("nexaFiltroPendenciaCliente", clienteNome)
+    }
+
+    if (pagina === "Movimentos Clientes" && clienteNome) {
+      localStorage.setItem("nexaFiltroMovimentosCliente", clienteNome)
+    }
+
+    if (pagina === "Certificados Digitais" && clienteAcaoId) {
+      localStorage.setItem("nexaCertificadoClienteId", clienteAcaoId)
+    }
+
+    if (pagina === "Procurações e-CAC" && clienteAcaoId) {
+      localStorage.setItem("nexaProcuracaoClienteId", clienteAcaoId)
+    }
+
+    if (pagina === "Memória da Nexa" && clienteAcaoId) {
+      localStorage.setItem("nexaMemoriaClienteId", clienteAcaoId)
+    }
+
+    if (pagina === "Segundo Contador" && clienteAcaoId) {
+      localStorage.setItem("nexaSegundoContadorClienteId", clienteAcaoId)
+    }
+
+    if (pagina === "Consultora Tributária" && clienteAcaoId) {
+      localStorage.setItem("nexaConsultoraClienteId", clienteAcaoId)
+    }
+
+    setPage(pagina)
+  }
+
   async function enviar(texto = mensagem) {
     const pergunta = String(texto || "").trim()
     if (!pergunta || enviando) return
@@ -98,8 +152,13 @@ export default function ConversaNexa({ usuario }) {
         provedor: resposta.provedor || "groq",
         modelo: resposta.modelo || "",
         fallback: Boolean(resposta.fallback),
+        acao: resposta.acao || null,
         data: resposta.respondidoEm || new Date().toISOString(),
       }])
+
+      if (resposta.acao) {
+        setTimeout(() => executarAcaoNexa(resposta.acao), 450)
+      }
     } catch (error) {
       console.error(error)
       const mensagemErro = error.response?.data?.message || error.message || "Não consegui concluir a análise agora."
@@ -195,6 +254,7 @@ export default function ConversaNexa({ usuario }) {
             </div>
             <p style={styles.messageText}>{item.texto}</p>
             {item.fallback && <div style={styles.fallbackNotice}>Groq indisponível nesta resposta; Ollama local utilizado automaticamente.</div>}
+            {item.acao && <div style={styles.actionNotice}>✓ Navegação segura executada — nenhum dado foi alterado.</div>}
             {!!item.pontos?.length && <ul style={styles.list}>{item.pontos.map((ponto) => <li key={ponto}>{ponto}</li>)}</ul>}
             {item.recomendacao && <div style={styles.recommendation}><span>Minha recomendação</span><strong>{item.recomendacao}</strong></div>}
             {!!item.fundamentos?.length && <details style={styles.details}><summary>Por que a Nexa respondeu assim?</summary><ul style={styles.list}>{item.fundamentos.map((f) => <li key={f}>{f}</li>)}</ul></details>}
@@ -224,7 +284,7 @@ export default function ConversaNexa({ usuario }) {
           {enviando ? "Analisando..." : "Enviar"}
         </button>
       </section>
-      <p style={styles.notice}>A Nexa usa a Groq online como principal e tenta o Ollama local automaticamente quando necessário. Decisões tributárias e ações que alterem dados continuam sob responsabilidade do contador.</p>
+      <p style={styles.notice}>A Nexa usa a Groq online como principal, tenta o Ollama local quando necessário e já pode abrir telas por comando. Nesta etapa, os comandos apenas navegam e não alteram dados.</p>
     </div>
   )
 }
@@ -258,7 +318,10 @@ function boasVindas(usuarioRecebido) {
 }
 
 function nomeProvedor(provedor) {
-  return String(provedor).toLowerCase() === "ollama" ? "Ollama local" : "Groq online"
+  const nome = String(provedor || "").toLowerCase()
+  if (nome === "ollama") return "Ollama local"
+  if (nome === "sistema") return "Nexa Actions"
+  return "Groq online"
 }
 
 function formatarHora(data) {
@@ -291,6 +354,7 @@ const styles = {
   messageHeader: { display: "flex", justifyContent: "space-between", gap: "20px", color: "#a9b8cc", fontSize: "12px" },
   messageText: { whiteSpace: "pre-wrap", lineHeight: 1.55, margin: "10px 0 0" },
   fallbackNotice: { marginTop: "10px", color: "#ffd298", fontSize: "12px" },
+  actionNotice: { marginTop: "10px", color: "#aaffc2", fontSize: "12px", fontWeight: "bold" },
   list: { margin: "10px 0 0", paddingLeft: "20px", color: "#dce8f8", lineHeight: 1.65 },
   recommendation: { marginTop: "12px", background: "rgba(55,255,116,.08)", border: "1px solid rgba(55,255,116,.20)", borderRadius: "11px", padding: "11px", display: "flex", flexDirection: "column", gap: "4px" },
   details: { marginTop: "11px", color: "#a9c5df" },

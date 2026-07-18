@@ -76,6 +76,24 @@ export default function Clientes({ setPage }) {
     carregarProcuracoesEcac()
   }, [])
 
+  useEffect(() => {
+    const clienteIdSolicitado = localStorage.getItem("nexaAbrirClienteId")
+    const clienteNomeSolicitado = localStorage.getItem("nexaAbrirClienteNome")
+
+    if ((!clienteIdSolicitado && !clienteNomeSolicitado) || !clientes.length) return
+
+    const clienteEncontrado = clientes.find((item) =>
+      (clienteIdSolicitado && String(item.id) === String(clienteIdSolicitado)) ||
+      (clienteNomeSolicitado && String(item.nome || "").toLowerCase() === String(clienteNomeSolicitado).toLowerCase())
+    )
+
+    if (!clienteEncontrado) return
+
+    localStorage.removeItem("nexaAbrirClienteId")
+    localStorage.removeItem("nexaAbrirClienteNome")
+    visualizarCliente(clienteEncontrado)
+  }, [clientes])
+
   async function carregarClientes() {
     try {
       const resposta = await api.get("/clientes")

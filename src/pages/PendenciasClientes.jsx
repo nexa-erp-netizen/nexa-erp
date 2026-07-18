@@ -32,6 +32,12 @@ export default function PendenciasClientes() {
 
     setClientes(Array.isArray(clientesResp.data) ? clientesResp.data : [])
     setPendencias(Array.isArray(pendenciasResp.data) ? pendenciasResp.data : [])
+
+    const clienteSolicitado = localStorage.getItem("nexaFiltroPendenciaCliente")
+    if (clienteSolicitado) {
+      setForm((atual) => ({ ...atual, cliente: clienteSolicitado }))
+      localStorage.removeItem("nexaFiltroPendenciaCliente")
+    }
   }
 
   async function salvarPendencia() {

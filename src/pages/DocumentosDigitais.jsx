@@ -47,6 +47,12 @@ export default function DocumentosDigitais() {
         const clientesResposta = await api.get("/clientes")
         setClientes(clientesResposta.data || [])
         setDocumentos(listaDocumentos)
+
+        const clienteSolicitado = localStorage.getItem("nexaFiltroDocumentoCliente")
+        if (clienteSolicitado) {
+          setCliente(clienteSolicitado)
+          localStorage.removeItem("nexaFiltroDocumentoCliente")
+        }
       }
     } catch (error) {
       alert("Erro ao carregar documentos digitais")
