@@ -20,6 +20,9 @@ export default function MovimentosCliente() {
   })
 
   const [movimentos, setMovimentos] = useState([])
+  const [clienteSelecionado, setClienteSelecionado] = useState(
+    () => localStorage.getItem("nexaFiltroMovimentosCliente") || ""
+  )
   const [planos, setPlanos] = useState([])
   const [formasPagamento, setFormasPagamento] = useState([])
   const [fiscal, setFiscal] = useState([])
@@ -35,21 +38,28 @@ export default function MovimentosCliente() {
   ])
 
   useEffect(() => {
-    carregarTudo()
+    const clienteVoz = localStorage.getItem("nexaFiltroMovimentosCliente") || ""
+    if (clienteVoz) {
+      setClienteSelecionado(clienteVoz)
+      localStorage.removeItem("nexaFiltroMovimentosCliente")
+    }
+    carregarTudo(clienteVoz)
   }, [])
 
-  async function carregarTudo() {
+  async function carregarTudo(clienteInicial = clienteSelecionado) {
     await Promise.all([
-      carregarMovimentos(),
+      carregarMovimentos(clienteInicial),
       carregarPlanos(),
       carregarFormasPagamento(),
       carregarFiscal(),
     ])
   }
 
-  async function carregarMovimentos() {
+  async function carregarMovimentos(cliente = clienteSelecionado) {
     try {
-      const resposta = await api.get("/movimentos-cliente")
+      const resposta = await api.get("/movimentos-cliente", {
+        params: cliente ? { cliente } : {},
+      })
       setMovimentos(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
       console.error("ERRO AO CARREGAR MOVIMENTOS:", error)
@@ -183,6 +193,7 @@ export default function MovimentosCliente() {
 
       for (const linha of linhasValidas) {
         const dados = {
+          cliente: clienteSelecionado || undefined,
           tipo: linha.tipo,
           data: linha.data,
           planoContaId: linha.planoContaId || null,
@@ -216,7 +227,7 @@ export default function MovimentosCliente() {
         linhaVazia(),
       ])
 
-      await carregarMovimentos()
+      await carregarMovimentos(clienteSelecionado)
       alert("Lançamentos salvos com sucesso.")
     } catch (erro) {
       console.error("Erro ao salvar lançamentos:", erro)
@@ -396,6 +407,20 @@ export default function MovimentosCliente() {
         .mv-subtitle {
           opacity: .8;
           margin-bottom: 25px;
+        }
+
+        .mv-client-context {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin: -10px 0 20px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          background: rgba(60,188,255,.12);
+          border: 1px solid rgba(60,188,255,.35);
+          color: #8edcff;
+          font-size: 13px;
+          font-weight: 700;
         }
 
         .mv-summary {
@@ -748,6 +773,9 @@ export default function MovimentosCliente() {
       <div className="mv-subtitle">
         Controle simplificado de receitas e despesas
       </div>
+        {clienteSelecionado && (
+          <div className="mv-client-context">Cliente em contexto: {clienteSelecionado}</div>
+        )}
 
       <div className="mv-summary">
         <div className="mv-box">

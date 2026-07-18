@@ -25,6 +25,12 @@ export default function LancamentosContabeis() {
   })
 
   useEffect(() => {
+    const clienteVoz = localStorage.getItem("nexaFiltroLancamentosCliente") || ""
+    if (clienteVoz) {
+      setClienteFiltro(clienteVoz)
+      setForm((atual) => ({ ...atual, cliente: clienteVoz }))
+      localStorage.removeItem("nexaFiltroLancamentosCliente")
+    }
     carregarTudo()
   }, [])
 

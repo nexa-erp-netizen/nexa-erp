@@ -1,3 +1,5 @@
+import api from "./api"
+
 const CLIENTE_ID_KEY = "nexaVoiceClienteId"
 const CLIENTE_NOME_KEY = "nexaVoiceClienteNome"
 const CONVERSA_ID_KEY = "nexaVoiceConversaId"
@@ -44,6 +46,8 @@ export function executarAcaoDeVoz({ acao, setPage }) {
   if (pagina === "Documentos Digitais" && clienteNome) localStorage.setItem("nexaFiltroDocumentoCliente", clienteNome)
   if (pagina === "Pendências Clientes" && clienteNome) localStorage.setItem("nexaFiltroPendenciaCliente", clienteNome)
   if (pagina === "Movimentos Clientes" && clienteNome) localStorage.setItem("nexaFiltroMovimentosCliente", clienteNome)
+  if (pagina === "Lançamentos Contábeis" && clienteNome) localStorage.setItem("nexaFiltroLancamentosCliente", clienteNome)
+  if (pagina === "DRE Gerencial" && clienteNome) localStorage.setItem("nexaFiltroDreCliente", clienteNome)
   if (pagina === "Certificados Digitais" && clienteId) localStorage.setItem("nexaCertificadoClienteId", clienteId)
   if (pagina === "Procurações e-CAC" && clienteId) localStorage.setItem("nexaProcuracaoClienteId", clienteId)
   if (pagina === "Memória da Nexa" && clienteId) localStorage.setItem("nexaMemoriaClienteId", clienteId)
@@ -52,4 +56,26 @@ export function executarAcaoDeVoz({ acao, setPage }) {
 
   setPage(pagina)
   return true
+}
+
+export async function listarVocabularioVoz(clienteId = null) {
+  const resposta = await api.get("/conversa/vocabulario-voz", {
+    params: clienteId ? { clienteId } : {},
+  })
+  return Array.isArray(resposta.data) ? resposta.data : []
+}
+
+export async function aprenderVocabularioVoz({ termoOuvido, termoCorreto, clienteId = null, origem = "confirmacao_voz" }) {
+  const resposta = await api.post("/conversa/vocabulario-voz", {
+    termoOuvido,
+    termoCorreto,
+    clienteId,
+    origem,
+  })
+  return resposta.data
+}
+
+export async function excluirVocabularioVoz(id) {
+  const resposta = await api.delete(`/conversa/vocabulario-voz/${id}`)
+  return resposta.data
 }

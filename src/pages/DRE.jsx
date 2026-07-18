@@ -8,6 +8,11 @@ export default function DRE() {
     useState("Todas")
 
   useEffect(() => {
+    const clienteVoz = localStorage.getItem("nexaFiltroDreCliente") || ""
+    if (clienteVoz) {
+      setEmpresaSelecionada(clienteVoz)
+      localStorage.removeItem("nexaFiltroDreCliente")
+    }
     carregarMovimentos()
   }, [])
 
