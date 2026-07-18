@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 
 import Sidebar from "./components/Sidebar"
 import Header from "./components/Header"
+import NexaVoiceListener from "./components/NexaVoiceListener"
 
 import Login from "./pages/Login"
 
@@ -308,6 +309,8 @@ export default function App() {
 
           {renderPage()}
         </main>
+
+        <NexaVoiceListener usuario={usuario} setPage={setPage} />
       </div>
     </div>
   )
