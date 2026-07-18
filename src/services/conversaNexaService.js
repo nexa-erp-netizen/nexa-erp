@@ -14,7 +14,7 @@ function normalizarHistorico(historico) {
   if (!Array.isArray(historico)) return []
 
   return historico
-    .slice(-8)
+    .slice(-16)
     .map((item) => ({
       autor: item?.autor === "Você" ? "usuario" : "nexa",
       texto: String(item?.texto || "").slice(0, 1200),
@@ -56,9 +56,11 @@ function montarPrompt({ instrucoes, contexto, mensagem, historico }) {
 
   return `Você é a Nexa, assistente de um escritório contábil brasileiro.
 Responda em português do Brasil, com naturalidade, objetividade e profissionalismo.
+Responda somente o que foi perguntado. Perguntas objetivas devem receber poucas palavras ou uma frase.
+Não acrescente detalhes, alertas, regras ou recomendações sem o usuário pedir.
+Quando o usuário pedir explicação ou detalhes, aprofunde com clareza.
 Não invente nomes, datas, valores ou pendências.
 Não use JSON, markdown, listas longas ou blocos de código.
-Responda em até 4 frases, salvo quando o usuário pedir detalhes.
 
 INSTRUÇÃO:
 ${String(instrucoes || "").slice(0, 700)}
@@ -75,10 +77,13 @@ ${String(mensagem || "").slice(0, 700)}
 RESPOSTA:`
 }
 
-async function buscarContexto({ mensagem, clienteId, historico }) {
+async function buscarContexto({ mensagem, clienteId, historico, conversaId, tipoContexto, interessadoNome }) {
   const resposta = await api.post("/conversa/contexto", {
     mensagem,
     clienteId,
+    conversaId,
+    tipoContexto,
+    interessadoNome,
     historico: normalizarHistorico(historico),
   })
 
@@ -162,13 +167,16 @@ function permiteFallbackLocal(error) {
   return !status || falhaProvedor || [429, 500, 502, 503, 504].includes(status)
 }
 
-export async function conversarComNexa({ mensagem, clienteId = null, historico = [] }) {
+export async function conversarComNexa({ mensagem, clienteId = null, historico = [], conversaId = null, tipoContexto = "geral", interessadoNome = "" }) {
   let erroGroq = null
 
   try {
     const resposta = await api.post("/conversa", {
       mensagem,
       clienteId,
+      conversaId,
+      tipoContexto,
+      interessadoNome,
       historico: normalizarHistorico(historico),
     })
 
@@ -184,7 +192,15 @@ export async function conversarComNexa({ mensagem, clienteId = null, historico =
   }
 
   try {
-    const contextoResposta = await buscarContexto({ mensagem, clienteId, historico })
+    const conversaIdFallback = erroGroq?.response?.data?.conversaId || conversaId
+    const contextoResposta = await buscarContexto({
+      mensagem,
+      clienteId,
+      historico,
+      conversaId: conversaIdFallback,
+      tipoContexto,
+      interessadoNome,
+    })
     const prompt = montarPrompt({
       instrucoes: contextoResposta.instrucoes,
       contexto: contextoResposta.contexto,
@@ -195,6 +211,8 @@ export async function conversarComNexa({ mensagem, clienteId = null, historico =
     return {
       ...(await gerarComOllama({ prompt })),
       avisoFallback: "A Groq ficou indisponível e a resposta foi gerada pelo Ollama local.",
+      conversaId: contextoResposta.conversaId || conversaIdFallback || null,
+      tipoContexto,
     }
   } catch (erroOllama) {
     const mensagemGroq = erroGroq?.response?.data?.message || erroGroq?.message || "Groq indisponível"
@@ -241,4 +259,45 @@ export async function verificarProvedores() {
     : { online: false, instalado: false, modelo: configuracaoLocal().modelo, modelos: [] }
 
   return { groq, ollama }
+}
+
+
+export async function listarConversasNexa() {
+  const resposta = await api.get("/conversa/sessoes")
+  return Array.isArray(resposta.data) ? resposta.data : []
+}
+
+export async function criarConversaNexa({ titulo = "Nova conversa", tipoContexto = "geral", clienteId = null, interessadoNome = "" } = {}) {
+  const resposta = await api.post("/conversa/sessoes", {
+    titulo,
+    tipoContexto,
+    clienteId,
+    interessadoNome,
+  })
+  return resposta.data
+}
+
+export async function abrirConversaNexa(id) {
+  const resposta = await api.get(`/conversa/sessoes/${id}/mensagens`)
+  return resposta.data
+}
+
+export async function atualizarConversaNexa(id, alteracoes) {
+  const resposta = await api.patch(`/conversa/sessoes/${id}`, alteracoes)
+  return resposta.data
+}
+
+export async function excluirConversaNexa(id) {
+  const resposta = await api.delete(`/conversa/sessoes/${id}`)
+  return resposta.data
+}
+
+export async function listarMemoriasNexa(filtros = {}) {
+  const resposta = await api.get("/conversa/memorias", { params: filtros })
+  return Array.isArray(resposta.data) ? resposta.data : []
+}
+
+export async function excluirMemoriaNexa(id) {
+  const resposta = await api.delete(`/conversa/memorias/${id}`)
+  return resposta.data
 }
