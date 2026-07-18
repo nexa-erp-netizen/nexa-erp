@@ -17,9 +17,9 @@ const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|exatamente|essa mesma|e
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|outra)[.!?]*\s*$/i
 const TEMPO_MAXIMO_FALA_MS = 30000
 
-function limparRespostaDaNexa(valor) {
+function limparRespostaDaNexa(valor, fallback = "Comando concluído.") {
   const texto = String(valor || "").trim()
-  if (!texto) return "Comando concluído."
+  if (!texto) return fallback
 
   const inicioJson = texto.indexOf('{"resposta"')
   if (inicioJson === 0) {
@@ -87,10 +87,10 @@ function pontuarVozLocal(voz) {
   if (!idioma.startsWith("pt")) return -1000
 
   let pontos = idioma === "pt-br" ? 100 : 40
-  if (nome.includes("microsoft maria")) pontos += 1000
-  else if (nome.includes("maria")) pontos += 850
-  if (nome.includes("natural")) pontos += 220
-  if (nome.includes("online")) pontos += 80
+  if (nome.includes("natural")) pontos += 1300
+  if (nome.includes("online")) pontos += 280
+  if (nome.includes("microsoft maria")) pontos += 900
+  else if (nome.includes("maria")) pontos += 760
   if (/francisca|heloisa|heloísa|luciana|camila|fernanda|vitoria|vitória|female|feminina/.test(nome)) pontos += 140
   if (/daniel|ricardo|felipe|antonio|antônio|male|masculin/.test(nome)) pontos -= 400
   if (voz?.localService) pontos += 30
@@ -132,9 +132,9 @@ function extrairAtivacao(textoOriginal) {
 }
 
 function respostaDeAtivacao(gatilho) {
-  if (gatilho === "bom dia") return "Bom dia. Estou ouvindo."
-  if (gatilho === "boa tarde") return "Boa tarde. Estou ouvindo."
-  return "Estou ouvindo."
+  if (gatilho === "bom dia") return "Bom dia, pode falar."
+  if (gatilho === "boa tarde") return "Boa tarde, pode falar."
+  return "Oi, pode falar."
 }
 
 export default function NexaVoiceListener({ usuario, setPage }) {
@@ -239,8 +239,8 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     const voz = escolherVozFeminina(vozes)
     const fala = new CriadorDeFala(texto)
     fala.lang = "pt-BR"
-    fala.rate = 0.94
-    fala.pitch = 1
+    fala.rate = 0.98
+    fala.pitch = 1.02
     fala.volume = 1
     if (voz) fala.voice = voz
     setVozAtiva(nomeAmigavelVoz(voz))
@@ -399,6 +399,10 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       }
 
       const textoResposta = limparRespostaDaNexa(resposta.resposta || "Comando concluído.")
+      const temFalaEspecifica = Object.prototype.hasOwnProperty.call(resposta, "fala")
+      const textoFalado = temFalaEspecifica
+        ? limparRespostaDaNexa(resposta.fala, "")
+        : textoResposta
       setUltimaResposta(textoResposta)
 
       if (resposta.vocabularioSugestao) {
@@ -417,7 +421,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       ].slice(-12)
 
       executarAcaoDeVoz({ acao: resposta.acao, setPage })
-      await falarResposta(textoResposta)
+      if (textoFalado) await falarResposta(textoFalado)
       voltarParaEscuta()
     } catch (error) {
       console.error("[Nexa Voice] Falha ao processar comando:", error)
