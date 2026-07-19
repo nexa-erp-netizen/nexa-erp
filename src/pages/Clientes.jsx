@@ -94,6 +94,30 @@ export default function Clientes({ setPage }) {
     visualizarCliente(clienteEncontrado)
   }, [clientes])
 
+
+  useEffect(() => {
+    function abrirClienteSolicitado(evento) {
+      const clienteIdSolicitado = evento?.detail?.id
+      const clienteNomeSolicitado = evento?.detail?.nome
+
+      if ((!clienteIdSolicitado && !clienteNomeSolicitado) || !clientes.length) return
+
+      const clienteEncontrado = clientes.find((item) =>
+        (clienteIdSolicitado && String(item.id) === String(clienteIdSolicitado)) ||
+        (clienteNomeSolicitado && String(item.nome || "").toLowerCase() === String(clienteNomeSolicitado).toLowerCase())
+      )
+
+      if (!clienteEncontrado) return
+
+      localStorage.removeItem("nexaAbrirClienteId")
+      localStorage.removeItem("nexaAbrirClienteNome")
+      visualizarCliente(clienteEncontrado)
+    }
+
+    window.addEventListener("nexa:abrir-cliente", abrirClienteSolicitado)
+    return () => window.removeEventListener("nexa:abrir-cliente", abrirClienteSolicitado)
+  }, [clientes])
+
   async function carregarClientes() {
     try {
       const resposta = await api.get("/clientes")

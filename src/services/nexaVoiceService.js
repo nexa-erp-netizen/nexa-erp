@@ -41,6 +41,14 @@ export function executarAcaoDeVoz({ acao, setPage }) {
   if (acao.alvo === "central-cliente" && clienteId) {
     localStorage.setItem("nexaAbrirClienteId", clienteId)
     localStorage.setItem("nexaAbrirClienteNome", clienteNome)
+
+    // Quando a tela de Clientes já está aberta, setPage("Clientes") não remonta
+    // o componente. O evento força a troca imediata para o cliente correto.
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("nexa:abrir-cliente", {
+        detail: { id: clienteId, nome: clienteNome },
+      }))
+    }, 0)
   }
   if (pagina === "Fiscal" && clienteNome) localStorage.setItem("nexaFiltroFiscalCliente", clienteNome)
   if (pagina === "Documentos Digitais" && clienteNome) localStorage.setItem("nexaFiltroDocumentoCliente", clienteNome)

@@ -633,7 +633,9 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       vozNeuralNomeRef.current = status.vozNeural || "pt-BR-FranciscaNeural"
 
       if (status.neuralDisponivel) {
-        setVozAtiva(`Voz neural — ${vozNeuralNomeRef.current}`)
+        setVozAtiva(status.provedor === "microsoft-edge"
+          ? "Microsoft Edge Neural — Francisca"
+          : `Voz neural — ${vozNeuralNomeRef.current}`)
         return
       }
 
