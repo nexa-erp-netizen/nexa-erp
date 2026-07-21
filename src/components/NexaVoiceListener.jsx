@@ -81,6 +81,10 @@ function obterReconhecimento() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null
 }
 
+function reconhecimentoNativoDisponivel() {
+  return Boolean(window.nexaDesktop?.nativeVoice?.isAvailable)
+}
+
 function pontuarVozLocal(voz) {
   const nome = String(voz?.name || "").toLowerCase()
   const idioma = String(voz?.lang || "").replace("_", "-").toLowerCase()
@@ -161,6 +165,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   const vozNeuralDisponivelRef = useRef(false)
   const vozNeuralNomeRef = useRef("pt-BR-FranciscaNeural")
   const audioVozRef = useRef(null)
+  const usaReconhecimentoNativoRef = useRef(reconhecimentoNativoDisponivel())
 
   const atualizarEstado = useCallback((status, detalhe = "") => {
     setEstado((atual) => ({ ...atual, status, detalhe }))
@@ -178,6 +183,37 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       setMicrofone("Microfone padrão do Windows")
     }
   }, [])
+
+
+  const pausarReconhecimento = useCallback(() => {
+    if (usaReconhecimentoNativoRef.current) {
+      window.nexaDesktop?.nativeVoice?.pause?.().catch?.(() => {})
+      return
+    }
+
+    try {
+      reconhecimentoRef.current?.abort()
+    } catch {
+      // O reconhecimento pode já estar encerrado.
+    }
+  }, [])
+
+  const iniciarReconhecimento = useCallback(() => {
+    if (!ativadaRef.current || processandoRef.current || falandoRef.current) return
+
+    if (usaReconhecimentoNativoRef.current) {
+      window.nexaDesktop?.nativeVoice?.start?.().catch?.((error) => {
+        atualizarEstado("erro", error?.message || "Não consegui iniciar o reconhecimento de voz do Windows.")
+      })
+      return
+    }
+
+    try {
+      reconhecimentoRef.current?.start()
+    } catch {
+      // start() lança erro quando o reconhecimento Web já está ativo.
+    }
+  }, [atualizarEstado])
 
   const carregarVocabulario = useCallback(async () => {
     try {
@@ -271,11 +307,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     const texto = limparRespostaDaNexa(textoOriginal)
     if (!texto) return false
 
-    try {
-      reconhecimentoRef.current?.abort()
-    } catch {
-      // O reconhecimento pode já estar encerrado.
-    }
+    pausarReconhecimento()
 
     falandoRef.current = true
     atualizarEstado("falando", texto)
@@ -287,19 +319,14 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     } finally {
       falandoRef.current = false
     }
-  }, [atualizarEstado, falarComVozLocal, falarComVozNeural])
+  }, [atualizarEstado, falarComVozLocal, falarComVozNeural, pausarReconhecimento])
 
   const agendarReinicio = useCallback((atraso = 450) => {
     clearTimeout(reinicioRef.current)
     reinicioRef.current = setTimeout(() => {
-      if (!ativadaRef.current || processandoRef.current || falandoRef.current) return
-      try {
-        reconhecimentoRef.current?.start()
-      } catch {
-        // start() lança erro quando o reconhecimento já está ativo.
-      }
+      iniciarReconhecimento()
     }, atraso)
-  }, [])
+  }, [iniciarReconhecimento])
 
   const voltarParaEscuta = useCallback(() => {
     processandoRef.current = false
@@ -328,11 +355,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     setUltimaFala("Obrigado")
     setUltimaResposta("Por nada.")
 
-    try {
-      reconhecimentoRef.current?.abort()
-    } catch {
-      // Sem ação.
-    }
+    pausarReconhecimento()
 
     await falarResposta("Por nada.")
     sessaoAtivaRef.current = false
@@ -344,7 +367,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       `Conversa encerrada. Diga “Bom dia”, “Boa tarde” ou “Nexa” quando precisar de mim.`,
     )
     agendarReinicio(550)
-  }, [agendarReinicio, atualizarEstado, falarResposta])
+  }, [agendarReinicio, atualizarEstado, falarResposta, pausarReconhecimento])
 
   const iniciarSessao = useCallback(async (gatilho) => {
     if (processandoRef.current || falandoRef.current) return
@@ -358,15 +381,11 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     setUltimaFala(gatilho === "nexa" ? "Nexa" : gatilho.replace(/^./, (letra) => letra.toUpperCase()))
     setUltimaResposta(resposta)
 
-    try {
-      reconhecimentoRef.current?.abort()
-    } catch {
-      // Sem ação.
-    }
+    pausarReconhecimento()
 
     await falarResposta(resposta)
     voltarParaEscuta()
-  }, [falarResposta, voltarParaEscuta])
+  }, [falarResposta, pausarReconhecimento, voltarParaEscuta])
 
   const processarComando = useCallback(async (texto) => {
     const comando = String(texto || "").trim()
@@ -376,11 +395,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     setUltimaFala(comando)
     atualizarEstado("processando", comando)
 
-    try {
-      reconhecimentoRef.current?.abort()
-    } catch {
-      // Sem ação: o reconhecimento pode já ter sido encerrado pelo navegador.
-    }
+    pausarReconhecimento()
 
     const contexto = obterContextoVoz()
 
@@ -431,7 +446,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       atualizarEstado("erro", mensagem)
       agendarReinicio(1800)
     }
-  }, [agendarReinicio, atualizarEstado, carregarVocabulario, falarResposta, setPage, voltarParaEscuta])
+  }, [agendarReinicio, atualizarEstado, carregarVocabulario, falarResposta, pausarReconhecimento, setPage, voltarParaEscuta])
 
   const confirmarSugestaoVocabulario = useCallback(async (texto) => {
     const sugestao = sugestaoVocabularioRef.current
@@ -522,6 +537,71 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   }, [confirmarSugestaoVocabulario, encerrarSessao, iniciarSessao, processarComando])
 
   useEffect(() => {
+    if (!usaReconhecimentoNativoRef.current) return undefined
+
+    const vozNativa = window.nexaDesktop?.nativeVoice
+    if (!vozNativa) return undefined
+
+    const removerTranscricao = vozNativa.onTranscript?.((evento) => {
+      const texto = String(evento?.text || "").trim()
+      if (texto) tratarTranscricaoRef.current?.(texto)
+    })
+
+    const removerStatus = vozNativa.onStatus?.((evento) => {
+      if (!ativadaRef.current || processandoRef.current || falandoRef.current) return
+      const status = String(evento?.status || "")
+
+      if (["ready", "listening"].includes(status)) {
+        if (sessaoAtivaRef.current || modoRef.current === "session") {
+          atualizarEstado("conversando", "Pode falar normalmente. Diga “Obrigado” para encerrar.")
+        } else {
+          atualizarEstado(
+            "aguardando",
+            `Reconhecimento do Windows ativo pelo ${microfone}. Diga “Bom dia”, “Boa tarde” ou “Nexa”.`,
+          )
+        }
+      }
+    })
+
+    const removerAudio = vozNativa.onAudioState?.((evento) => {
+      if (!ativadaRef.current || processandoRef.current || falandoRef.current) return
+      if (String(evento?.state || "").toLowerCase() === "speech") {
+        atualizarEstado(sessaoAtivaRef.current ? "ouvindo" : "aguardando", "Fala detectada pelo Windows...")
+      }
+    })
+
+    const removerErro = vozNativa.onError?.((evento) => {
+      const codigo = String(evento?.code || "")
+      const mensagem = String(evento?.message || "Falha no reconhecimento nativo do Windows.")
+
+      if (codigo === "pt-br-recognizer-not-installed") {
+        ativadaRef.current = false
+        localStorage.setItem(VOICE_ENABLED_KEY, "false")
+        setEstado({
+          ativada: false,
+          status: "erro",
+          detalhe: "Instale o recurso Reconhecimento de fala em Português (Brasil) nas configurações de idioma do Windows.",
+        })
+        return
+      }
+
+      atualizarEstado("erro", mensagem)
+    })
+
+    if (ativadaRef.current) vozNativa.start?.().catch?.(() => {})
+
+    return () => {
+      removerTranscricao?.()
+      removerStatus?.()
+      removerAudio?.()
+      removerErro?.()
+      vozNativa.stop?.().catch?.(() => {})
+    }
+  }, [atualizarEstado, microfone])
+
+  useEffect(() => {
+    if (usaReconhecimentoNativoRef.current) return undefined
+
     const Reconhecimento = obterReconhecimento()
     if (!Reconhecimento) {
       atualizarEstado("erro", "Reconhecimento de voz indisponível. Use Chrome ou o aplicativo Desktop atualizado.")
@@ -616,13 +696,10 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       setSessaoAtiva(false)
       window.speechSynthesis?.cancel?.()
       modoRef.current = "wake"
-      try {
-        reconhecimentoRef.current?.abort()
-      } catch {
-        // Sem ação.
-      }
+      pausarReconhecimento()
+      window.nexaDesktop?.nativeVoice?.stop?.().catch?.(() => {})
     }
-  }, [estado.ativada])
+  }, [estado.ativada, pausarReconhecimento])
 
   useEffect(() => {
     let ativo = true
@@ -670,14 +747,16 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   }, [atualizarNomeMicrofone, carregarVocabulario, estado.ativada])
 
   async function ativarVoz() {
-    if (!obterReconhecimento()) {
-      atualizarEstado("erro", "Reconhecimento de voz indisponível. Use Chrome ou o aplicativo Desktop atualizado.")
+    if (!usaReconhecimentoNativoRef.current && !obterReconhecimento()) {
+      atualizarEstado("erro", "Reconhecimento de voz indisponível. Use o aplicativo Desktop atualizado.")
       return
     }
 
     try {
-      const fluxo = await navigator.mediaDevices.getUserMedia({ audio: true })
-      fluxo.getTracks().forEach((faixa) => faixa.stop())
+      if (!usaReconhecimentoNativoRef.current) {
+        const fluxo = await navigator.mediaDevices.getUserMedia({ audio: true })
+        fluxo.getTracks().forEach((faixa) => faixa.stop())
+      }
       await atualizarNomeMicrofone()
       await carregarVocabulario()
       ativadaRef.current = true
