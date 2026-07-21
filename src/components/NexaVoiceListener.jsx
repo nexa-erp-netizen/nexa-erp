@@ -202,6 +202,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   const framesVozRef = useRef(0)
   const ruidoBaseRef = useRef(0.006)
   const iniciarCapturaRef = useRef(null)
+  const pararCapturaRef = useRef(null)
   const microfoneSelecionadoRef = useRef(localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
 
   const atualizarEstado = useCallback((status, detalhe = "") => {
@@ -281,12 +282,57 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   const pausarReconhecimento = useCallback(() => {
     capturaPausadaRef.current = true
     limparTrechoAtual()
+
+    try {
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.pause()
+      }
+    } catch (error) {
+      console.warn("[Nexa Voice] Não foi possível pausar o gravador:", error)
+    }
   }, [limparTrechoAtual])
 
   const iniciarReconhecimento = useCallback(() => {
     if (!ativadaRef.current || processandoRef.current || transcrevendoRef.current || falandoRef.current) return
-    capturaPausadaRef.current = false
-  }, [])
+
+    const retomar = async () => {
+      try {
+        if (audioContextRef.current?.state === "suspended") {
+          await audioContextRef.current.resume()
+        }
+
+        const gravador = mediaRecorderRef.current
+        const faixaAtiva = streamRef.current?.getAudioTracks?.().some(
+          (faixa) => faixa.readyState === "live" && faixa.enabled,
+        )
+
+        if (gravador?.state === "paused") gravador.resume()
+
+        const gravadorAtivo = mediaRecorderRef.current?.state === "recording"
+        const capturaSaudavel = Boolean(
+          faixaAtiva
+          && gravadorAtivo
+          && analyserRef.current
+          && audioContextRef.current?.state !== "closed",
+        )
+
+        if (!capturaSaudavel) {
+          pararCapturaRef.current?.()
+          await new Promise((resolve) => setTimeout(resolve, 120))
+          await iniciarCapturaRef.current?.(microfoneSelecionadoRef.current || null)
+          return
+        }
+
+        capturaPausadaRef.current = false
+      } catch (error) {
+        console.error("[Nexa Voice] Falha ao retomar a escuta:", error)
+        capturaPausadaRef.current = true
+        atualizarEstado("erro", "A escuta travou e não conseguiu reiniciar o microfone.")
+      }
+    }
+
+    retomar()
+  }, [atualizarEstado])
 
   const carregarVocabulario = useCallback(async () => {
     try {
@@ -421,7 +467,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       atualizarEstado("aguardando", `Escutando pelo ${microfone}. Diga “Bom dia”, “Boa tarde” ou “Nexa”.`)
     }
 
-    agendarReinicio(550)
+    agendarReinicio(160)
   }, [agendarReinicio, atualizarEstado, microfone])
 
   const encerrarSessao = useCallback(async () => {
@@ -606,7 +652,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     }
 
     transcrevendoRef.current = true
-    capturaPausadaRef.current = true
+    pausarReconhecimento()
     atualizarEstado("transcrevendo", "Entendendo sua fala...")
 
     try {
@@ -625,7 +671,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         }
       }, 120)
     }
-  }, [atualizarEstado, iniciarReconhecimento, montarPromptTranscricao, voltarParaEscuta])
+  }, [atualizarEstado, montarPromptTranscricao, pausarReconhecimento, voltarParaEscuta])
 
   const finalizarTrechoDeFala = useCallback(() => {
     if (!falaAtivaRef.current) return
@@ -790,7 +836,30 @@ export default function NexaVoiceListener({ usuario, setPage }) {
 
   useEffect(() => {
     iniciarCapturaRef.current = iniciarCapturaAudio
-  }, [iniciarCapturaAudio])
+    pararCapturaRef.current = pararCapturaAudio
+  }, [iniciarCapturaAudio, pararCapturaAudio])
+
+  useEffect(() => {
+    if (!estado.ativada) return undefined
+
+    const vigilante = setInterval(() => {
+      if (!ativadaRef.current || processandoRef.current || transcrevendoRef.current || falandoRef.current) return
+
+      const gravadorParado = !mediaRecorderRef.current
+        || mediaRecorderRef.current.state === "inactive"
+        || mediaRecorderRef.current.state === "paused"
+      const contextoSuspenso = audioContextRef.current?.state === "suspended"
+      const faixaInativa = !streamRef.current?.getAudioTracks?.().some(
+        (faixa) => faixa.readyState === "live" && faixa.enabled,
+      )
+
+      if (capturaPausadaRef.current || gravadorParado || contextoSuspenso || faixaInativa) {
+        iniciarReconhecimento()
+      }
+    }, 1200)
+
+    return () => clearInterval(vigilante)
+  }, [estado.ativada, iniciarReconhecimento])
 
   useEffect(() => {
     let ativo = true
