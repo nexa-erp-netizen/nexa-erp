@@ -14,6 +14,7 @@ import {
 } from "../services/nexaVoiceService"
 
 const VOICE_ENABLED_KEY = "nexaVoiceEnabled"
+const MICROPHONE_DEVICE_KEY = "nexaVoiceMicrophoneDeviceId"
 const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta|nessa)\b[\s,.:;-]*(.*)$/i
 const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.:;-]*(.*)$/i
 const END_SESSION_PATTERN = /^\s*(?:muito\s+)?obrigad[oa](?:\s+por\s+.+)?[.!?]*\s*$/i
@@ -163,6 +164,8 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   const [ultimaFala, setUltimaFala] = useState("")
   const [ultimaResposta, setUltimaResposta] = useState("")
   const [microfone, setMicrofone] = useState("Microfone padrão do Windows")
+  const [microfonesDisponiveis, setMicrofonesDisponiveis] = useState([])
+  const [microfoneSelecionado, setMicrofoneSelecionado] = useState(() => localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
   const [vozAtiva, setVozAtiva] = useState("Procurando voz feminina...")
   const [transcricaoAtiva, setTranscricaoAtiva] = useState("Groq Whisper")
   const [expandido, setExpandido] = useState(false)
@@ -199,6 +202,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   const framesVozRef = useRef(0)
   const ruidoBaseRef = useRef(0.006)
   const iniciarCapturaRef = useRef(null)
+  const microfoneSelecionadoRef = useRef(localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
 
   const atualizarEstado = useCallback((status, detalhe = "") => {
     setEstado((atual) => ({ ...atual, status, detalhe }))
@@ -216,12 +220,54 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       const entradas = Array.isArray(dispositivos)
         ? dispositivos.filter((item) => item.kind === "audioinput")
         : []
-      const padrao = entradas.find((item) => item.deviceId === "default") || entradas[0]
+      const selecionado = entradas.find((item) => item.deviceId === microfoneSelecionadoRef.current)
+      const padrao = selecionado || entradas.find((item) => item.deviceId === "default") || entradas[0]
       if (padrao?.label) setMicrofone(padrao.label.replace(/^Default\s*-\s*/i, ""))
     } catch {
       setMicrofone("Microfone padrão do Windows")
     }
   }, [])
+
+  const escolherMicrofonePreferido = useCallback((entradas = []) => {
+    const salvo = microfoneSelecionadoRef.current
+    if (salvo && entradas.some((item) => item.deviceId === salvo)) return salvo
+
+    const preferido = entradas.find((item) => /lifecam|microfone de mesa|webcam|camera|câmera/i.test(item.label || ""))
+    if (preferido?.deviceId) return preferido.deviceId
+
+    const padraoReal = entradas.find((item) => item.deviceId !== "default" && /padr[aã]o/i.test(item.label || ""))
+    if (padraoReal?.deviceId) return padraoReal.deviceId
+
+    return entradas.find((item) => item.deviceId === "default")?.deviceId || entradas[0]?.deviceId || ""
+  }, [])
+
+  const carregarMicrofones = useCallback(async ({ selecionarAutomaticamente = false } = {}) => {
+    try {
+      const dispositivos = await navigator.mediaDevices?.enumerateDevices?.()
+      const entradas = Array.isArray(dispositivos)
+        ? dispositivos.filter((item) => item.kind === "audioinput" && item.deviceId)
+        : []
+
+      setMicrofonesDisponiveis(entradas)
+
+      if (selecionarAutomaticamente || !microfoneSelecionadoRef.current
+        || !entradas.some((item) => item.deviceId === microfoneSelecionadoRef.current)) {
+        const escolhido = escolherMicrofonePreferido(entradas)
+        if (escolhido) {
+          microfoneSelecionadoRef.current = escolhido
+          setMicrofoneSelecionado(escolhido)
+          localStorage.setItem(MICROPHONE_DEVICE_KEY, escolhido)
+        }
+        return escolhido
+      }
+
+      setMicrofoneSelecionado(microfoneSelecionadoRef.current)
+      return microfoneSelecionadoRef.current
+    } catch (error) {
+      console.warn("[Nexa Voice] Não foi possível listar os microfones:", error)
+      return microfoneSelecionadoRef.current || ""
+    }
+  }, [escolherMicrofonePreferido])
 
   const limparTrechoAtual = useCallback(() => {
     falaAtivaRef.current = false
@@ -621,7 +667,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     limparTrechoAtual()
   }, [limparTrechoAtual])
 
-  const iniciarCapturaAudio = useCallback(async () => {
+  const iniciarCapturaAudio = useCallback(async (deviceIdForcado = null) => {
     if (streamRef.current || !ativadaRef.current) return
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       throw new Error("Este dispositivo não oferece gravação de áudio compatível.")
@@ -632,8 +678,12 @@ export default function NexaVoiceListener({ usuario, setPage }) {
 
     window.nexaDesktop?.nativeVoice?.stop?.().catch?.(() => {})
 
-    const stream = await navigator.mediaDevices.getUserMedia({
+    let deviceId = deviceIdForcado || microfoneSelecionadoRef.current
+    if (!deviceId) deviceId = await carregarMicrofones({ selecionarAutomaticamente: true })
+
+    const criarRestricoes = (id) => ({
       audio: {
+        ...(id && id !== "default" ? { deviceId: { exact: id } } : {}),
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
@@ -641,8 +691,20 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       },
     })
 
+    let stream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(criarRestricoes(deviceId))
+    } catch (error) {
+      if (!deviceId || error?.name !== "OverconstrainedError") throw error
+      localStorage.removeItem(MICROPHONE_DEVICE_KEY)
+      microfoneSelecionadoRef.current = ""
+      setMicrofoneSelecionado("")
+      stream = await navigator.mediaDevices.getUserMedia(criarRestricoes(null))
+    }
+
     streamRef.current = stream
     await atualizarNomeMicrofone(stream)
+    await carregarMicrofones()
 
     const AudioContext = window.AudioContext || window.webkitAudioContext
     const contexto = new AudioContext()
@@ -724,7 +786,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
 
     animacaoRef.current = requestAnimationFrame(analisar)
     voltarParaEscuta()
-  }, [atualizarEstado, atualizarNomeMicrofone, finalizarTrechoDeFala, voltarParaEscuta])
+  }, [atualizarEstado, atualizarNomeMicrofone, carregarMicrofones, finalizarTrechoDeFala, voltarParaEscuta])
 
   useEffect(() => {
     iniciarCapturaRef.current = iniciarCapturaAudio
@@ -798,10 +860,14 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   }, [atualizarEstado, estado.ativada, iniciarCapturaAudio, pararCapturaAudio])
 
   useEffect(() => {
-    navigator.mediaDevices?.addEventListener?.("devicechange", atualizarNomeMicrofone)
+    const aoMudarDispositivo = () => {
+      carregarMicrofones().then(() => atualizarNomeMicrofone())
+    }
+    navigator.mediaDevices?.addEventListener?.("devicechange", aoMudarDispositivo)
+    carregarMicrofones()
     if (estado.ativada) carregarVocabulario()
-    return () => navigator.mediaDevices?.removeEventListener?.("devicechange", atualizarNomeMicrofone)
-  }, [atualizarNomeMicrofone, carregarVocabulario, estado.ativada])
+    return () => navigator.mediaDevices?.removeEventListener?.("devicechange", aoMudarDispositivo)
+  }, [atualizarNomeMicrofone, carregarMicrofones, carregarVocabulario, estado.ativada])
 
   useEffect(() => () => {
     clearTimeout(reinicioRef.current)
@@ -840,6 +906,31 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     }
   }
 
+  async function trocarMicrofone(evento) {
+    const novoDeviceId = evento.target.value
+    if (!novoDeviceId || novoDeviceId === microfoneSelecionadoRef.current) return
+
+    microfoneSelecionadoRef.current = novoDeviceId
+    setMicrofoneSelecionado(novoDeviceId)
+    localStorage.setItem(MICROPHONE_DEVICE_KEY, novoDeviceId)
+
+    const item = microfonesDisponiveis.find((entrada) => entrada.deviceId === novoDeviceId)
+    if (item?.label) setMicrofone(item.label.replace(/^Default\s*-\s*/i, ""))
+
+    if (!estado.ativada) return
+
+    atualizarEstado("iniciando", "Trocando o microfone...")
+    pararCapturaAudio()
+    await new Promise((resolve) => setTimeout(resolve, 180))
+
+    try {
+      await iniciarCapturaAudio(novoDeviceId)
+    } catch (error) {
+      console.error("[Nexa Voice] Não foi possível trocar o microfone:", error)
+      atualizarEstado("erro", error?.message || "Não consegui usar o microfone selecionado.")
+    }
+  }
+
   function pausarOuRetomar() {
     if (estado.ativada) {
       setEstado({ ativada: false, status: "pausada", detalhe: "Escuta contínua pausada." })
@@ -864,7 +955,23 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       {expandido && (
         <div style={styles.content}>
           <p style={styles.detail}>{estado.detalhe}</p>
-          <div style={styles.microphone}><span>Entrada</span><strong>{microfone}</strong></div>
+          <label style={styles.microphone}>
+            <span>Entrada</span>
+            <select
+              value={microfoneSelecionado}
+              onChange={trocarMicrofone}
+              style={styles.microphoneSelect}
+              aria-label="Selecionar microfone da Nexa Voice"
+            >
+              {!microfonesDisponiveis.length && <option value="">{microfone}</option>}
+              {microfonesDisponiveis.map((entrada, indice) => (
+                <option key={entrada.deviceId} value={entrada.deviceId}>
+                  {entrada.label || `Microfone ${indice + 1}`}
+                </option>
+              ))}
+            </select>
+            <small style={styles.microphoneCurrent}>Em uso: {microfone}</small>
+          </label>
           <div style={styles.microphone}><span>Transcrição</span><strong>{transcricaoAtiva}</strong></div>
           <div style={styles.microphone}><span>Voz</span><strong>{vozAtiva}</strong></div>
           <div style={styles.vocabulary}>Vocabulário adaptativo ativo · {totalVocabulario} termos aprendidos</div>
@@ -918,7 +1025,9 @@ const styles = {
   chevron: { fontSize: "20px", color: "#8bd7ff" },
   content: { padding: "13px", display: "flex", flexDirection: "column", gap: "10px" },
   detail: { margin: 0, color: "#b9cbe0", fontSize: "12px", lineHeight: 1.45 },
-  microphone: { display: "flex", flexDirection: "column", gap: "3px", padding: "9px", background: "rgba(255,255,255,.05)", borderRadius: "9px", fontSize: "11px" },
+  microphone: { display: "flex", flexDirection: "column", gap: "5px", padding: "9px", background: "rgba(255,255,255,.05)", borderRadius: "9px", fontSize: "11px" },
+  microphoneSelect: { width: "100%", minWidth: 0, padding: "7px 8px", borderRadius: "7px", border: "1px solid rgba(139,215,255,.24)", background: "#0b284b", color: "#f4fbff", fontSize: "11px", outline: "none" },
+  microphoneCurrent: { color: "#8fb0cf", lineHeight: 1.3 },
   vocabulary: { fontSize: "11px", color: "#9ee7c2", marginTop: "-3px" },
   sessionBadge: { padding: "8px 9px", borderRadius: "9px", background: "rgba(55,255,116,.09)", border: "1px solid rgba(55,255,116,.22)", color: "#aaffc5", fontSize: "11px", fontWeight: 700 },
   last: { padding: "9px", background: "rgba(0,168,255,.08)", border: "1px solid rgba(0,168,255,.17)", borderRadius: "9px" },
