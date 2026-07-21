@@ -10,11 +10,11 @@ import {
 } from "../services/nexaVoiceService"
 
 const VOICE_ENABLED_KEY = "nexaVoiceEnabled"
-const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá|oi)\s+)?(?:nexa|néxa|neksa|nexta|nexia|nessa|nexa assist)\b[\s,.:;-]*(.*)$/i
+const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta)\b[\s,.:;-]*(.*)$/i
 const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.:;-]*(.*)$/i
 const END_SESSION_PATTERN = /^\s*(?:muito\s+)?obrigad[oa](?:\s+por\s+.+)?[.!?]*\s*$/i
-const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|confirmo|confirmado|isso|correto|exatamente|essa mesma|esse mesmo|pode ser|pode fazer|pode concluir|pode criar|faça|faca|execute|autorizo|é esse|e esse|é essa|e essa)[.!?]*\s*$/i
-const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|outra|cancele|cancelar|não faça|nao faca|agora não|agora nao)[.!?]*\s*$/i
+const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|exatamente|essa mesma|esse mesmo|pode ser|é esse|e esse|é essa|e essa)[.!?]*\s*$/i
+const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|outra)[.!?]*\s*$/i
 const TEMPO_MAXIMO_FALA_MS = 30000
 
 function limparRespostaDaNexa(valor, fallback = "Comando concluído.") {
@@ -110,34 +110,21 @@ function nomeAmigavelVoz(voz) {
   return nome ? `${nome} — Windows` : "Voz feminina do Windows"
 }
 
-function normalizarTranscricao(valor) {
-  return String(valor || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[“”"'`´]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
 function extrairAtivacao(textoOriginal) {
   const texto = String(textoOriginal || "").trim()
-  const normalizado = normalizarTranscricao(texto).toLowerCase()
-
-  const saudacao = normalizado.match(/^(bom dia|boa tarde)\b[\s,.:;-]*(.*)$/i)
-  if (saudacao) {
-    const restante = String(saudacao[2] || "").trim()
-    const restanteSemNome = restante.replace(/^(?:nexa|neksa|nexta|nexia|nessa)(?: assist)?\b[\s,.:;-]*/i, "").trim()
-    return {
-      gatilho: saudacao[1].toLowerCase(),
-      comando: restanteSemNome,
-    }
-  }
-
-  const wake = normalizado.match(/^(?:(?:ei|ola|oi)\s+)?(?:nexa|neksa|nexta|nexia|nessa)(?: assist)?\b[\s,.:;-]*(.*)$/i)
+  const wake = texto.match(WAKE_WORD_PATTERN)
   if (wake) {
     return {
       gatilho: "nexa",
       comando: String(wake[1] || "").trim(),
+    }
+  }
+
+  const saudacao = texto.match(GREETING_PATTERN)
+  if (saudacao) {
+    return {
+      gatilho: saudacao[1].toLowerCase(),
+      comando: String(saudacao[2] || "").trim(),
     }
   }
 
@@ -159,7 +146,6 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   const [vozAtiva, setVozAtiva] = useState("Procurando Microsoft Maria...")
   const [expandido, setExpandido] = useState(false)
   const [totalVocabulario, setTotalVocabulario] = useState(0)
-  const [acaoPendente, setAcaoPendente] = useState(null)
 
   const reconhecimentoRef = useRef(null)
   const ativadaRef = useRef(estado.ativada)
@@ -172,15 +158,9 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   const historicoRef = useRef([])
   const tratarTranscricaoRef = useRef(null)
   const sugestaoVocabularioRef = useRef(null)
-  const acaoPendenteRef = useRef(null)
   const vozNeuralDisponivelRef = useRef(false)
   const vozNeuralNomeRef = useRef("pt-BR-FranciscaNeural")
   const audioVozRef = useRef(null)
-  const reconhecimentoAtivoRef = useRef(false)
-  const ultimaAtividadeReconhecimentoRef = useRef(Date.now())
-  const inicioReconhecimentoPendenteRef = useRef(false)
-  const pausaReconhecimentoRef = useRef(false)
-  const tentativaReconhecimentoRef = useRef(0)
 
   const atualizarEstado = useCallback((status, detalhe = "") => {
     setEstado((atual) => ({ ...atual, status, detalhe }))
@@ -291,7 +271,6 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     const texto = limparRespostaDaNexa(textoOriginal)
     if (!texto) return false
 
-    pausaReconhecimentoRef.current = true
     try {
       reconhecimentoRef.current?.abort()
     } catch {
@@ -307,42 +286,17 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       return await falarComVozLocal(texto)
     } finally {
       falandoRef.current = false
-      pausaReconhecimentoRef.current = false
-      reconhecimentoAtivoRef.current = false
-      inicioReconhecimentoPendenteRef.current = false
     }
   }, [atualizarEstado, falarComVozLocal, falarComVozNeural])
 
-  const agendarReinicio = useCallback((atraso = 350) => {
+  const agendarReinicio = useCallback((atraso = 450) => {
     clearTimeout(reinicioRef.current)
     reinicioRef.current = setTimeout(() => {
-      if (
-        !ativadaRef.current
-        || processandoRef.current
-        || falandoRef.current
-        || pausaReconhecimentoRef.current
-        || reconhecimentoAtivoRef.current
-        || inicioReconhecimentoPendenteRef.current
-      ) return
-
-      const reconhecimento = reconhecimentoRef.current
-      if (!reconhecimento) return
-
-      inicioReconhecimentoPendenteRef.current = true
-      tentativaReconhecimentoRef.current += 1
+      if (!ativadaRef.current || processandoRef.current || falandoRef.current) return
       try {
-        reconhecimento.start()
-      } catch (error) {
-        inicioReconhecimentoPendenteRef.current = false
-        reconhecimentoAtivoRef.current = false
-        const mensagem = String(error?.message || "")
-        const atrasoNovaTentativa = /already started|invalidstate/i.test(mensagem) ? 900 : 1400
-        clearTimeout(reinicioRef.current)
-        reinicioRef.current = setTimeout(() => {
-          if (ativadaRef.current && !processandoRef.current && !falandoRef.current) {
-            agendarReinicio(0)
-          }
-        }, atrasoNovaTentativa)
+        reconhecimentoRef.current?.start()
+      } catch {
+        // start() lança erro quando o reconhecimento já está ativo.
       }
     }, atraso)
   }, [])
@@ -383,8 +337,6 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     await falarResposta("Por nada.")
     sessaoAtivaRef.current = false
     setSessaoAtiva(false)
-    acaoPendenteRef.current = null
-    setAcaoPendente(null)
     processandoRef.current = false
     modoRef.current = "wake"
     atualizarEstado(
@@ -431,24 +383,6 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     }
 
     const contexto = obterContextoVoz()
-    const acaoPendente = acaoPendenteRef.current
-    let confirmacaoAcaoToken = ""
-    let decisaoAcao = ""
-
-    if (acaoPendente) {
-      if (CONFIRMACAO_SIM_PATTERN.test(comando)) {
-        confirmacaoAcaoToken = acaoPendente.token
-        decisaoAcao = "confirmar"
-      } else if (CONFIRMACAO_NAO_PATTERN.test(comando)) {
-        confirmacaoAcaoToken = acaoPendente.token
-        decisaoAcao = "cancelar"
-      } else {
-        setUltimaResposta("Só preciso que você confirme com sim ou não.")
-        await falarResposta("Confirma?")
-        voltarParaEscuta()
-        return
-      }
-    }
 
     try {
       const resposta = await conversarComNexa({
@@ -457,8 +391,6 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         conversaId: conversaIdRef.current || contexto.conversaId || null,
         tipoContexto: contexto.clienteId ? "cliente" : "geral",
         historico: historicoRef.current,
-        confirmacaoAcaoToken,
-        decisaoAcao,
       })
 
       if (resposta.conversaId) {
@@ -481,18 +413,6 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       }
 
       if (resposta.vocabularioAprendido) await carregarVocabulario()
-
-      if (resposta.acaoPendente?.token) {
-        acaoPendenteRef.current = resposta.acaoPendente
-        setAcaoPendente(resposta.acaoPendente)
-      }
-      if (resposta.acaoExecutada || resposta.acaoCancelada) {
-        acaoPendenteRef.current = null
-        setAcaoPendente(null)
-      }
-      if (resposta.acaoExecutada) {
-        window.dispatchEvent(new CustomEvent("nexa:acao-executada", { detail: resposta.acaoExecutada }))
-      }
 
       historicoRef.current = [
         ...historicoRef.current,
@@ -610,17 +530,11 @@ export default function NexaVoiceListener({ usuario, setPage }) {
 
     const reconhecimento = new Reconhecimento()
     reconhecimento.lang = "pt-BR"
-    // O modo contínuo do Chromium/Electron pode ficar “preso” sem emitir novos
-    // resultados. Usamos sessões curtas e reinício automático após cada fala.
-    reconhecimento.continuous = false
-    reconhecimento.interimResults = true
-    reconhecimento.maxAlternatives = 3
+    reconhecimento.continuous = true
+    reconhecimento.interimResults = false
+    reconhecimento.maxAlternatives = 1
 
     reconhecimento.onstart = () => {
-      inicioReconhecimentoPendenteRef.current = false
-      reconhecimentoAtivoRef.current = true
-      tentativaReconhecimentoRef.current = 0
-      ultimaAtividadeReconhecimentoRef.current = Date.now()
       if (!ativadaRef.current || processandoRef.current || falandoRef.current) return
 
       if (sessaoAtivaRef.current || modoRef.current === "session") {
@@ -634,30 +548,16 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     }
 
     reconhecimento.onresult = (evento) => {
-      ultimaAtividadeReconhecimentoRef.current = Date.now()
-      let transcricaoFinal = ""
-
       for (let indice = evento.resultIndex; indice < evento.results.length; indice += 1) {
         const resultado = evento.results[indice]
-        if (!resultado?.isFinal) continue
-
-        const alternativas = Array.from(resultado)
-          .map((alternativa) => String(alternativa?.transcript || "").trim())
-          .filter(Boolean)
-        if (alternativas.length) transcricaoFinal = alternativas[0]
-      }
-
-      if (transcricaoFinal) {
-        atualizarEstado("ouvindo", `Ouvi: ${transcricaoFinal}`)
-        tratarTranscricaoRef.current?.(transcricaoFinal)
+        if (!resultado.isFinal) continue
+        tratarTranscricaoRef.current?.(resultado[0]?.transcript || "")
       }
     }
 
     reconhecimento.onerror = (evento) => {
-      inicioReconhecimentoPendenteRef.current = false
-      reconhecimentoAtivoRef.current = false
-      ultimaAtividadeReconhecimentoRef.current = Date.now()
       const codigo = evento?.error || "erro-desconhecido"
+      if (["no-speech", "aborted"].includes(codigo)) return
 
       if (["not-allowed", "service-not-allowed"].includes(codigo)) {
         ativadaRef.current = false
@@ -672,33 +572,13 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         return
       }
 
-      if (codigo === "network") {
-        atualizarEstado("erro", "O reconhecimento de voz perdeu a conexão. Reconectando...")
-        agendarReinicio(2200)
-        return
-      }
-
-      // no-speech e aborted são normais em sessões curtas. Reinicia sem
-      // interromper a experiência do usuário.
-      if (["no-speech", "aborted", "audio-capture"].includes(codigo)) {
-        if (codigo === "audio-capture") {
-          atualizarEstado("erro", "Não encontrei o microfone selecionado. Tentando novamente...")
-        }
-        agendarReinicio(codigo === "audio-capture" ? 1600 : 350)
-        return
-      }
-
-      atualizarEstado("erro", `Falha no reconhecimento: ${codigo}. Tentando novamente...`)
-      agendarReinicio(1200)
+      atualizarEstado("erro", codigo === "network"
+        ? "O serviço de reconhecimento de voz ficou indisponível. Tentarei novamente."
+        : `Falha no microfone: ${codigo}.`)
     }
 
     reconhecimento.onend = () => {
-      inicioReconhecimentoPendenteRef.current = false
-      reconhecimentoAtivoRef.current = false
-      ultimaAtividadeReconhecimentoRef.current = Date.now()
-      if (ativadaRef.current && !processandoRef.current && !falandoRef.current && !pausaReconhecimentoRef.current) {
-        agendarReinicio(250)
-      }
+      if (ativadaRef.current && !processandoRef.current && !falandoRef.current) agendarReinicio(500)
     }
 
     reconhecimentoRef.current = reconhecimento
@@ -719,29 +599,9 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         // Sem ação.
       }
       falandoRef.current = false
-      reconhecimentoAtivoRef.current = false
       reconhecimentoRef.current = null
     }
   }, [agendarReinicio, atualizarEstado, microfone])
-
-  useEffect(() => {
-    const watchdog = window.setInterval(() => {
-      if (!ativadaRef.current || processandoRef.current || falandoRef.current || pausaReconhecimentoRef.current) return
-
-      const semAtividadeHaMuitoTempo = Date.now() - ultimaAtividadeReconhecimentoRef.current > 20000
-      if ((reconhecimentoAtivoRef.current || inicioReconhecimentoPendenteRef.current) && semAtividadeHaMuitoTempo) {
-        try { reconhecimentoRef.current?.abort() } catch { /* sem ação */ }
-        reconhecimentoAtivoRef.current = false
-        inicioReconhecimentoPendenteRef.current = false
-        agendarReinicio(350)
-        return
-      }
-
-      if (!reconhecimentoAtivoRef.current && !inicioReconhecimentoPendenteRef.current) agendarReinicio(50)
-    }, 3000)
-
-    return () => window.clearInterval(watchdog)
-  }, [agendarReinicio])
 
   useEffect(() => {
     ativadaRef.current = estado.ativada
@@ -752,13 +612,8 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       clearTimeout(reinicioRef.current)
       processandoRef.current = false
       falandoRef.current = false
-      reconhecimentoAtivoRef.current = false
-      inicioReconhecimentoPendenteRef.current = false
-      pausaReconhecimentoRef.current = false
       sessaoAtivaRef.current = false
       setSessaoAtiva(false)
-      acaoPendenteRef.current = null
-      setAcaoPendente(null)
       window.speechSynthesis?.cancel?.()
       modoRef.current = "wake"
       try {
@@ -825,11 +680,6 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       fluxo.getTracks().forEach((faixa) => faixa.stop())
       await atualizarNomeMicrofone()
       await carregarVocabulario()
-      try { reconhecimentoRef.current?.abort() } catch { /* sem ação */ }
-      reconhecimentoAtivoRef.current = false
-      inicioReconhecimentoPendenteRef.current = false
-      pausaReconhecimentoRef.current = false
-      ultimaAtividadeReconhecimentoRef.current = Date.now()
       ativadaRef.current = true
       sessaoAtivaRef.current = false
       setSessaoAtiva(false)
@@ -874,7 +724,6 @@ export default function NexaVoiceListener({ usuario, setPage }) {
           <div style={styles.microphone}><span>Voz</span><strong>{vozAtiva}</strong></div>
           <div style={styles.vocabulary}>Vocabulário adaptativo ativo · {totalVocabulario} termos aprendidos</div>
           {sessaoAtiva && <div style={styles.sessionBadge}>Conversa aberta — diga “Obrigado” para encerrar</div>}
-          {acaoPendente && <div style={styles.confirmationBadge}>Confirmação pendente — responda “sim” ou “não”</div>}
           {ultimaFala && <div style={styles.last}><span>Você</span><p>{ultimaFala}</p></div>}
           {ultimaResposta && <div style={styles.last}><span>Nexa</span><p>{ultimaResposta}</p></div>}
           <button type="button" style={{ ...styles.control, ...(estado.ativada ? styles.controlPause : styles.controlStart) }} onClick={pausarOuRetomar}>
@@ -927,7 +776,6 @@ const styles = {
   microphone: { display: "flex", flexDirection: "column", gap: "3px", padding: "9px", background: "rgba(255,255,255,.05)", borderRadius: "9px", fontSize: "11px" },
   vocabulary: { fontSize: "11px", color: "#9ee7c2", marginTop: "-3px" },
   sessionBadge: { padding: "8px 9px", borderRadius: "9px", background: "rgba(55,255,116,.09)", border: "1px solid rgba(55,255,116,.22)", color: "#aaffc5", fontSize: "11px", fontWeight: 700 },
-  confirmationBadge: { padding: "8px 9px", borderRadius: "9px", background: "rgba(255,184,77,.12)", border: "1px solid rgba(255,184,77,.30)", color: "#ffd298", fontSize: "11px", fontWeight: 700 },
   last: { padding: "9px", background: "rgba(0,168,255,.08)", border: "1px solid rgba(0,168,255,.17)", borderRadius: "9px" },
   control: { border: 0, borderRadius: "10px", padding: "10px 12px", fontWeight: "bold", cursor: "pointer" },
   controlStart: { background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34" },
