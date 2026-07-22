@@ -167,7 +167,7 @@ function permiteFallbackLocal(error) {
   return !status || falhaProvedor || [429, 500, 502, 503, 504].includes(status)
 }
 
-export async function conversarComNexa({ mensagem, clienteId = null, historico = [], conversaId = null, tipoContexto = "geral", interessadoNome = "" }) {
+export async function conversarComNexa({ mensagem, clienteId = null, historico = [], conversaId = null, tipoContexto = "geral", interessadoNome = "", origem = "texto", paginaAtual = "" }) {
   let erroGroq = null
 
   try {
@@ -177,6 +177,8 @@ export async function conversarComNexa({ mensagem, clienteId = null, historico =
       conversaId,
       tipoContexto,
       interessadoNome,
+      origem,
+      paginaAtual,
       historico: normalizarHistorico(historico),
     })
 

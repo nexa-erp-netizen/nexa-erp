@@ -310,7 +310,7 @@ export default function App() {
           {renderPage()}
         </main>
 
-        <NexaVoiceListener usuario={usuario} setPage={setPage} />
+        <NexaVoiceListener usuario={usuario} setPage={setPage} page={page} />
       </div>
     </div>
   )

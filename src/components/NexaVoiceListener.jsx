@@ -12,7 +12,6 @@ import {
   obterContextoVoz,
   precarregarClientesVoz,
   registrarConversaVoz,
-  resolverAcaoAbrirClientePorVoz,
 } from "../services/nexaVoiceService"
 
 const VOICE_ENABLED_KEY = "nexaVoiceEnabled"
@@ -288,7 +287,7 @@ function calcularRms(amostras) {
   return Math.sqrt(soma / amostras.length)
 }
 
-export default function NexaVoiceListener({ usuario, setPage }) {
+export default function NexaVoiceListener({ usuario, setPage, page }) {
   const [estado, setEstado] = useState(criarEstadoInicial)
   const [sessaoAtiva, setSessaoAtiva] = useState(false)
   const [ultimaFala, setUltimaFala] = useState("")
@@ -676,50 +675,9 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     atualizarEstado("processando", comando)
     pausarReconhecimento()
 
-    // Primeiro tenta localizar um cliente. Isso evita que frases como
-    // “entrar no cliente Maurício” sejam confundidas com a tela genérica Clientes.
-    try {
-      const acaoClienteLocal = await resolverAcaoAbrirClientePorVoz(comando)
-      if (acaoClienteLocal) {
-        const executada = executarAcaoDeVoz({ acao: acaoClienteLocal, setPage })
-        if (executada) {
-          const nomeCliente = acaoClienteLocal.cliente?.nome || "cliente"
-          const respostaLocal = acaoClienteLocal.alvo === "central-cliente"
-            ? `Cliente ${nomeCliente} aberto.`
-            : `${acaoClienteLocal.pagina} de ${nomeCliente} aberto.`
-          setUltimaResposta(respostaLocal)
-          historicoRef.current = [
-            ...historicoRef.current,
-            { autor: "Você", texto: comando },
-            { autor: "Nexa", texto: respostaLocal },
-          ].slice(-12)
-          tocarSinal(690, 55)
-          voltarParaEscuta(TEMPO_REARME_COMANDO_DIRETO_MS)
-          return
-        }
-      }
-    } catch (error) {
-      console.warn("[Nexa Voice] Não foi possível localizar o cliente localmente:", error)
-    }
-
-    // Só depois trata a navegação genérica de páginas.
-    const acaoLocal = detectarAcaoLocalDeNavegacao(comando)
-    if (acaoLocal) {
-      const executada = executarAcaoDeVoz({ acao: acaoLocal, setPage })
-      if (executada) {
-        console.info("[Nexa Voice] Comando local executado:", acaoLocal.pagina || acaoLocal.grupo)
-        const [respostaLocal] = respostaLocalDeNavegacao(acaoLocal.pagina, acaoLocal.grupo)
-        setUltimaResposta(respostaLocal)
-        historicoRef.current = [
-          ...historicoRef.current,
-          { autor: "Você", texto: comando },
-          { autor: "Nexa", texto: respostaLocal },
-        ].slice(-12)
-        tocarSinal(690, 55)
-        voltarParaEscuta(TEMPO_REARME_COMANDO_DIRETO_MS)
-        return
-      }
-    }
+    // Toda fala é interpretada pelo roteador central da API. Ele conhece as
+    // páginas, os grupos, os clientes e o contexto atual. Assim, a navegação
+    // não depende de uma lista rígida de frases no navegador.
 
     const contexto = obterContextoVoz()
 
@@ -730,6 +688,8 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         conversaId: conversaIdRef.current || contexto.conversaId || null,
         tipoContexto: contexto.clienteId ? "cliente" : "geral",
         historico: historicoRef.current,
+        origem: "voz",
+        paginaAtual: page || "",
       })
 
       if (resposta.conversaId) {
@@ -757,9 +717,10 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         { autor: "Nexa", texto: textoResposta },
       ].slice(-12)
 
-      executarAcaoDeVoz({ acao: resposta.acao, setPage })
+      const acaoExecutada = executarAcaoDeVoz({ acao: resposta.acao, setPage })
+      if (acaoExecutada) tocarSinal(690, 55)
       if (textoFalado) await falarResposta(textoFalado)
-      voltarParaEscuta()
+      voltarParaEscuta(acaoExecutada ? TEMPO_REARME_COMANDO_DIRETO_MS : undefined)
     } catch (error) {
       console.error("[Nexa Voice] Falha ao processar comando:", error)
       const mensagem = error.response?.data?.message || error.message || "Não consegui processar o comando."
@@ -768,7 +729,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       atualizarEstado("erro", mensagem)
       agendarReinicio(1800)
     }
-  }, [agendarReinicio, atualizarEstado, carregarVocabulario, falarResposta, pausarReconhecimento, setPage, voltarParaEscuta])
+  }, [agendarReinicio, atualizarEstado, carregarVocabulario, falarResposta, page, pausarReconhecimento, setPage, voltarParaEscuta])
 
   const confirmarSugestaoVocabulario = useCallback(async (texto) => {
     const sugestao = sugestaoVocabularioRef.current
