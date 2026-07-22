@@ -18,21 +18,21 @@ const VOICE_ENABLED_KEY = "nexaVoiceEnabled"
 const MICROPHONE_DEVICE_KEY = "nexaVoiceMicrophoneDeviceId"
 const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta|nessa)\b[\s,.:;-]*(.*)$/i
 const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.:;-]*(.*)$/i
-const END_SESSION_PATTERN = /^\s*(?:muito\s+)?obrigad[oa](?:\s+por\s+.+)?[.!?]*\s*$/i
+const END_SESSION_PATTERN = /^\s*(?:muito\s+)?obrigad[oa][.!?]*\s*$/i
 const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|exatamente|essa mesma|esse mesmo|pode ser|é esse|e esse|é essa|e essa)[.!?]*\s*$/i
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|outra)[.!?]*\s*$/i
 const TEMPO_MAXIMO_FALA_MS = 30000
 
 const SILENCIO_PARA_FINALIZAR_MS = 760
-const DURACAO_MINIMA_FALA_MS = 360
+const DURACAO_MINIMA_FALA_MS = 480
 const DURACAO_MAXIMA_FALA_MS = 10000
 const TAMANHO_MINIMO_AUDIO = 900
 const TEMPO_CALIBRACAO_RUIDO_MS = 650
-const TEMPO_REARME_MICROFONE_MS = 900
+const TEMPO_REARME_MICROFONE_MS = 1250
 
 const NAVEGACAO_LOCAL = [
   { pagina: "Dashboard", aliases: ["dashboard", "painel inicial", "tela inicial", "inicio", "home"] },
-  { pagina: "Clientes", aliases: ["cadastro de clientes", "carteira de clientes", "lista de clientes", "clientes", "cliente"] },
+  { pagina: "Clientes", aliases: ["cadastro de clientes", "carteira de clientes", "lista de clientes", "clientes"] },
   { pagina: "Fiscal", aliases: ["modulo fiscal", "tela fiscal", "area fiscal", "parte fiscal", "fiscal"] },
   { pagina: "Financeiro", aliases: ["financeiro do escritorio", "modulo financeiro", "tela financeira", "financeiro"] },
   { pagina: "Movimentos Clientes", aliases: ["movimentos dos clientes", "movimentacoes dos clientes", "movimentos clientes", "movimentacoes clientes", "movimentacao", "movimentacoes", "movimento", "movimentos"] },
@@ -75,11 +75,35 @@ function transcricaoPareceEco(texto, ultimaResposta) {
   return ouvido === falado || falado.includes(ouvido) || ouvido.includes(falado)
 }
 
+
+const TRANSCRICOES_RUIDO_PATTERN = /^\s*(?:e\s+a[ií]|ei|oi|ah|hã|ha|hum|hmm|é|eh|tá|ta|obrigad[oa]\s+por\s+assistir|legendas(?:\s+pela\s+comunidade)?.*)\s*[.!?]*\s*$/i
+
+function falaTemQualidadeMinima(texto, metadados = {}) {
+  const duracao = Number(metadados.duracao || 0)
+  const pico = Number(metadados.pico || 0)
+  const ruido = Math.max(Number(metadados.ruido || 0.006), 0.003)
+  const palavras = normalizarComandoLocal(texto).split(" ").filter(Boolean)
+
+  const picoMinimo = Math.max(0.014, ruido * 2.25)
+  if (duracao < DURACAO_MINIMA_FALA_MS || pico < picoMinimo) return false
+
+  const comandoDireto = Boolean(detectarAcaoLocalDeNavegacao(texto))
+  if (comandoDireto) return true
+
+  // Frases curtas e sem ação conhecida são as mais inventadas pelo Whisper
+  // quando há ruído. Exige uma voz mais nítida antes de enviá-las à IA.
+  if (palavras.length <= 2) {
+    return duracao >= 620 && pico >= Math.max(0.019, ruido * 2.75)
+  }
+
+  return true
+}
+
 function encerramentoTemVozConfiavel(metadados = {}) {
   const duracao = Number(metadados.duracao || 0)
   const pico = Number(metadados.pico || 0)
   const ruido = Number(metadados.ruido || 0.006)
-  return duracao >= 520 && pico >= Math.max(0.016, ruido * 2.15)
+  return duracao >= 720 && pico >= Math.max(0.022, ruido * 3.0)
 }
 
 function detectarAcaoLocalDeNavegacao(textoOriginal) {
@@ -636,27 +660,8 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     atualizarEstado("processando", comando)
     pausarReconhecimento()
 
-    // Comandos simples de navegação são executados diretamente no navegador.
-    // Assim a voz usa exatamente o mesmo setPage da interface e não depende
-    // da resposta da IA para abrir telas como Clientes, Fiscal e Financeiro.
-    const acaoLocal = detectarAcaoLocalDeNavegacao(comando)
-    if (acaoLocal) {
-      const executada = executarAcaoDeVoz({ acao: acaoLocal, setPage })
-      if (executada) {
-        console.info("[Nexa Voice] Navegação local executada:", acaoLocal.pagina)
-        const [respostaLocal, falaLocal] = respostaLocalDeNavegacao(acaoLocal.pagina)
-        setUltimaResposta(respostaLocal)
-        historicoRef.current = [
-          ...historicoRef.current,
-          { autor: "Você", texto: comando },
-          { autor: "Nexa", texto: respostaLocal },
-        ].slice(-12)
-        if (falaLocal) await falarResposta(falaLocal)
-        voltarParaEscuta()
-        return
-      }
-    }
-
+    // Primeiro tenta localizar um cliente. Isso evita que frases como
+    // “entrar no cliente Maurício” sejam confundidas com a tela genérica Clientes.
     try {
       const acaoClienteLocal = await resolverAcaoAbrirClientePorVoz(comando)
       if (acaoClienteLocal) {
@@ -677,6 +682,25 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       }
     } catch (error) {
       console.warn("[Nexa Voice] Não foi possível localizar o cliente localmente:", error)
+    }
+
+    // Só depois trata a navegação genérica de páginas.
+    const acaoLocal = detectarAcaoLocalDeNavegacao(comando)
+    if (acaoLocal) {
+      const executada = executarAcaoDeVoz({ acao: acaoLocal, setPage })
+      if (executada) {
+        console.info("[Nexa Voice] Navegação local executada:", acaoLocal.pagina)
+        const [respostaLocal, falaLocal] = respostaLocalDeNavegacao(acaoLocal.pagina)
+        setUltimaResposta(respostaLocal)
+        historicoRef.current = [
+          ...historicoRef.current,
+          { autor: "Você", texto: comando },
+          { autor: "Nexa", texto: respostaLocal },
+        ].slice(-12)
+        if (falaLocal) await falarResposta(falaLocal)
+        voltarParaEscuta()
+        return
+      }
     }
 
     const contexto = obterContextoVoz()
@@ -777,6 +801,18 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     tratarTranscricaoRef.current = (transcricao, metadados = {}) => {
       const texto = String(transcricao || "").trim()
       if (!texto || processandoRef.current || falandoRef.current) return
+
+      if (!falaTemQualidadeMinima(texto, metadados)) {
+        console.info("[Nexa Voice] Transcrição descartada por áudio fraco:", texto, metadados)
+        voltarParaEscuta()
+        return
+      }
+
+      if (TRANSCRICOES_RUIDO_PATTERN.test(texto)) {
+        console.info("[Nexa Voice] Frase curta sem comando descartada:", texto)
+        voltarParaEscuta()
+        return
+      }
 
       const dentroDaJanelaDeEco = performance.now() < ignorarEcoAteRef.current
       if (dentroDaJanelaDeEco && transcricaoPareceEco(texto, ultimaRespostaFaladaRef.current)) {
