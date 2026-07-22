@@ -203,6 +203,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   const ruidoBaseRef = useRef(0.006)
   const iniciarCapturaRef = useRef(null)
   const pararCapturaRef = useRef(null)
+  const reiniciandoCapturaRef = useRef(false)
   const microfoneSelecionadoRef = useRef(localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
 
   const atualizarEstado = useCallback((status, detalhe = "") => {
@@ -280,20 +281,38 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   }, [])
 
   const pausarReconhecimento = useCallback(() => {
+    // Mantém o microfone aberto, mas ignora os blocos enquanto a Nexa fala
+    // ou processa. O MediaRecorder será recriado antes da próxima fala para
+    // que cada áudio enviado ao Whisper comece com um cabeçalho WebM válido.
     capturaPausadaRef.current = true
     limparTrechoAtual()
+  }, [limparTrechoAtual])
+
+  const reiniciarCapturaCompleta = useCallback(async () => {
+    if (!ativadaRef.current || processandoRef.current || transcrevendoRef.current || falandoRef.current) return
+    if (reiniciandoCapturaRef.current) return
+
+    reiniciandoCapturaRef.current = true
+    capturaPausadaRef.current = true
 
     try {
-      if (mediaRecorderRef.current?.state === "recording") {
-        mediaRecorderRef.current.pause()
-      }
+      pararCapturaRef.current?.()
+      await new Promise((resolve) => setTimeout(resolve, 180))
+
+      if (!ativadaRef.current || processandoRef.current || transcrevendoRef.current || falandoRef.current) return
+      await iniciarCapturaRef.current?.(microfoneSelecionadoRef.current || null)
     } catch (error) {
-      console.warn("[Nexa Voice] Não foi possível pausar o gravador:", error)
+      console.error("[Nexa Voice] Falha ao recriar a captura de áudio:", error)
+      capturaPausadaRef.current = true
+      atualizarEstado("erro", "A escuta travou e não conseguiu reiniciar o microfone.")
+    } finally {
+      reiniciandoCapturaRef.current = false
     }
-  }, [limparTrechoAtual])
+  }, [atualizarEstado])
 
   const iniciarReconhecimento = useCallback(() => {
     if (!ativadaRef.current || processandoRef.current || transcrevendoRef.current || falandoRef.current) return
+    if (reiniciandoCapturaRef.current) return
 
     const retomar = async () => {
       try {
@@ -301,13 +320,9 @@ export default function NexaVoiceListener({ usuario, setPage }) {
           await audioContextRef.current.resume()
         }
 
-        const gravador = mediaRecorderRef.current
         const faixaAtiva = streamRef.current?.getAudioTracks?.().some(
           (faixa) => faixa.readyState === "live" && faixa.enabled,
         )
-
-        if (gravador?.state === "paused") gravador.resume()
-
         const gravadorAtivo = mediaRecorderRef.current?.state === "recording"
         const capturaSaudavel = Boolean(
           faixaAtiva
@@ -317,12 +332,11 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         )
 
         if (!capturaSaudavel) {
-          pararCapturaRef.current?.()
-          await new Promise((resolve) => setTimeout(resolve, 120))
-          await iniciarCapturaRef.current?.(microfoneSelecionadoRef.current || null)
+          await reiniciarCapturaCompleta()
           return
         }
 
+        limparTrechoAtual()
         capturaPausadaRef.current = false
       } catch (error) {
         console.error("[Nexa Voice] Falha ao retomar a escuta:", error)
@@ -332,7 +346,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     }
 
     retomar()
-  }, [atualizarEstado])
+  }, [atualizarEstado, limparTrechoAtual, reiniciarCapturaCompleta])
 
   const carregarVocabulario = useCallback(async () => {
     try {
@@ -467,8 +481,14 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       atualizarEstado("aguardando", `Escutando pelo ${microfone}. Diga “Bom dia”, “Boa tarde” ou “Nexa”.`)
     }
 
-    agendarReinicio(160)
-  }, [agendarReinicio, atualizarEstado, microfone])
+    // Cada frase precisa começar em um novo MediaRecorder. Reaproveitar o
+    // gravador anterior faz o segundo arquivo WebM ficar sem cabeçalho e o
+    // Whisper deixa de reconhecer os comandos depois da saudação.
+    clearTimeout(reinicioRef.current)
+    reinicioRef.current = setTimeout(() => {
+      reiniciarCapturaCompleta()
+    }, 220)
+  }, [atualizarEstado, microfone, reiniciarCapturaCompleta])
 
   const encerrarSessao = useCallback(async () => {
     if (processandoRef.current || falandoRef.current) return
@@ -831,8 +851,16 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     }
 
     animacaoRef.current = requestAnimationFrame(analisar)
-    voltarParaEscuta()
-  }, [atualizarEstado, atualizarNomeMicrofone, carregarMicrofones, finalizarTrechoDeFala, voltarParaEscuta])
+    capturaPausadaRef.current = false
+
+    if (sessaoAtivaRef.current) {
+      modoRef.current = "session"
+      atualizarEstado("conversando", "Pode falar normalmente. Diga “Obrigado” para encerrar.")
+    } else {
+      modoRef.current = "wake"
+      atualizarEstado("aguardando", `Escutando pelo ${microfone}. Diga “Bom dia”, “Boa tarde” ou “Nexa”.`)
+    }
+  }, [atualizarEstado, atualizarNomeMicrofone, carregarMicrofones, finalizarTrechoDeFala, microfone])
 
   useEffect(() => {
     iniciarCapturaRef.current = iniciarCapturaAudio
