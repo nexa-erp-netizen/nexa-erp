@@ -76,46 +76,63 @@ export default function Clientes({ setPage }) {
     carregarProcuracoesEcac()
   }, [])
 
-  useEffect(() => {
-    const clienteIdSolicitado = localStorage.getItem("nexaAbrirClienteId")
-    const clienteNomeSolicitado = localStorage.getItem("nexaAbrirClienteNome")
+  function normalizarNomeSolicitado(valor) {
+    return String(valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  }
 
-    if ((!clienteIdSolicitado && !clienteNomeSolicitado) || !clientes.length) return
+  function localizarClienteSolicitado(clienteIdSolicitado, clienteNomeSolicitado) {
+    if (!clientes.length) return null
 
-    const clienteEncontrado = clientes.find((item) =>
-      (clienteIdSolicitado && String(item.id) === String(clienteIdSolicitado)) ||
-      (clienteNomeSolicitado && String(item.nome || "").toLowerCase() === String(clienteNomeSolicitado).toLowerCase())
-    )
+    if (clienteIdSolicitado) {
+      const porId = clientes.find((item) => String(item.id) === String(clienteIdSolicitado))
+      if (porId) return porId
+    }
 
-    if (!clienteEncontrado) return
+    const nomeSolicitado = normalizarNomeSolicitado(clienteNomeSolicitado)
+    if (!nomeSolicitado) return null
+
+    return clientes.find((item) => normalizarNomeSolicitado(item.nome) === nomeSolicitado)
+      || clientes.find((item) => normalizarNomeSolicitado(item.nome).includes(nomeSolicitado))
+      || null
+  }
+
+  function consumirSolicitacaoAbertura(clienteIdSolicitado, clienteNomeSolicitado) {
+    if (!clienteIdSolicitado && !clienteNomeSolicitado) return false
+
+    const clienteEncontrado = localizarClienteSolicitado(clienteIdSolicitado, clienteNomeSolicitado)
+    if (!clienteEncontrado) return false
 
     localStorage.removeItem("nexaAbrirClienteId")
     localStorage.removeItem("nexaAbrirClienteNome")
     visualizarCliente(clienteEncontrado)
-  }, [clientes])
+    return true
+  }
 
+  useEffect(() => {
+    const clienteIdSolicitado = localStorage.getItem("nexaAbrirClienteId")
+    const clienteNomeSolicitado = localStorage.getItem("nexaAbrirClienteNome")
+    consumirSolicitacaoAbertura(clienteIdSolicitado, clienteNomeSolicitado)
+  }, [clientes])
 
   useEffect(() => {
     function abrirClienteSolicitado(evento) {
-      const clienteIdSolicitado = evento?.detail?.id
-      const clienteNomeSolicitado = evento?.detail?.nome
-
-      if ((!clienteIdSolicitado && !clienteNomeSolicitado) || !clientes.length) return
-
-      const clienteEncontrado = clientes.find((item) =>
-        (clienteIdSolicitado && String(item.id) === String(clienteIdSolicitado)) ||
-        (clienteNomeSolicitado && String(item.nome || "").toLowerCase() === String(clienteNomeSolicitado).toLowerCase())
-      )
-
-      if (!clienteEncontrado) return
-
-      localStorage.removeItem("nexaAbrirClienteId")
-      localStorage.removeItem("nexaAbrirClienteNome")
-      visualizarCliente(clienteEncontrado)
+      const clienteIdSolicitado = evento?.detail?.id || localStorage.getItem("nexaAbrirClienteId")
+      const clienteNomeSolicitado = evento?.detail?.nome || localStorage.getItem("nexaAbrirClienteNome")
+      consumirSolicitacaoAbertura(clienteIdSolicitado, clienteNomeSolicitado)
     }
 
     window.addEventListener("nexa:abrir-cliente", abrirClienteSolicitado)
-    return () => window.removeEventListener("nexa:abrir-cliente", abrirClienteSolicitado)
+    window.addEventListener("focus", abrirClienteSolicitado)
+    return () => {
+      window.removeEventListener("nexa:abrir-cliente", abrirClienteSolicitado)
+      window.removeEventListener("focus", abrirClienteSolicitado)
+    }
   }, [clientes])
 
   async function carregarClientes() {

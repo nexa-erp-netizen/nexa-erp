@@ -4,6 +4,121 @@ const CLIENTE_ID_KEY = "nexaVoiceClienteId"
 const CLIENTE_NOME_KEY = "nexaVoiceClienteNome"
 const CONVERSA_ID_KEY = "nexaVoiceConversaId"
 
+function normalizarTextoVoz(valor) {
+  return String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function distanciaLevenshtein(a, b) {
+  const origem = normalizarTextoVoz(a)
+  const destino = normalizarTextoVoz(b)
+  if (!origem) return destino.length
+  if (!destino) return origem.length
+
+  const linha = Array.from({ length: destino.length + 1 }, (_, indice) => indice)
+  for (let i = 1; i <= origem.length; i += 1) {
+    let diagonal = linha[0]
+    linha[0] = i
+    for (let j = 1; j <= destino.length; j += 1) {
+      const anterior = linha[j]
+      const custo = origem[i - 1] === destino[j - 1] ? 0 : 1
+      linha[j] = Math.min(linha[j] + 1, linha[j - 1] + 1, diagonal + custo)
+      diagonal = anterior
+    }
+  }
+  return linha[destino.length]
+}
+
+function similaridade(a, b) {
+  const origem = normalizarTextoVoz(a)
+  const destino = normalizarTextoVoz(b)
+  const maior = Math.max(origem.length, destino.length)
+  if (!maior) return 1
+  return 1 - (distanciaLevenshtein(origem, destino) / maior)
+}
+
+function extrairNomeClienteDoComando(comando) {
+  const texto = normalizarTextoVoz(comando)
+  if (!texto) return ""
+
+  const correspondencia = texto.match(
+    /^(?:(?:por favor|agora)\s+)*(?:(?:quero|pode|favor)\s+)*(?:abra|abre|abrir|acesse|acessar|entre|entrar|me leve(?: para)?|va para|vai para)\s+(?:(?:o|a)\s+)?(?:(?:cliente|empresa)\s+)?(.+)$/,
+  )
+  if (!correspondencia) return ""
+
+  const alvo = String(correspondencia[1] || "")
+    .replace(/\b(?:por favor|para mim|pra mim|agora)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  const paginas = new Set([
+    "cliente", "clientes", "cadastro de clientes", "lista de clientes",
+    "fiscal", "financeiro", "dashboard", "painel", "movimentos",
+    "movimentacoes", "documentos", "pendencias", "dre", "agenda",
+    "whatsapp", "relatorios", "relatorio", "backup", "sobre",
+  ])
+
+  if (!alvo || paginas.has(alvo)) return ""
+  return alvo
+}
+
+function pontuarCliente(cliente, alvo) {
+  const nome = normalizarTextoVoz(cliente?.nome)
+  if (!nome || !alvo) return 0
+  if (nome === alvo) return 1000
+  if (nome.includes(alvo)) return 900 + alvo.length
+  if (alvo.includes(nome)) return 850 + nome.length
+
+  const tokensAlvo = alvo.split(" ").filter((item) => item.length >= 3)
+  const tokensNome = nome.split(" ").filter((item) => item.length >= 3)
+  const encontrados = tokensAlvo.filter((token) => tokensNome.some((nomeToken) => nomeToken === token || similaridade(nomeToken, token) >= 0.82))
+  const cobertura = tokensAlvo.length ? encontrados.length / tokensAlvo.length : 0
+  const semelhanca = similaridade(alvo, nome)
+  return Math.max(cobertura * 800, semelhanca * 700)
+}
+
+export async function resolverAcaoAbrirClientePorVoz(comando) {
+  const alvo = extrairNomeClienteDoComando(comando)
+  if (!alvo) return null
+
+  const resposta = await api.get("/clientes")
+  const clientes = Array.isArray(resposta.data) ? resposta.data : []
+  const candidatos = clientes
+    .map((cliente) => ({ cliente, pontos: pontuarCliente(cliente, alvo) }))
+    .filter((item) => item.pontos >= 560)
+    .sort((a, b) => b.pontos - a.pontos)
+
+  const melhor = candidatos[0]
+  const segundo = candidatos[1]
+  if (!melhor) return null
+  if (segundo && melhor.pontos - segundo.pontos < 45) return null
+
+  return {
+    tipo: "navegar",
+    pagina: "Clientes",
+    alvo: "central-cliente",
+    segura: true,
+    cliente: {
+      id: melhor.cliente.id,
+      nome: melhor.cliente.nome,
+    },
+  }
+}
+
+function emitirAberturaCliente(clienteId, clienteNome) {
+  const detalhe = { id: clienteId, nome: clienteNome }
+  ;[0, 100, 300, 700].forEach((atraso) => {
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("nexa:abrir-cliente", { detail: detalhe }))
+    }, atraso)
+  })
+}
+
 export function obterContextoVoz() {
   return {
     clienteId: localStorage.getItem(CLIENTE_ID_KEY) || "",
@@ -42,13 +157,12 @@ export function executarAcaoDeVoz({ acao, setPage }) {
     localStorage.setItem("nexaAbrirClienteId", clienteId)
     localStorage.setItem("nexaAbrirClienteNome", clienteNome)
 
-    // Quando a tela de Clientes já está aberta, setPage("Clientes") não remonta
-    // o componente. O evento força a troca imediata para o cliente correto.
-    window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("nexa:abrir-cliente", {
-        detail: { id: clienteId, nome: clienteNome },
-      }))
-    }, 0)
+    // Primeiro garante que a tela de Clientes esteja montada. Depois repete o
+    // evento por alguns instantes, cobrindo tanto a lista já aberta quanto a
+    // navegação iniciada em outra página.
+    setPage("Clientes")
+    emitirAberturaCliente(clienteId, clienteNome)
+    return true
   }
   if (pagina === "Fiscal" && clienteNome) localStorage.setItem("nexaFiltroFiscalCliente", clienteNome)
   if (pagina === "Documentos Digitais" && clienteNome) localStorage.setItem("nexaFiltroDocumentoCliente", clienteNome)

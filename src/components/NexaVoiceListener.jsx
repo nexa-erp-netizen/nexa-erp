@@ -11,6 +11,7 @@ import {
   listarVocabularioVoz,
   obterContextoVoz,
   registrarConversaVoz,
+  resolverAcaoAbrirClientePorVoz,
 } from "../services/nexaVoiceService"
 
 const VOICE_ENABLED_KEY = "nexaVoiceEnabled"
@@ -27,7 +28,7 @@ const DURACAO_MINIMA_FALA_MS = 360
 const DURACAO_MAXIMA_FALA_MS = 10000
 const TAMANHO_MINIMO_AUDIO = 900
 const TEMPO_CALIBRACAO_RUIDO_MS = 650
-const TEMPO_REARME_MICROFONE_MS = 260
+const TEMPO_REARME_MICROFONE_MS = 900
 
 const NAVEGACAO_LOCAL = [
   { pagina: "Dashboard", aliases: ["dashboard", "painel inicial", "tela inicial", "inicio", "home"] },
@@ -65,6 +66,20 @@ function normalizarComandoLocal(valor) {
     .replace(/[.,!?;:]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
+}
+
+function transcricaoPareceEco(texto, ultimaResposta) {
+  const ouvido = normalizarComandoLocal(texto)
+  const falado = normalizarComandoLocal(ultimaResposta)
+  if (!ouvido || !falado) return false
+  return ouvido === falado || falado.includes(ouvido) || ouvido.includes(falado)
+}
+
+function encerramentoTemVozConfiavel(metadados = {}) {
+  const duracao = Number(metadados.duracao || 0)
+  const pico = Number(metadados.pico || 0)
+  const ruido = Number(metadados.ruido || 0.006)
+  return duracao >= 520 && pico >= Math.max(0.016, ruido * 2.15)
 }
 
 function detectarAcaoLocalDeNavegacao(textoOriginal) {
@@ -263,6 +278,8 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   const vozNeuralNomeRef = useRef("pt-BR-FranciscaNeural")
   const transcricaoDisponivelRef = useRef(false)
   const audioVozRef = useRef(null)
+  const ultimaRespostaFaladaRef = useRef("")
+  const ignorarEcoAteRef = useRef(0)
 
   const streamRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -458,7 +475,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       .slice(0, 20)
 
     return [
-      "Nexa, bom dia, boa tarde, obrigado, Multicópias, Fiscal, Movimentações, Contábil, DRE, lançamentos contábeis, e-CAC, PGDAS-D, DCTFWeb, DAS.",
+      "Nexa, bom dia, boa tarde, Multicópias, Fiscal, Movimentações, Contábil, DRE, lançamentos contábeis, e-CAC, PGDAS-D, DCTFWeb, DAS.",
       termos.length ? `Vocabulário do escritório: ${termos.join(", ")}.` : "",
     ].filter(Boolean).join(" ")
   }, [])
@@ -543,6 +560,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
 
     pausarReconhecimento()
     falandoRef.current = true
+    ultimaRespostaFaladaRef.current = texto
     atualizarEstado("falando", texto)
 
     try {
@@ -551,6 +569,9 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       return await falarComVozLocal(texto)
     } finally {
       falandoRef.current = false
+      // Evita que a LifeCam capture o final da própria voz da Nexa e envie
+      // esse eco ao Whisper como se fosse um novo comando do usuário.
+      ignorarEcoAteRef.current = performance.now() + TEMPO_REARME_MICROFONE_MS
     }
   }, [atualizarEstado, falarComVozLocal, falarComVozNeural, pausarReconhecimento])
 
@@ -634,6 +655,28 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         voltarParaEscuta()
         return
       }
+    }
+
+    try {
+      const acaoClienteLocal = await resolverAcaoAbrirClientePorVoz(comando)
+      if (acaoClienteLocal) {
+        const executada = executarAcaoDeVoz({ acao: acaoClienteLocal, setPage })
+        if (executada) {
+          const nomeCliente = acaoClienteLocal.cliente?.nome || "cliente"
+          const respostaLocal = `Cliente ${nomeCliente} aberto.`
+          setUltimaResposta(respostaLocal)
+          historicoRef.current = [
+            ...historicoRef.current,
+            { autor: "Você", texto: comando },
+            { autor: "Nexa", texto: respostaLocal },
+          ].slice(-12)
+          await falarResposta("Certo.")
+          voltarParaEscuta()
+          return
+        }
+      }
+    } catch (error) {
+      console.warn("[Nexa Voice] Não foi possível localizar o cliente localmente:", error)
     }
 
     const contexto = obterContextoVoz()
@@ -731,9 +774,16 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   }, [atualizarEstado, carregarVocabulario, falarResposta, processarComando, voltarParaEscuta])
 
   useEffect(() => {
-    tratarTranscricaoRef.current = (transcricao) => {
+    tratarTranscricaoRef.current = (transcricao, metadados = {}) => {
       const texto = String(transcricao || "").trim()
       if (!texto || processandoRef.current || falandoRef.current) return
+
+      const dentroDaJanelaDeEco = performance.now() < ignorarEcoAteRef.current
+      if (dentroDaJanelaDeEco && transcricaoPareceEco(texto, ultimaRespostaFaladaRef.current)) {
+        console.info("[Nexa Voice] Eco da própria resposta ignorado:", texto)
+        voltarParaEscuta()
+        return
+      }
 
       if (sessaoAtivaRef.current || modoRef.current === "session") {
         if (sugestaoVocabularioRef.current) {
@@ -747,7 +797,12 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         }
 
         if (END_SESSION_PATTERN.test(texto)) {
-          encerrarSessao()
+          if (encerramentoTemVozConfiavel(metadados)) {
+            encerrarSessao()
+          } else {
+            console.info("[Nexa Voice] Encerramento descartado por falta de voz confiável.", metadados)
+            voltarParaEscuta()
+          }
           return
         }
 
@@ -771,9 +826,9 @@ export default function NexaVoiceListener({ usuario, setPage }) {
 
       iniciarSessao(ativacao.gatilho)
     }
-  }, [confirmarSugestaoVocabulario, encerrarSessao, iniciarSessao, processarComando])
+  }, [confirmarSugestaoVocabulario, encerrarSessao, iniciarSessao, processarComando, voltarParaEscuta])
 
-  const transcreverTrecho = useCallback(async (blob) => {
+  const transcreverTrecho = useCallback(async (blob, metadados = {}) => {
     if (!blob?.size || blob.size < TAMANHO_MINIMO_AUDIO || transcrevendoRef.current) {
       voltarParaEscuta()
       return
@@ -788,7 +843,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       const texto = String(resultado.texto || "").trim()
       if (texto) {
         console.info("[Nexa Voice] Transcrição recebida:", texto)
-        tratarTranscricaoRef.current?.(texto)
+        tratarTranscricaoRef.current?.(texto, metadados)
       }
     } catch (error) {
       console.error("[Nexa Voice] Falha na transcrição:", error)
@@ -936,6 +991,11 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         const partes = [...falaChunksRef.current]
         const duracao = duracaoTrechoRef.current || (performance.now() - inicioFalaRef.current)
         const mime = gravador.mimeType || tipo || "audio/webm"
+        const metadados = {
+          duracao,
+          pico: picoFalaRef.current,
+          ruido: ruidoBaseRef.current,
+        }
 
         mediaRecorderRef.current = null
         descartarTrechoRef.current = false
@@ -948,7 +1008,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         }
 
         const blob = new Blob(partes, { type: mime })
-        transcreverTrecho(blob)
+        transcreverTrecho(blob, metadados)
       }
 
       try {
@@ -976,7 +1036,8 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       const rms = calcularRms(amostras)
       const agora = performance.now()
 
-      if (!capturaPausadaRef.current && !processandoRef.current && !transcrevendoRef.current && !falandoRef.current) {
+      if (!capturaPausadaRef.current && !processandoRef.current && !transcrevendoRef.current && !falandoRef.current
+        && agora >= ignorarEcoAteRef.current) {
         if (!falaAtivaRef.current && agora < calibrandoAteRef.current) {
           ruidoBaseRef.current = (ruidoBaseRef.current * 0.82) + (rms * 0.18)
           framesVozRef.current = 0
