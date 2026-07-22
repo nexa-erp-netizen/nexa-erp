@@ -103,6 +103,17 @@ export default function Sidebar({ page, setPage, usuario }) {
     "Documentos Digitais",
   ]
 
+  useEffect(() => {
+    const abrirGrupoPorVoz = (evento) => {
+      const grupo = String(evento?.detail?.grupo || "").trim()
+      if (!grupo || !gruposEscritorio.some((item) => item.titulo === grupo)) return
+      setGrupoAberto(grupo)
+    }
+
+    window.addEventListener("nexa:abrir-grupo-menu", abrirGrupoPorVoz)
+    return () => window.removeEventListener("nexa:abrir-grupo-menu", abrirGrupoPorVoz)
+  }, [])
+
   function abrirGrupo(titulo) {
     setGrupoAberto(grupoAberto === titulo ? "" : titulo)
   }

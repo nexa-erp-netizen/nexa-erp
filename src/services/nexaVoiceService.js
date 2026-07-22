@@ -42,29 +42,104 @@ function similaridade(a, b) {
   return 1 - (distanciaLevenshtein(origem, destino) / maior)
 }
 
-function extrairNomeClienteDoComando(comando) {
-  const texto = normalizarTextoVoz(comando)
-  if (!texto) return ""
+const CACHE_CLIENTES_TTL_MS = 5 * 60 * 1000
+let cacheClientesVoz = []
+let cacheClientesVozAte = 0
+let carregamentoClientesVoz = null
+
+const DESTINOS_COM_CLIENTE = [
+  {
+    pagina: "Movimentos Clientes",
+    aliases: ["movimentos dos clientes", "movimentacoes dos clientes", "movimentos clientes", "movimentacoes clientes", "movimentacao", "movimentacoes", "movimento", "movimentos"],
+  },
+  { pagina: "Lançamentos Contábeis", aliases: ["lancamentos contabeis", "lancamento contabil", "contabilidade", "contabil"] },
+  { pagina: "Documentos Digitais", aliases: ["documentos digitais", "documentos", "documento"] },
+  { pagina: "Pendências Clientes", aliases: ["pendencias dos clientes", "pendencias clientes", "pendencias", "pendencia"] },
+  { pagina: "DRE Gerencial", aliases: ["dre gerencial", "demonstracao do resultado", "dre"] },
+  { pagina: "Fiscal", aliases: ["modulo fiscal", "area fiscal", "parte fiscal", "fiscal"] },
+  { pagina: "Financeiro", aliases: ["financeiro do escritorio", "modulo financeiro", "financeiro"] },
+]
+
+const ALVOS_NAO_CLIENTE = new Set([
+  "cliente", "clientes", "cadastro de clientes", "lista de clientes",
+  "fiscal", "financeiro", "dashboard", "painel", "movimentos", "movimento",
+  "movimentacoes", "movimentacao", "documentos", "documento", "pendencias",
+  "pendencia", "dre", "agenda", "whatsapp", "relatorios", "relatorio",
+  "backup", "sobre", "ferramentas", "configuracoes", "atendimento",
+])
+
+async function obterClientesVoz({ forcar = false } = {}) {
+  const agora = Date.now()
+  if (!forcar && cacheClientesVoz.length && agora < cacheClientesVozAte) return cacheClientesVoz
+  if (!forcar && carregamentoClientesVoz) return carregamentoClientesVoz
+
+  carregamentoClientesVoz = api.get("/clientes")
+    .then((resposta) => {
+      cacheClientesVoz = Array.isArray(resposta.data) ? resposta.data : []
+      cacheClientesVozAte = Date.now() + CACHE_CLIENTES_TTL_MS
+      return cacheClientesVoz
+    })
+    .finally(() => {
+      carregamentoClientesVoz = null
+    })
+
+  return carregamentoClientesVoz
+}
+
+export async function precarregarClientesVoz() {
+  try {
+    return await obterClientesVoz()
+  } catch (error) {
+    console.warn("[Nexa Voice] Não foi possível pré-carregar os clientes:", error)
+    return []
+  }
+}
+
+function extrairDestinoEClienteDoComando(comando) {
+  let texto = normalizarTextoVoz(comando)
+  if (!texto) return null
+
+  texto = texto
+    .replace(/^(?:(?:por favor|agora)\s+)*/g, "")
+    .replace(/^(?:(?:quero|pode|favor)\s+)*/g, "")
 
   const correspondencia = texto.match(
-    /^(?:(?:por favor|agora)\s+)*(?:(?:quero|pode|favor)\s+)*(?:abra|abre|abrir|acesse|acessar|entre|entrar|me leve(?: para)?|va para|vai para)\s+(?:(?:o|a)\s+)?(?:(?:cliente|empresa)\s+)?(.+)$/,
+    /^(?:abra|abre|abrir|acesse|acessar|entre|entrar|me leve(?: para)?|va para|vai para|ir para|navegue(?: para)?|mostre|mostrar|exiba)\s+(.+)$/,
   )
-  if (!correspondencia) return ""
+  if (!correspondencia) return null
 
-  const alvo = String(correspondencia[1] || "")
+  let alvoCompleto = String(correspondencia[1] || "")
+    .replace(/^(?:o|a)\s+/, "")
     .replace(/\b(?:por favor|para mim|pra mim|agora)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim()
 
-  const paginas = new Set([
-    "cliente", "clientes", "cadastro de clientes", "lista de clientes",
-    "fiscal", "financeiro", "dashboard", "painel", "movimentos",
-    "movimentacoes", "documentos", "pendencias", "dre", "agenda",
-    "whatsapp", "relatorios", "relatorio", "backup", "sobre",
-  ])
+  if (!alvoCompleto || ALVOS_NAO_CLIENTE.has(alvoCompleto)) return null
 
-  if (!alvo || paginas.has(alvo)) return ""
-  return alvo
+  const destinos = DESTINOS_COM_CLIENTE
+    .flatMap((item) => item.aliases.map((alias) => ({ pagina: item.pagina, alias: normalizarTextoVoz(alias) })))
+    .sort((a, b) => b.alias.length - a.alias.length)
+
+  for (const destino of destinos) {
+    if (!alvoCompleto.startsWith(`${destino.alias} `)) continue
+
+    const nomeCliente = alvoCompleto
+      .slice(destino.alias.length)
+      .trim()
+      .replace(/^(?:(?:do|da|de|no|na)\s+)?(?:cliente|empresa)\s+/, "")
+      .trim()
+
+    if (!nomeCliente || ALVOS_NAO_CLIENTE.has(nomeCliente)) return null
+    return { pagina: destino.pagina, alvo: "pagina", nomeCliente }
+  }
+
+  alvoCompleto = alvoCompleto
+    .trim()
+    .replace(/^(?:(?:do|da|de|no|na)\s+)?(?:cliente|empresa)\s+/, "")
+    .trim()
+
+  if (!alvoCompleto || ALVOS_NAO_CLIENTE.has(alvoCompleto)) return null
+  return { pagina: "Clientes", alvo: "central-cliente", nomeCliente: alvoCompleto }
 }
 
 function pontuarCliente(cliente, alvo) {
@@ -83,11 +158,11 @@ function pontuarCliente(cliente, alvo) {
 }
 
 export async function resolverAcaoAbrirClientePorVoz(comando) {
-  const alvo = extrairNomeClienteDoComando(comando)
-  if (!alvo) return null
+  const destino = extrairDestinoEClienteDoComando(comando)
+  if (!destino?.nomeCliente) return null
 
-  const resposta = await api.get("/clientes")
-  const clientes = Array.isArray(resposta.data) ? resposta.data : []
+  const clientes = await obterClientesVoz()
+  const alvo = normalizarTextoVoz(destino.nomeCliente)
   const candidatos = clientes
     .map((cliente) => ({ cliente, pontos: pontuarCliente(cliente, alvo) }))
     .filter((item) => item.pontos >= 560)
@@ -100,8 +175,8 @@ export async function resolverAcaoAbrirClientePorVoz(comando) {
 
   return {
     tipo: "navegar",
-    pagina: "Clientes",
-    alvo: "central-cliente",
+    pagina: destino.pagina,
+    alvo: destino.alvo,
     segura: true,
     cliente: {
       id: melhor.cliente.id,
@@ -143,7 +218,16 @@ export function limparContextoClienteVoz() {
 }
 
 export function executarAcaoDeVoz({ acao, setPage }) {
-  if (!acao || acao.tipo !== "navegar" || typeof setPage !== "function") return false
+  if (!acao) return false
+
+  if (acao.tipo === "abrir-grupo") {
+    const grupo = String(acao.grupo || "").trim()
+    if (!grupo) return false
+    window.dispatchEvent(new CustomEvent("nexa:abrir-grupo-menu", { detail: { grupo } }))
+    return true
+  }
+
+  if (acao.tipo !== "navegar" || typeof setPage !== "function") return false
 
   const pagina = String(acao.pagina || "").trim()
   const cliente = acao.cliente || null

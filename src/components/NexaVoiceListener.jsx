@@ -10,6 +10,7 @@ import {
   executarAcaoDeVoz,
   listarVocabularioVoz,
   obterContextoVoz,
+  precarregarClientesVoz,
   registrarConversaVoz,
   resolverAcaoAbrirClientePorVoz,
 } from "../services/nexaVoiceService"
@@ -23,14 +24,19 @@ const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|exatamente|essa mesma|e
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|outra)[.!?]*\s*$/i
 const TEMPO_MAXIMO_FALA_MS = 30000
 
-const SILENCIO_PARA_FINALIZAR_MS = 760
-const DURACAO_MINIMA_FALA_MS = 480
-const DURACAO_MAXIMA_FALA_MS = 10000
+const SILENCIO_PARA_FINALIZAR_MS = 520
+const DURACAO_MINIMA_FALA_MS = 420
+const DURACAO_MAXIMA_FALA_MS = 8500
 const TAMANHO_MINIMO_AUDIO = 900
-const TEMPO_CALIBRACAO_RUIDO_MS = 650
-const TEMPO_REARME_MICROFONE_MS = 1250
+const TEMPO_CALIBRACAO_RUIDO_MS = 320
+const TEMPO_REARME_MICROFONE_MS = 380
+const TEMPO_BLOQUEIO_ECO_MS = 1050
+const TEMPO_REARME_COMANDO_DIRETO_MS = 180
 
 const NAVEGACAO_LOCAL = [
+  { tipo: "abrir-grupo", grupo: "Ferramentas", aliases: ["menu ferramentas", "grupo ferramentas", "ferramentas"] },
+  { tipo: "abrir-grupo", grupo: "Configurações", aliases: ["menu configuracoes", "grupo configuracoes", "configuracoes"] },
+  { tipo: "abrir-grupo", grupo: "Atendimento", aliases: ["menu atendimento", "grupo atendimento", "atendimento"] },
   { pagina: "Dashboard", aliases: ["dashboard", "painel inicial", "tela inicial", "inicio", "home"] },
   { pagina: "Clientes", aliases: ["cadastro de clientes", "carteira de clientes", "lista de clientes", "clientes"] },
   { pagina: "Fiscal", aliases: ["modulo fiscal", "tela fiscal", "area fiscal", "parte fiscal", "fiscal"] },
@@ -113,11 +119,19 @@ function detectarAcaoLocalDeNavegacao(textoOriginal) {
   const temVerbo = /(^|\s)(abra|abre|abrir|acesse|acessar|entre|entrar|va|vai|ir|navegue|navegar|mostre|mostrar|exiba|ver|volte|voltar|retorne|retornar|me leve|me leva)(\s|$)/.test(texto)
 
   const candidatos = NAVEGACAO_LOCAL
-    .flatMap((item) => item.aliases.map((alias) => ({ pagina: item.pagina, alias: normalizarComandoLocal(alias) })))
+    .flatMap((item) => item.aliases.map((alias) => ({ ...item, alias: normalizarComandoLocal(alias) })))
     .sort((a, b) => b.alias.length - a.alias.length)
 
   const encontrado = candidatos.find(({ alias }) => texto === alias || (temVerbo && texto.includes(alias)))
   if (!encontrado) return null
+
+  if (encontrado.tipo === "abrir-grupo") {
+    return {
+      tipo: "abrir-grupo",
+      grupo: encontrado.grupo,
+      segura: true,
+    }
+  }
 
   return {
     tipo: "navegar",
@@ -128,7 +142,9 @@ function detectarAcaoLocalDeNavegacao(textoOriginal) {
   }
 }
 
-function respostaLocalDeNavegacao(pagina) {
+function respostaLocalDeNavegacao(pagina, grupo = "") {
+  if (grupo) return [`Menu ${grupo} aberto.`, ""]
+
   const respostas = {
     Dashboard: ["Dashboard aberto.", "Pronto."],
     Clientes: ["Clientes abertos.", "Certo."],
@@ -466,7 +482,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
 
         limparTrechoAtual()
         ruidoBaseRef.current = Math.max(0.004, ruidoBaseRef.current)
-        calibrandoAteRef.current = performance.now() + TEMPO_REARME_MICROFONE_MS
+        calibrandoAteRef.current = performance.now() + TEMPO_CALIBRACAO_RUIDO_MS
         capturaPausadaRef.current = false
       } catch (error) {
         console.error("[Nexa Voice] Falha ao retomar a escuta:", error)
@@ -595,7 +611,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       falandoRef.current = false
       // Evita que a LifeCam capture o final da própria voz da Nexa e envie
       // esse eco ao Whisper como se fosse um novo comando do usuário.
-      ignorarEcoAteRef.current = performance.now() + TEMPO_REARME_MICROFONE_MS
+      ignorarEcoAteRef.current = performance.now() + TEMPO_BLOQUEIO_ECO_MS
     }
   }, [atualizarEstado, falarComVozLocal, falarComVozNeural, pausarReconhecimento])
 
@@ -604,7 +620,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     reinicioRef.current = setTimeout(() => iniciarReconhecimento(), atraso)
   }, [iniciarReconhecimento])
 
-  const voltarParaEscuta = useCallback(() => {
+  const voltarParaEscuta = useCallback((atraso = TEMPO_REARME_MICROFONE_MS) => {
     processandoRef.current = false
 
     if (sessaoAtivaRef.current) {
@@ -618,7 +634,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     // O microfone permanece aberto, mas cada fala cria um MediaRecorder novo.
     // Isso garante um arquivo WebM completo, com cabeçalho válido, em todos os comandos.
     clearTimeout(reinicioRef.current)
-    reinicioRef.current = setTimeout(() => iniciarReconhecimento(), TEMPO_REARME_MICROFONE_MS)
+    reinicioRef.current = setTimeout(() => iniciarReconhecimento(), atraso)
   }, [atualizarEstado, iniciarReconhecimento, microfone])
 
   const encerrarSessao = useCallback(async () => {
@@ -668,15 +684,17 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         const executada = executarAcaoDeVoz({ acao: acaoClienteLocal, setPage })
         if (executada) {
           const nomeCliente = acaoClienteLocal.cliente?.nome || "cliente"
-          const respostaLocal = `Cliente ${nomeCliente} aberto.`
+          const respostaLocal = acaoClienteLocal.alvo === "central-cliente"
+            ? `Cliente ${nomeCliente} aberto.`
+            : `${acaoClienteLocal.pagina} de ${nomeCliente} aberto.`
           setUltimaResposta(respostaLocal)
           historicoRef.current = [
             ...historicoRef.current,
             { autor: "Você", texto: comando },
             { autor: "Nexa", texto: respostaLocal },
           ].slice(-12)
-          await falarResposta("Certo.")
-          voltarParaEscuta()
+          tocarSinal(690, 55)
+          voltarParaEscuta(TEMPO_REARME_COMANDO_DIRETO_MS)
           return
         }
       }
@@ -689,16 +707,16 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     if (acaoLocal) {
       const executada = executarAcaoDeVoz({ acao: acaoLocal, setPage })
       if (executada) {
-        console.info("[Nexa Voice] Navegação local executada:", acaoLocal.pagina)
-        const [respostaLocal, falaLocal] = respostaLocalDeNavegacao(acaoLocal.pagina)
+        console.info("[Nexa Voice] Comando local executado:", acaoLocal.pagina || acaoLocal.grupo)
+        const [respostaLocal] = respostaLocalDeNavegacao(acaoLocal.pagina, acaoLocal.grupo)
         setUltimaResposta(respostaLocal)
         historicoRef.current = [
           ...historicoRef.current,
           { autor: "Você", texto: comando },
           { autor: "Nexa", texto: respostaLocal },
         ].slice(-12)
-        if (falaLocal) await falarResposta(falaLocal)
-        voltarParaEscuta()
+        tocarSinal(690, 55)
+        voltarParaEscuta(TEMPO_REARME_COMANDO_DIRETO_MS)
         return
       }
     }
@@ -891,7 +909,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         if (!processandoRef.current && !falandoRef.current) {
           voltarParaEscuta()
         }
-      }, 120)
+      }, 60)
     }
   }, [atualizarEstado, montarPromptTranscricao, pausarReconhecimento, voltarParaEscuta])
 
@@ -1236,7 +1254,10 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     }
     navigator.mediaDevices?.addEventListener?.("devicechange", aoMudarDispositivo)
     carregarMicrofones()
-    if (estado.ativada) carregarVocabulario()
+    if (estado.ativada) {
+      carregarVocabulario()
+      precarregarClientesVoz()
+    }
     return () => navigator.mediaDevices?.removeEventListener?.("devicechange", aoMudarDispositivo)
   }, [atualizarNomeMicrofone, carregarMicrofones, carregarVocabulario, estado.ativada])
 
@@ -1264,7 +1285,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       setSessaoAtiva(false)
       modoRef.current = "wake"
       setEstado({ ativada: true, status: "iniciando", detalhe: "Preparando microfone e Groq Whisper..." })
-      await carregarVocabulario()
+      await Promise.all([carregarVocabulario(), precarregarClientesVoz()])
       await iniciarCapturaAudio()
     } catch (error) {
       console.error("[Nexa Voice] Não foi possível ativar:", error)
