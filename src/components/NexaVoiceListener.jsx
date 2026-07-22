@@ -22,19 +22,19 @@ const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|exatamente|essa mesma|e
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|outra)[.!?]*\s*$/i
 const TEMPO_MAXIMO_FALA_MS = 30000
 
-const INTERVALO_GRAVACAO_MS = 200
-const PRE_ROLL_MAXIMO = 5
-const SILENCIO_PARA_FINALIZAR_MS = 950
-const DURACAO_MINIMA_FALA_MS = 420
-const DURACAO_MAXIMA_FALA_MS = 14000
-const TAMANHO_MINIMO_AUDIO = 1200
+const SILENCIO_PARA_FINALIZAR_MS = 760
+const DURACAO_MINIMA_FALA_MS = 360
+const DURACAO_MAXIMA_FALA_MS = 10000
+const TAMANHO_MINIMO_AUDIO = 900
+const TEMPO_CALIBRACAO_RUIDO_MS = 650
+const TEMPO_REARME_MICROFONE_MS = 260
 
 const NAVEGACAO_LOCAL = [
   { pagina: "Dashboard", aliases: ["dashboard", "painel inicial", "tela inicial", "inicio", "home"] },
-  { pagina: "Clientes", aliases: ["cadastro de clientes", "carteira de clientes", "lista de clientes", "clientes"] },
+  { pagina: "Clientes", aliases: ["cadastro de clientes", "carteira de clientes", "lista de clientes", "clientes", "cliente"] },
   { pagina: "Fiscal", aliases: ["modulo fiscal", "tela fiscal", "area fiscal", "parte fiscal", "fiscal"] },
   { pagina: "Financeiro", aliases: ["financeiro do escritorio", "modulo financeiro", "tela financeira", "financeiro"] },
-  { pagina: "Movimentos Clientes", aliases: ["movimentos dos clientes", "movimentacoes dos clientes", "movimentos clientes", "movimentacoes clientes", "movimentacoes", "movimentos"] },
+  { pagina: "Movimentos Clientes", aliases: ["movimentos dos clientes", "movimentacoes dos clientes", "movimentos clientes", "movimentacoes clientes", "movimentacao", "movimentacoes", "movimento", "movimentos"] },
   { pagina: "Lançamentos Contábeis", aliases: ["lancamentos contabeis", "lancamento contabil", "contabilidade", "contabil"] },
   { pagina: "DRE Gerencial", aliases: ["dre gerencial", "demonstracao do resultado", "dre"] },
   { pagina: "Documentos Digitais", aliases: ["documentos digitais", "documentos"] },
@@ -74,7 +74,7 @@ function detectarAcaoLocalDeNavegacao(textoOriginal) {
   const temVerbo = /(^|\s)(abra|abre|abrir|acesse|acessar|entre|entrar|va|vai|ir|navegue|navegar|mostre|mostrar|exiba|ver|volte|voltar|retorne|retornar|me leve|me leva)(\s|$)/.test(texto)
 
   const candidatos = NAVEGACAO_LOCAL
-    .flatMap((item) => item.aliases.map((alias) => ({ pagina: item.pagina, alias })))
+    .flatMap((item) => item.aliases.map((alias) => ({ pagina: item.pagina, alias: normalizarComandoLocal(alias) })))
     .sort((a, b) => b.alias.length - a.alias.length)
 
   const encontrado = candidatos.find(({ alias }) => texto === alias || (temVerbo && texto.includes(alias)))
@@ -269,13 +269,17 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   const analyserRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const animacaoRef = useRef(null)
-  const preRollRef = useRef([])
   const falaChunksRef = useRef([])
   const falaAtivaRef = useRef(false)
+  const finalizandoTrechoRef = useRef(false)
+  const descartarTrechoRef = useRef(false)
+  const duracaoTrechoRef = useRef(0)
   const inicioFalaRef = useRef(0)
   const ultimaVozRef = useRef(0)
   const framesVozRef = useRef(0)
+  const picoFalaRef = useRef(0)
   const ruidoBaseRef = useRef(0.006)
+  const calibrandoAteRef = useRef(0)
   const iniciarCapturaRef = useRef(null)
   const pararCapturaRef = useRef(null)
   const reiniciandoCapturaRef = useRef(false)
@@ -348,18 +352,28 @@ export default function NexaVoiceListener({ usuario, setPage }) {
 
   const limparTrechoAtual = useCallback(() => {
     falaAtivaRef.current = false
+    finalizandoTrechoRef.current = false
+    duracaoTrechoRef.current = 0
     falaChunksRef.current = []
-    preRollRef.current = []
     inicioFalaRef.current = 0
     ultimaVozRef.current = 0
     framesVozRef.current = 0
+    picoFalaRef.current = 0
   }, [])
 
   const pausarReconhecimento = useCallback(() => {
-    // Mantém o microfone aberto, mas ignora os blocos enquanto a Nexa fala
-    // ou processa. O MediaRecorder será recriado antes da próxima fala para
-    // que cada áudio enviado ao Whisper comece com um cabeçalho WebM válido.
     capturaPausadaRef.current = true
+
+    const gravador = mediaRecorderRef.current
+    if (gravador?.state === "recording") {
+      descartarTrechoRef.current = true
+      try {
+        gravador.stop()
+      } catch {
+        mediaRecorderRef.current = null
+      }
+    }
+
     limparTrechoAtual()
   }, [limparTrechoAtual])
 
@@ -398,10 +412,8 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         const faixaAtiva = streamRef.current?.getAudioTracks?.().some(
           (faixa) => faixa.readyState === "live" && faixa.enabled,
         )
-        const gravadorAtivo = mediaRecorderRef.current?.state === "recording"
         const capturaSaudavel = Boolean(
           faixaAtiva
-          && gravadorAtivo
           && analyserRef.current
           && audioContextRef.current?.state !== "closed",
         )
@@ -412,6 +424,8 @@ export default function NexaVoiceListener({ usuario, setPage }) {
         }
 
         limparTrechoAtual()
+        ruidoBaseRef.current = Math.max(0.004, ruidoBaseRef.current)
+        calibrandoAteRef.current = performance.now() + TEMPO_REARME_MICROFONE_MS
         capturaPausadaRef.current = false
       } catch (error) {
         console.error("[Nexa Voice] Falha ao retomar a escuta:", error)
@@ -556,14 +570,11 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       atualizarEstado("aguardando", `Escutando pelo ${microfone}. Diga “Bom dia”, “Boa tarde” ou “Nexa”.`)
     }
 
-    // Cada frase precisa começar em um novo MediaRecorder. Reaproveitar o
-    // gravador anterior faz o segundo arquivo WebM ficar sem cabeçalho e o
-    // Whisper deixa de reconhecer os comandos depois da saudação.
+    // O microfone permanece aberto, mas cada fala cria um MediaRecorder novo.
+    // Isso garante um arquivo WebM completo, com cabeçalho válido, em todos os comandos.
     clearTimeout(reinicioRef.current)
-    reinicioRef.current = setTimeout(() => {
-      reiniciarCapturaCompleta()
-    }, 220)
-  }, [atualizarEstado, microfone, reiniciarCapturaCompleta])
+    reinicioRef.current = setTimeout(() => iniciarReconhecimento(), TEMPO_REARME_MICROFONE_MS)
+  }, [atualizarEstado, iniciarReconhecimento, microfone])
 
   const encerrarSessao = useCallback(async () => {
     if (processandoRef.current || falandoRef.current) return
@@ -611,6 +622,7 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     if (acaoLocal) {
       const executada = executarAcaoDeVoz({ acao: acaoLocal, setPage })
       if (executada) {
+        console.info("[Nexa Voice] Navegação local executada:", acaoLocal.pagina)
         const [respostaLocal, falaLocal] = respostaLocalDeNavegacao(acaoLocal.pagina)
         setUltimaResposta(respostaLocal)
         historicoRef.current = [
@@ -774,7 +786,10 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     try {
       const resultado = await transcreverVozGroq(blob, { prompt: montarPromptTranscricao() })
       const texto = String(resultado.texto || "").trim()
-      if (texto) tratarTranscricaoRef.current?.(texto)
+      if (texto) {
+        console.info("[Nexa Voice] Transcrição recebida:", texto)
+        tratarTranscricaoRef.current?.(texto)
+      }
     } catch (error) {
       console.error("[Nexa Voice] Falha na transcrição:", error)
       const mensagem = error.response?.data?.message || error.message || "Não consegui entender a fala."
@@ -790,29 +805,43 @@ export default function NexaVoiceListener({ usuario, setPage }) {
   }, [atualizarEstado, montarPromptTranscricao, pausarReconhecimento, voltarParaEscuta])
 
   const finalizarTrechoDeFala = useCallback(() => {
-    if (!falaAtivaRef.current) return
-    const duracao = performance.now() - inicioFalaRef.current
-    const partes = [...falaChunksRef.current]
-    const tipo = mediaRecorderRef.current?.mimeType || "audio/webm"
-    limparTrechoAtual()
+    if (!falaAtivaRef.current || finalizandoTrechoRef.current) return
 
-    if (duracao < DURACAO_MINIMA_FALA_MS || !partes.length) {
+    const gravador = mediaRecorderRef.current
+    const duracao = performance.now() - inicioFalaRef.current
+    duracaoTrechoRef.current = duracao
+    finalizandoTrechoRef.current = true
+    capturaPausadaRef.current = true
+
+    if (!gravador || gravador.state !== "recording") {
+      limparTrechoAtual()
       voltarParaEscuta()
       return
     }
-    const blob = new Blob(partes, { type: tipo })
-    transcreverTrecho(blob)
-  }, [limparTrechoAtual, transcreverTrecho, voltarParaEscuta])
+
+    try {
+      gravador.stop()
+    } catch (error) {
+      console.error("[Nexa Voice] Não foi possível finalizar o trecho:", error)
+      mediaRecorderRef.current = null
+      limparTrechoAtual()
+      voltarParaEscuta()
+    }
+  }, [limparTrechoAtual, voltarParaEscuta])
 
   const pararCapturaAudio = useCallback(() => {
     clearTimeout(reinicioRef.current)
     if (animacaoRef.current) cancelAnimationFrame(animacaoRef.current)
     animacaoRef.current = null
 
-    try {
-      if (mediaRecorderRef.current?.state !== "inactive") mediaRecorderRef.current.stop()
-    } catch {
-      // Sem ação.
+    const gravador = mediaRecorderRef.current
+    if (gravador?.state === "recording") {
+      descartarTrechoRef.current = true
+      try {
+        gravador.stop()
+      } catch {
+        // Sem ação.
+      }
     }
     mediaRecorderRef.current = null
 
@@ -873,34 +902,72 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     if (contexto.state === "suspended") await contexto.resume()
     const analisador = contexto.createAnalyser()
     analisador.fftSize = 1024
-    analisador.smoothingTimeConstant = 0.35
+    analisador.smoothingTimeConstant = 0.28
     const fonte = contexto.createMediaStreamSource(stream)
     fonte.connect(analisador)
     audioContextRef.current = contexto
     analyserRef.current = analisador
 
-    const tipo = mimeGravacaoDisponivel()
-    const gravador = tipo ? new MediaRecorder(stream, { mimeType: tipo }) : new MediaRecorder(stream)
-    mediaRecorderRef.current = gravador
+    const iniciarGravadorDaFala = () => {
+      if (mediaRecorderRef.current?.state === "recording") return true
 
-    gravador.ondataavailable = (evento) => {
-      if (!evento.data?.size || capturaPausadaRef.current) return
-      if (falaAtivaRef.current) {
-        falaChunksRef.current.push(evento.data)
-        return
+      const tipo = mimeGravacaoDisponivel()
+      const gravador = tipo ? new MediaRecorder(stream, { mimeType: tipo }) : new MediaRecorder(stream)
+      mediaRecorderRef.current = gravador
+      falaChunksRef.current = []
+      descartarTrechoRef.current = false
+      finalizandoTrechoRef.current = false
+      duracaoTrechoRef.current = 0
+
+      gravador.ondataavailable = (evento) => {
+        if (evento.data?.size) falaChunksRef.current.push(evento.data)
       }
-      preRollRef.current.push(evento.data)
-      if (preRollRef.current.length > PRE_ROLL_MAXIMO) preRollRef.current.shift()
+
+      gravador.onerror = (evento) => {
+        console.error("[Nexa Voice] Falha no gravador:", evento?.error || evento)
+        mediaRecorderRef.current = null
+        limparTrechoAtual()
+        atualizarEstado("erro", "O gravador do microfone apresentou uma falha.")
+        agendarReinicio(900)
+      }
+
+      gravador.onstop = () => {
+        const descartar = descartarTrechoRef.current
+        const partes = [...falaChunksRef.current]
+        const duracao = duracaoTrechoRef.current || (performance.now() - inicioFalaRef.current)
+        const mime = gravador.mimeType || tipo || "audio/webm"
+
+        mediaRecorderRef.current = null
+        descartarTrechoRef.current = false
+        limparTrechoAtual()
+
+        if (descartar) return
+        if (duracao < DURACAO_MINIMA_FALA_MS || !partes.length) {
+          voltarParaEscuta()
+          return
+        }
+
+        const blob = new Blob(partes, { type: mime })
+        transcreverTrecho(blob)
+      }
+
+      try {
+        // Um gravador novo por fala garante que todo arquivo tenha cabeçalho WebM válido.
+        gravador.start()
+        return true
+      } catch (error) {
+        console.error("[Nexa Voice] Não foi possível iniciar a gravação da fala:", error)
+        mediaRecorderRef.current = null
+        limparTrechoAtual()
+        atualizarEstado("erro", "Não consegui iniciar a gravação do comando.")
+        agendarReinicio(900)
+        return false
+      }
     }
 
-    gravador.onerror = (evento) => {
-      console.error("[Nexa Voice] Falha no gravador:", evento?.error || evento)
-      atualizarEstado("erro", "O gravador do microfone apresentou uma falha.")
-    }
-
-    gravador.start(INTERVALO_GRAVACAO_MS)
     capturaPausadaRef.current = false
     ruidoBaseRef.current = 0.006
+    calibrandoAteRef.current = performance.now() + TEMPO_CALIBRACAO_RUIDO_MS
 
     const amostras = new Float32Array(analisador.fftSize)
     const analisar = () => {
@@ -910,30 +977,36 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       const agora = performance.now()
 
       if (!capturaPausadaRef.current && !processandoRef.current && !transcrevendoRef.current && !falandoRef.current) {
-        if (!falaAtivaRef.current && rms < 0.035) {
-          ruidoBaseRef.current = (ruidoBaseRef.current * 0.96) + (rms * 0.04)
-        }
-
-        const limite = Math.max(0.014, ruidoBaseRef.current * 2.8)
-        const temVoz = rms > limite
-
-        if (temVoz) {
-          framesVozRef.current += 1
-          ultimaVozRef.current = agora
-        } else {
+        if (!falaAtivaRef.current && agora < calibrandoAteRef.current) {
+          ruidoBaseRef.current = (ruidoBaseRef.current * 0.82) + (rms * 0.18)
           framesVozRef.current = 0
-        }
+        } else if (!falaAtivaRef.current) {
+          const limiteInicio = Math.max(0.011, ruidoBaseRef.current * 2.55)
 
-        if (!falaAtivaRef.current && framesVozRef.current >= 3) {
-          falaAtivaRef.current = true
-          inicioFalaRef.current = agora
-          ultimaVozRef.current = agora
-          falaChunksRef.current = [...preRollRef.current]
-          preRollRef.current = []
-          atualizarEstado("ouvindo", "Pode falar...")
-        }
+          if (rms < limiteInicio * 0.88) {
+            ruidoBaseRef.current = (ruidoBaseRef.current * 0.97) + (rms * 0.03)
+          }
 
-        if (falaAtivaRef.current) {
+          if (rms > limiteInicio) framesVozRef.current += 1
+          else framesVozRef.current = 0
+
+          if (framesVozRef.current >= 2 && iniciarGravadorDaFala()) {
+            falaAtivaRef.current = true
+            inicioFalaRef.current = agora
+            ultimaVozRef.current = agora
+            picoFalaRef.current = rms
+            atualizarEstado("ouvindo", "Fala detectada. Finalizando ao perceber o silêncio...")
+          }
+        } else {
+          picoFalaRef.current = Math.max(rms, picoFalaRef.current * 0.997)
+          const limiteContinuidade = Math.max(
+            0.009,
+            ruidoBaseRef.current * 1.7,
+            picoFalaRef.current * 0.20,
+          )
+
+          if (rms > limiteContinuidade) ultimaVozRef.current = agora
+
           const duracao = agora - inicioFalaRef.current
           const silencio = agora - ultimaVozRef.current
           if ((silencio >= SILENCIO_PARA_FINALIZAR_MS && duracao >= DURACAO_MINIMA_FALA_MS)
@@ -947,7 +1020,6 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     }
 
     animacaoRef.current = requestAnimationFrame(analisar)
-    capturaPausadaRef.current = false
 
     if (sessaoAtivaRef.current) {
       modoRef.current = "session"
@@ -956,7 +1028,17 @@ export default function NexaVoiceListener({ usuario, setPage }) {
       modoRef.current = "wake"
       atualizarEstado("aguardando", `Escutando pelo ${microfone}. Diga “Bom dia”, “Boa tarde” ou “Nexa”.`)
     }
-  }, [atualizarEstado, atualizarNomeMicrofone, carregarMicrofones, finalizarTrechoDeFala, microfone])
+  }, [
+    agendarReinicio,
+    atualizarEstado,
+    atualizarNomeMicrofone,
+    carregarMicrofones,
+    finalizarTrechoDeFala,
+    limparTrechoAtual,
+    microfone,
+    transcreverTrecho,
+    voltarParaEscuta,
+  ])
 
   useEffect(() => {
     iniciarCapturaRef.current = iniciarCapturaAudio
@@ -969,15 +1051,14 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     const vigilante = setInterval(() => {
       if (!ativadaRef.current || processandoRef.current || transcrevendoRef.current || falandoRef.current) return
 
-      const gravadorParado = !mediaRecorderRef.current
-        || mediaRecorderRef.current.state === "inactive"
-        || mediaRecorderRef.current.state === "paused"
+      const gravadorFalhouDuranteFala = falaAtivaRef.current
+        && mediaRecorderRef.current?.state !== "recording"
       const contextoSuspenso = audioContextRef.current?.state === "suspended"
       const faixaInativa = !streamRef.current?.getAudioTracks?.().some(
         (faixa) => faixa.readyState === "live" && faixa.enabled,
       )
 
-      if (capturaPausadaRef.current || gravadorParado || contextoSuspenso || faixaInativa) {
+      if (capturaPausadaRef.current || gravadorFalhouDuranteFala || contextoSuspenso || faixaInativa) {
         iniciarReconhecimento()
       }
     }, 1200)
