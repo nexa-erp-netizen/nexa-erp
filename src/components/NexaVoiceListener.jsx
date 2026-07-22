@@ -29,6 +29,81 @@ const DURACAO_MINIMA_FALA_MS = 420
 const DURACAO_MAXIMA_FALA_MS = 14000
 const TAMANHO_MINIMO_AUDIO = 1200
 
+const NAVEGACAO_LOCAL = [
+  { pagina: "Dashboard", aliases: ["dashboard", "painel inicial", "tela inicial", "inicio", "home"] },
+  { pagina: "Clientes", aliases: ["cadastro de clientes", "carteira de clientes", "lista de clientes", "clientes"] },
+  { pagina: "Fiscal", aliases: ["modulo fiscal", "tela fiscal", "area fiscal", "parte fiscal", "fiscal"] },
+  { pagina: "Financeiro", aliases: ["financeiro do escritorio", "modulo financeiro", "tela financeira", "financeiro"] },
+  { pagina: "Movimentos Clientes", aliases: ["movimentos dos clientes", "movimentacoes dos clientes", "movimentos clientes", "movimentacoes clientes", "movimentacoes", "movimentos"] },
+  { pagina: "Lançamentos Contábeis", aliases: ["lancamentos contabeis", "lancamento contabil", "contabilidade", "contabil"] },
+  { pagina: "DRE Gerencial", aliases: ["dre gerencial", "demonstracao do resultado", "dre"] },
+  { pagina: "Documentos Digitais", aliases: ["documentos digitais", "documentos"] },
+  { pagina: "Pendências Clientes", aliases: ["pendencias dos clientes", "pendencias clientes", "pendencias"] },
+  { pagina: "Acesso Rápido Fiscal", aliases: ["acesso rapido fiscal", "atalhos fiscais"] },
+  { pagina: "WhatsApp Inteligente", aliases: ["whatsapp inteligente", "whatsapp"] },
+  { pagina: "Assistente do Dia", aliases: ["assistente do dia", "prioridades do dia"] },
+  { pagina: "Escritório Digital", aliases: ["escritorio digital"] },
+  { pagina: "Certificados Digitais", aliases: ["certificados digitais", "certificado digital", "certificados"] },
+  { pagina: "Procurações e-CAC", aliases: ["procuracoes e-cac", "procuracoes ecac", "procuracoes"] },
+  { pagina: "Central e-CAC", aliases: ["central e-cac", "central ecac", "e-cac", "ecac"] },
+  { pagina: "Memória da Nexa", aliases: ["memoria da nexa", "memoria nexa"] },
+  { pagina: "Segundo Contador", aliases: ["segundo contador"] },
+  { pagina: "Consultora Tributária", aliases: ["consultora tributaria", "consultora"] },
+  { pagina: "Conversa com a Nexa", aliases: ["conversa com a nexa", "nexa assist"] },
+  { pagina: "Radar Inteligente", aliases: ["radar inteligente", "radar"] },
+  { pagina: "Relatórios", aliases: ["relatorios"] },
+  { pagina: "Agenda", aliases: ["agenda"] },
+  { pagina: "Backup Sistema", aliases: ["backup do sistema", "backup sistema", "backup"] },
+  { pagina: "Sobre", aliases: ["sobre a nexa", "sobre"] },
+]
+
+function normalizarComandoLocal(valor) {
+  return String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[.,!?;:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function detectarAcaoLocalDeNavegacao(textoOriginal) {
+  const texto = normalizarComandoLocal(textoOriginal)
+  if (!texto) return null
+
+  const temVerbo = /(^|\s)(abra|abre|abrir|acesse|acessar|entre|entrar|va|vai|ir|navegue|navegar|mostre|mostrar|exiba|ver|volte|voltar|retorne|retornar|me leve|me leva)(\s|$)/.test(texto)
+
+  const candidatos = NAVEGACAO_LOCAL
+    .flatMap((item) => item.aliases.map((alias) => ({ pagina: item.pagina, alias })))
+    .sort((a, b) => b.alias.length - a.alias.length)
+
+  const encontrado = candidatos.find(({ alias }) => texto === alias || (temVerbo && texto.includes(alias)))
+  if (!encontrado) return null
+
+  return {
+    tipo: "navegar",
+    pagina: encontrado.pagina,
+    alvo: "pagina",
+    segura: true,
+    cliente: null,
+  }
+}
+
+function respostaLocalDeNavegacao(pagina) {
+  const respostas = {
+    Dashboard: ["Dashboard aberto.", "Pronto."],
+    Clientes: ["Clientes abertos.", "Certo."],
+    Fiscal: ["Fiscal aberto.", "Pronto."],
+    Financeiro: ["Financeiro aberto.", "Pronto."],
+    "Movimentos Clientes": ["Movimentações abertas.", "Aqui está."],
+    "Lançamentos Contábeis": ["Lançamentos contábeis abertos.", "Certo."],
+    "DRE Gerencial": ["DRE aberta.", "Aqui está."],
+    "Documentos Digitais": ["Documentos abertos.", "Aqui está."],
+    "Pendências Clientes": ["Pendências abertas.", "Certo."],
+  }
+  return respostas[pagina] || ["Tela aberta.", "Pronto."]
+}
+
 function limparRespostaDaNexa(valor, fallback = "Comando concluído.") {
   const texto = String(valor || "").trim()
   if (!texto) return fallback
@@ -528,6 +603,27 @@ export default function NexaVoiceListener({ usuario, setPage }) {
     setUltimaFala(comando)
     atualizarEstado("processando", comando)
     pausarReconhecimento()
+
+    // Comandos simples de navegação são executados diretamente no navegador.
+    // Assim a voz usa exatamente o mesmo setPage da interface e não depende
+    // da resposta da IA para abrir telas como Clientes, Fiscal e Financeiro.
+    const acaoLocal = detectarAcaoLocalDeNavegacao(comando)
+    if (acaoLocal) {
+      const executada = executarAcaoDeVoz({ acao: acaoLocal, setPage })
+      if (executada) {
+        const [respostaLocal, falaLocal] = respostaLocalDeNavegacao(acaoLocal.pagina)
+        setUltimaResposta(respostaLocal)
+        historicoRef.current = [
+          ...historicoRef.current,
+          { autor: "Você", texto: comando },
+          { autor: "Nexa", texto: respostaLocal },
+        ].slice(-12)
+        if (falaLocal) await falarResposta(falaLocal)
+        voltarParaEscuta()
+        return
+      }
+    }
+
     const contexto = obterContextoVoz()
 
     try {
