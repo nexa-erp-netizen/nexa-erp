@@ -12,6 +12,7 @@ import {
   obterContextoVoz,
   precarregarClientesVoz,
   registrarConversaVoz,
+  resolverEscolhaClientePendente,
 } from "../services/nexaVoiceService"
 
 const VOICE_ENABLED_KEY = "nexaVoiceEnabled"
@@ -21,6 +22,7 @@ const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.:;-]*(.*)$/i
 const END_SESSION_PATTERN = /^\s*(?:muito\s+)?obrigad[oa][.!?]*\s*$/i
 const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|exatamente|essa mesma|esse mesmo|pode ser|é esse|e esse|é essa|e essa)[.!?]*\s*$/i
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|outra)[.!?]*\s*$/i
+const CANCELAR_SELECAO_CLIENTE_PATTERN = /^\s*(?:cancela|cancelar|cancele|deixa|deixe|deixa pra la|deixa para la|esquece|esqueca|não quero|nao quero)[.!?]*\s*$/i
 const TEMPO_MAXIMO_FALA_MS = 30000
 
 const SILENCIO_PARA_FINALIZAR_MS = 520
@@ -295,7 +297,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const [microfone, setMicrofone] = useState("Microfone padrão do Windows")
   const [microfonesDisponiveis, setMicrofonesDisponiveis] = useState([])
   const [microfoneSelecionado, setMicrofoneSelecionado] = useState(() => localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
-  const [vozAtiva, setVozAtiva] = useState("Procurando voz feminina...")
+  const [vozAtiva, setVozAtiva] = useState("Preparando voz da Nexa...")
   const [transcricaoAtiva, setTranscricaoAtiva] = useState("Groq Whisper")
   const [expandido, setExpandido] = useState(false)
   const [totalVocabulario, setTotalVocabulario] = useState(0)
@@ -315,6 +317,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const sugestaoVocabularioRef = useRef(null)
   const vocabularioRef = useRef([])
   const clientesConhecidosRef = useRef([])
+  const selecaoClientePendenteRef = useRef(null)
   const vozNeuralDisponivelRef = useRef(false)
   const vozNeuralNomeRef = useRef("pt-BR-FranciscaNeural")
   const transcricaoDisponivelRef = useRef(false)
@@ -569,7 +572,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       audioVozRef.current = audio
       audio.onended = () => finalizar(true)
       audio.onerror = () => finalizar(false)
-      setVozAtiva(`Voz neural — ${vozNeuralNomeRef.current}`)
+      setVozAtiva("Nexa — voz neural")
       await audio.play()
       setTimeout(() => finalizar(false), TEMPO_MAXIMO_FALA_MS)
     } catch (error) {
@@ -669,6 +672,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     await falarResposta("Por nada.")
     sessaoAtivaRef.current = false
     setSessaoAtiva(false)
+    selecaoClientePendenteRef.current = null
     processandoRef.current = false
     modoRef.current = "wake"
     atualizarEstado("aguardando", "Conversa encerrada. Diga “Bom dia”, “Boa tarde” ou “Nexa” quando precisar de mim.")
@@ -704,6 +708,13 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     // não depende de uma lista rígida de frases no navegador.
 
     const contexto = obterContextoVoz()
+    const selecaoClientePendente = selecaoClientePendenteRef.current
+    const cancelarSelecaoCliente = Boolean(
+      selecaoClientePendente && CANCELAR_SELECAO_CLIENTE_PATTERN.test(comando),
+    )
+    const clienteEscolhido = selecaoClientePendente && !cancelarSelecaoCliente
+      ? resolverEscolhaClientePendente(comando, selecaoClientePendente)
+      : null
 
     try {
       const resposta = await conversarComNexa({
@@ -714,6 +725,9 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         historico: historicoRef.current,
         origem: "voz",
         paginaAtual: page || "",
+        selecaoClientePendente,
+        selecaoClienteId: clienteEscolhido?.id || null,
+        cancelarSelecaoCliente,
       })
 
       if (resposta.conversaId) {
@@ -728,6 +742,16 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         ? limparRespostaDaNexa(resposta.fala, resposta.acao ? "Pronto." : textoResposta)
         : textoResposta
       setUltimaResposta(textoResposta)
+
+      if (resposta.selecaoClientePendente) {
+        selecaoClientePendenteRef.current = resposta.selecaoClientePendente
+      } else if (
+        resposta.selecaoClienteConcluida
+        || resposta.selecaoClienteCancelada
+        || (selecaoClientePendente && resposta.acao)
+      ) {
+        selecaoClientePendenteRef.current = null
+      }
 
       if (resposta.vocabularioSugestao) {
         sugestaoVocabularioRef.current = resposta.vocabularioSugestao
@@ -1181,9 +1205,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         : "Groq Whisper indisponível")
 
       if (status.neuralDisponivel) {
-        setVozAtiva(status.provedor === "microsoft-edge"
-          ? "Microsoft Edge Neural — Francisca"
-          : `Voz neural — ${vozNeuralNomeRef.current}`)
+        setVozAtiva("Nexa — voz neural")
       } else {
         const voz = escolherVozFeminina(window.speechSynthesis?.getVoices?.() || [])
         setVozAtiva(nomeAmigavelVoz(voz))
@@ -1231,6 +1253,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     capturaPausadaRef.current = true
     sessaoAtivaRef.current = false
     setSessaoAtiva(false)
+    selecaoClientePendenteRef.current = null
     window.speechSynthesis?.cancel?.()
     modoRef.current = "wake"
     pararCapturaAudio()
@@ -1271,6 +1294,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       ativadaRef.current = true
       sessaoAtivaRef.current = false
       setSessaoAtiva(false)
+      selecaoClientePendenteRef.current = null
       modoRef.current = "wake"
       setEstado({ ativada: true, status: "iniciando", detalhe: "Preparando microfone e Groq Whisper..." })
       await Promise.all([carregarVocabulario(), carregarClientesParaVoz()])

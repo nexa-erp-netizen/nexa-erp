@@ -3,6 +3,12 @@ import api from "../services/api"
 import WhatsAppMenu from "../components/WhatsAppMenu"
 import { analisarPlanejamentoTributario } from "../motorTributario"
 
+function formatarCodigoCliente(id) {
+  const numero = Number(id)
+  if (!Number.isInteger(numero) || numero <= 0) return ""
+  return `CLI-${String(numero).padStart(4, "0")}`
+}
+
 export default function Clientes({ setPage }) {
   const [tela, setTela] = useState("lista")
   const [clienteSelecionado, setClienteSelecionado] = useState(null)
@@ -762,9 +768,15 @@ export default function Clientes({ setPage }) {
     String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR", { sensitivity: "base" })
   )
 
-  const clientesFiltrados = clientesOrdenados.filter((cliente) =>
-    String(cliente.nome || "").toLowerCase().includes(pesquisaCliente.toLowerCase())
-  )
+  const pesquisaNormalizada = String(pesquisaCliente || "").trim().toLowerCase()
+  const clientesFiltrados = clientesOrdenados.filter((cliente) => {
+    if (!pesquisaNormalizada) return true
+    const nomeCliente = String(cliente.nome || "").toLowerCase()
+    const codigoCliente = formatarCodigoCliente(cliente.id).toLowerCase()
+    return nomeCliente.includes(pesquisaNormalizada)
+      || codigoCliente.includes(pesquisaNormalizada)
+      || String(cliente.id) === pesquisaNormalizada.replace(/\D/g, "")
+  })
 
   const proximasAcoesCliente = Array.isArray(clienteSelecionado?.proximasAcoes)
     ? clienteSelecionado.proximasAcoes
@@ -1036,7 +1048,7 @@ export default function Clientes({ setPage }) {
           <div style={pesquisaBox}>
             <input
               style={input}
-              placeholder="Pesquisar cliente pelo nome..."
+              placeholder="Pesquisar cliente pelo nome ou código..."
               value={pesquisaCliente}
               onChange={(e) => setPesquisaCliente(e.target.value)}
             />
@@ -1045,6 +1057,7 @@ export default function Clientes({ setPage }) {
           <table style={table}>
             <thead>
               <tr>
+                <th style={th}>Código</th>
                 <th style={th}>Cliente</th>
                 <th style={th}>CPF</th>
                 <th style={th}>Telefone</th>
@@ -1055,6 +1068,7 @@ export default function Clientes({ setPage }) {
             <tbody>
               {clientesFiltrados.map((cliente) => (
                 <tr key={cliente.id}>
+                  <td style={td}><strong>{formatarCodigoCliente(cliente.id)}</strong></td>
                   <td style={td}>{cliente.nome}</td>
                   <td style={td}>{cliente.cpf}</td>
                   <td style={td}>{cliente.telefone}</td>
@@ -1093,6 +1107,15 @@ export default function Clientes({ setPage }) {
               value={nome}
               onChange={(e) => setNome(e.target.value)}
             />
+
+            {editandoId !== null && (
+              <input
+                style={{ ...input, opacity: 0.8 }}
+                value={formatarCodigoCliente(editandoId)}
+                readOnly
+                title="Código único do cliente usado pela Nexa Voice"
+              />
+            )}
 
             <input
               style={input}
@@ -1383,6 +1406,8 @@ export default function Clientes({ setPage }) {
                 <h2 style={centralTitulo}>{clienteSelecionado.nome}</h2>
 
                 <div style={centralMeta}>
+                  <span><strong>{formatarCodigoCliente(clienteSelecionado.id)}</strong></span>
+                  <span>•</span>
                   <span>{clienteSelecionado.regime || "Regime não informado"}</span>
                   <span>•</span>
                   <span>{localidadeCliente || "Cidade não informada"}</span>
@@ -1455,6 +1480,7 @@ export default function Clientes({ setPage }) {
           </div>
 
           <div style={contatoRapido}>
+            <Info label="Código Nexa" value={formatarCodigoCliente(clienteSelecionado.id)} />
             <Info label="Telefone" value={clienteSelecionado.telefone} />
             <Info label="E-mail" value={clienteSelecionado.email} />
             <Info label="CNPJ" value={clienteSelecionado.cnpj} />

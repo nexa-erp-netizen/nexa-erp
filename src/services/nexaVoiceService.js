@@ -4,6 +4,13 @@ const CLIENTE_ID_KEY = "nexaVoiceClienteId"
 const CLIENTE_NOME_KEY = "nexaVoiceClienteNome"
 const CONVERSA_ID_KEY = "nexaVoiceConversaId"
 
+export function formatarCodigoCliente(clienteOuId) {
+  const id = typeof clienteOuId === "object" ? clienteOuId?.id : clienteOuId
+  const numero = Number(id)
+  if (!Number.isInteger(numero) || numero <= 0) return ""
+  return `CLI-${String(numero).padStart(4, "0")}`
+}
+
 function normalizarTextoVoz(valor) {
   return String(valor || "")
     .normalize("NFD")
@@ -40,6 +47,41 @@ function similaridade(a, b) {
   const maior = Math.max(origem.length, destino.length)
   if (!maior) return 1
   return 1 - (distanciaLevenshtein(origem, destino) / maior)
+}
+
+export function resolverEscolhaClientePendente(texto, selecao) {
+  const candidatos = Array.isArray(selecao?.candidatos) ? selecao.candidatos : []
+  if (!candidatos.length) return null
+
+  const normalizado = normalizarTextoVoz(texto)
+  if (!normalizado) return null
+
+  const ordinais = [
+    [/(?:^|\s)(?:primeiro|primeira|um|uma)(?:\s|$)/, 0],
+    [/(?:^|\s)(?:segundo|segunda|dois|duas)(?:\s|$)/, 1],
+    [/(?:^|\s)(?:terceiro|terceira|tres)(?:\s|$)/, 2],
+    [/(?:^|\s)(?:quarto|quarta|quatro)(?:\s|$)/, 3],
+  ]
+  for (const [padrao, indice] of ordinais) {
+    if (padrao.test(normalizado) && candidatos[indice]) return candidatos[indice]
+  }
+
+  const numeros = [...normalizado.matchAll(/\d+/g)].map((item) => Number(item[0]))
+  for (const numero of numeros) {
+    const porId = candidatos.find((item) => Number(item.id) === numero)
+    if (porId) return porId
+  }
+
+  const correspondencias = candidatos.filter((item) => {
+    const nome = normalizarTextoVoz(item.nome)
+    const codigo = normalizarTextoVoz(item.codigo || formatarCodigoCliente(item.id))
+    return Boolean(
+      (codigo && normalizado.includes(codigo))
+      || (nome && (normalizado === nome || normalizado.includes(nome))),
+    )
+  })
+
+  return correspondencias.length === 1 ? correspondencias[0] : null
 }
 
 const CACHE_CLIENTES_TTL_MS = 5 * 60 * 1000
