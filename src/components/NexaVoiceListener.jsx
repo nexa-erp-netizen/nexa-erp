@@ -47,7 +47,7 @@ const NAVEGACAO_LOCAL = [
   { pagina: "Pendências Clientes", aliases: ["pendencias dos clientes", "pendencias clientes", "pendencias"] },
   { pagina: "Acesso Rápido Fiscal", aliases: ["acesso rapido fiscal", "atalhos fiscais"] },
   { pagina: "WhatsApp Inteligente", aliases: ["whatsapp inteligente", "whatsapp"] },
-  { pagina: "Assistente do Dia", aliases: ["assistente do dia", "prioridades do dia"] },
+  { pagina: "Assistente do Dia", aliases: ["assistente do dia", "prioridades do dia", "iniciar meu dia", "comecar meu dia", "começar meu dia"] },
   { pagina: "Escritório Digital", aliases: ["escritorio digital"] },
   { pagina: "Certificados Digitais", aliases: ["certificados digitais", "certificado digital", "certificados"] },
   { pagina: "Procurações e-CAC", aliases: ["procuracoes e-cac", "procuracoes ecac", "procuracoes"] },
@@ -535,7 +535,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     const contexto = obterContextoVoz()
 
     return [
-      "Nexa, bom dia, boa tarde, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, e-CAC, PGDAS-D, DCTFWeb, DAS.",
+      "Nexa, bom dia, boa tarde, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, e-CAC, PGDAS-D, DCTFWeb, DAS, prioridades de hoje, qual é a prioridade para hoje, o que tenho para fazer hoje, iniciar meu dia.",
       nomesClientes.length ? `Nomes de clientes do escritório: ${nomesClientes.join(", ")}.` : "",
       contexto.clienteNome ? `Cliente atual: ${contexto.clienteNome}.` : "",
       termos.length ? `Vocabulário aprendido: ${termos.join(", ")}.` : "",
