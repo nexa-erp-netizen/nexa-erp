@@ -299,6 +299,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const [transcricaoAtiva, setTranscricaoAtiva] = useState("Groq Whisper")
   const [expandido, setExpandido] = useState(false)
   const [totalVocabulario, setTotalVocabulario] = useState(0)
+  const [historicoSalvo, setHistoricoSalvo] = useState(() => Boolean(obterContextoVoz().conversaId))
 
   const ativadaRef = useRef(estado.ativada)
   const sessaoAtivaRef = useRef(false)
@@ -313,6 +314,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const tratarTranscricaoRef = useRef(null)
   const sugestaoVocabularioRef = useRef(null)
   const vocabularioRef = useRef([])
+  const clientesConhecidosRef = useRef([])
   const vozNeuralDisponivelRef = useRef(false)
   const vozNeuralNomeRef = useRef("pt-BR-FranciscaNeural")
   const transcricaoDisponivelRef = useRef(false)
@@ -507,16 +509,38 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     }
   }, [])
 
+  const carregarClientesParaVoz = useCallback(async () => {
+    const clientes = await precarregarClientesVoz()
+    clientesConhecidosRef.current = Array.isArray(clientes) ? clientes : []
+    return clientesConhecidosRef.current
+  }, [])
+
   const montarPromptTranscricao = useCallback(() => {
     const termos = vocabularioRef.current
       .map((item) => item?.termoCorreto || item?.termo_correto || item?.termoOuvido || "")
       .filter(Boolean)
       .slice(0, 20)
 
+    const nomesClientes = clientesConhecidosRef.current
+      .map((cliente) => String(cliente?.nome || cliente?.razaoSocial || cliente?.nomeFantasia || "").trim())
+      .filter(Boolean)
+      .slice(0, 35)
+
+    const falasRecentes = historicoRef.current
+      .filter((item) => item?.autor === "Você")
+      .map((item) => String(item?.texto || "").trim())
+      .filter(Boolean)
+      .slice(-3)
+
+    const contexto = obterContextoVoz()
+
     return [
-      "Nexa, bom dia, boa tarde, Multicópias, Fiscal, Movimentações, Contábil, DRE, lançamentos contábeis, e-CAC, PGDAS-D, DCTFWeb, DAS.",
-      termos.length ? `Vocabulário do escritório: ${termos.join(", ")}.` : "",
-    ].filter(Boolean).join(" ")
+      "Nexa, bom dia, boa tarde, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, e-CAC, PGDAS-D, DCTFWeb, DAS.",
+      nomesClientes.length ? `Nomes de clientes do escritório: ${nomesClientes.join(", ")}.` : "",
+      contexto.clienteNome ? `Cliente atual: ${contexto.clienteNome}.` : "",
+      termos.length ? `Vocabulário aprendido: ${termos.join(", ")}.` : "",
+      falasRecentes.length ? `Contexto recente: ${falasRecentes.join("; ")}.` : "",
+    ].filter(Boolean).join(" ").slice(0, 700)
   }, [])
 
   const falarComVozNeural = useCallback((texto) => new Promise(async (resolve) => {
@@ -695,11 +719,14 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       if (resposta.conversaId) {
         conversaIdRef.current = resposta.conversaId
         registrarConversaVoz(resposta.conversaId)
+        setHistoricoSalvo(Boolean(resposta.historicoSalvo ?? true))
       }
 
       const textoResposta = limparRespostaDaNexa(resposta.resposta || "Comando concluído.")
       const temFalaEspecifica = Object.prototype.hasOwnProperty.call(resposta, "fala")
-      const textoFalado = temFalaEspecifica ? limparRespostaDaNexa(resposta.fala, "") : textoResposta
+      const textoFalado = temFalaEspecifica
+        ? limparRespostaDaNexa(resposta.fala, resposta.acao ? "Pronto." : textoResposta)
+        : textoResposta
       setUltimaResposta(textoResposta)
 
       if (resposta.vocabularioSugestao) {
@@ -1217,10 +1244,10 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     carregarMicrofones()
     if (estado.ativada) {
       carregarVocabulario()
-      precarregarClientesVoz()
+      carregarClientesParaVoz()
     }
     return () => navigator.mediaDevices?.removeEventListener?.("devicechange", aoMudarDispositivo)
-  }, [atualizarNomeMicrofone, carregarMicrofones, carregarVocabulario, estado.ativada])
+  }, [atualizarNomeMicrofone, carregarClientesParaVoz, carregarMicrofones, carregarVocabulario, estado.ativada])
 
   useEffect(() => () => {
     clearTimeout(reinicioRef.current)
@@ -1246,7 +1273,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       setSessaoAtiva(false)
       modoRef.current = "wake"
       setEstado({ ativada: true, status: "iniciando", detalhe: "Preparando microfone e Groq Whisper..." })
-      await Promise.all([carregarVocabulario(), precarregarClientesVoz()])
+      await Promise.all([carregarVocabulario(), carregarClientesParaVoz()])
       await iniciarCapturaAudio()
     } catch (error) {
       console.error("[Nexa Voice] Não foi possível ativar:", error)
@@ -1327,7 +1354,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           </label>
           <div style={styles.microphone}><span>Transcrição</span><strong>{transcricaoAtiva}</strong></div>
           <div style={styles.microphone}><span>Voz</span><strong>{vozAtiva}</strong></div>
-          <div style={styles.vocabulary}>Vocabulário adaptativo ativo · {totalVocabulario} termos aprendidos</div>
+          <div style={styles.vocabulary}>Memória de conversa ativa · vocabulário: {totalVocabulario} termos aprendidos</div>
+          {historicoSalvo && <div style={styles.memoryBadge}>Histórico desta conversa salvo na Nexa</div>}
           {sessaoAtiva && <div style={styles.sessionBadge}>Conversa aberta — diga “Obrigado” para encerrar</div>}
           {ultimaFala && <div style={styles.last}><span>Você</span><p>{ultimaFala}</p></div>}
           {ultimaResposta && <div style={styles.last}><span>Nexa</span><p>{ultimaResposta}</p></div>}
@@ -1382,6 +1410,7 @@ const styles = {
   microphoneSelect: { width: "100%", minWidth: 0, padding: "7px 8px", borderRadius: "7px", border: "1px solid rgba(139,215,255,.24)", background: "#0b284b", color: "#f4fbff", fontSize: "11px", outline: "none" },
   microphoneCurrent: { color: "#8fb0cf", lineHeight: 1.3 },
   vocabulary: { fontSize: "11px", color: "#9ee7c2", marginTop: "-3px" },
+  memoryBadge: { padding: "7px 9px", borderRadius: "9px", background: "rgba(0,168,255,.08)", border: "1px solid rgba(0,168,255,.20)", color: "#a9ddff", fontSize: "11px", fontWeight: 700 },
   sessionBadge: { padding: "8px 9px", borderRadius: "9px", background: "rgba(55,255,116,.09)", border: "1px solid rgba(55,255,116,.22)", color: "#aaffc5", fontSize: "11px", fontWeight: 700 },
   last: { padding: "9px", background: "rgba(0,168,255,.08)", border: "1px solid rgba(0,168,255,.17)", borderRadius: "9px" },
   control: { border: 0, borderRadius: "10px", padding: "10px 12px", fontWeight: "bold", cursor: "pointer" },
