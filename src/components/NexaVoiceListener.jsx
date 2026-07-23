@@ -294,6 +294,10 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const [sessaoAtiva, setSessaoAtiva] = useState(false)
   const [ultimaFala, setUltimaFala] = useState("")
   const [ultimaResposta, setUltimaResposta] = useState("")
+  const [mensagemDigitada, setMensagemDigitada] = useState("")
+  const [mensagensPainel, setMensagensPainel] = useState([])
+  const [enviandoTexto, setEnviandoTexto] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640)
   const [microfone, setMicrofone] = useState("Microfone padrão do Windows")
   const [microfonesDisponiveis, setMicrofonesDisponiveis] = useState([])
   const [microfoneSelecionado, setMicrofoneSelecionado] = useState(() => localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
@@ -324,6 +328,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const audioVozRef = useRef(null)
   const ultimaRespostaFaladaRef = useRef("")
   const ignorarEcoAteRef = useRef(0)
+  const fimPainelRef = useRef(null)
 
   const streamRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -345,6 +350,16 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const pararCapturaRef = useRef(null)
   const reiniciandoCapturaRef = useRef(false)
   const microfoneSelecionadoRef = useRef(localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
+
+  useEffect(() => {
+    const atualizarMobile = () => setIsMobile(window.innerWidth <= 640)
+    window.addEventListener("resize", atualizarMobile)
+    return () => window.removeEventListener("resize", atualizarMobile)
+  }, [])
+
+  useEffect(() => {
+    fimPainelRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" })
+  }, [mensagensPainel, enviandoTexto, expandido])
 
   const atualizarEstado = useCallback((status, detalhe = "") => {
     setEstado((atual) => ({ ...atual, status, detalhe }))
@@ -694,12 +709,21 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     voltarParaEscuta()
   }, [falarResposta, pausarReconhecimento, voltarParaEscuta])
 
-  const processarComando = useCallback(async (texto) => {
+  const processarComando = useCallback(async (texto, opcoes = {}) => {
     const comando = String(texto || "").trim()
     if (!comando || processandoRef.current) return
 
+    const origem = opcoes.origem === "texto" ? "texto" : "voz"
+    const deveFalar = opcoes.falar !== false
+    const idBase = Date.now()
+
     processandoRef.current = true
+    if (origem === "texto") setEnviandoTexto(true)
     setUltimaFala(comando)
+    setMensagensPainel((atual) => [
+      ...atual,
+      { id: `usuario-${idBase}`, autor: "Você", texto: comando, data: new Date().toISOString() },
+    ].slice(-30))
     atualizarEstado("processando", comando)
     pausarReconhecimento()
 
@@ -723,7 +747,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         conversaId: conversaIdRef.current || contexto.conversaId || null,
         tipoContexto: contexto.clienteId ? "cliente" : "geral",
         historico: historicoRef.current,
-        origem: "voz",
+        origem,
         paginaAtual: page || "",
         selecaoClientePendente,
         selecaoClienteId: clienteEscolhido?.id || null,
@@ -742,6 +766,16 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         ? limparRespostaDaNexa(resposta.fala, resposta.acao ? "Pronto." : textoResposta)
         : textoResposta
       setUltimaResposta(textoResposta)
+      setMensagensPainel((atual) => [
+        ...atual,
+        {
+          id: `nexa-${idBase}`,
+          autor: "Nexa",
+          texto: textoResposta,
+          data: resposta.respondidoEm || new Date().toISOString(),
+          acaoExecutada: Boolean(resposta.acao),
+        },
+      ].slice(-30))
 
       if (resposta.selecaoClientePendente) {
         selecaoClientePendenteRef.current = resposta.selecaoClientePendente
@@ -755,8 +789,13 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
       if (resposta.vocabularioSugestao) {
         sugestaoVocabularioRef.current = resposta.vocabularioSugestao
-        await falarResposta(textoResposta)
-        voltarParaEscuta()
+        if (deveFalar) await falarResposta(textoResposta)
+        setEnviandoTexto(false)
+        if (ativadaRef.current) voltarParaEscuta()
+        else {
+          processandoRef.current = false
+          atualizarEstado("pausada", "Escuta contínua pausada.")
+        }
         return
       }
 
@@ -769,18 +808,38 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       ].slice(-12)
 
       const acaoExecutada = executarAcaoDeVoz({ acao: resposta.acao, setPage })
-      if (acaoExecutada) tocarSinal(690, 55)
-      if (textoFalado) await falarResposta(textoFalado)
-      voltarParaEscuta(acaoExecutada ? TEMPO_REARME_COMANDO_DIRETO_MS : undefined)
+      if (acaoExecutada && origem === "voz") tocarSinal(690, 55)
+      if (deveFalar && textoFalado) await falarResposta(textoFalado)
+
+      setEnviandoTexto(false)
+      if (ativadaRef.current) {
+        voltarParaEscuta(acaoExecutada ? TEMPO_REARME_COMANDO_DIRETO_MS : undefined)
+      } else {
+        processandoRef.current = false
+        atualizarEstado("pausada", "Escuta contínua pausada.")
+      }
     } catch (error) {
       console.error("[Nexa Voice] Falha ao processar comando:", error)
       const mensagem = error.response?.data?.message || error.message || "Não consegui processar o comando."
       setUltimaResposta(mensagem)
+      setMensagensPainel((atual) => [
+        ...atual,
+        { id: `erro-${idBase}`, autor: "Nexa", texto: mensagem, data: new Date().toISOString(), erro: true },
+      ].slice(-30))
+      setEnviandoTexto(false)
       processandoRef.current = false
       atualizarEstado("erro", mensagem)
-      agendarReinicio(1800)
+      if (ativadaRef.current) agendarReinicio(1800)
     }
   }, [agendarReinicio, atualizarEstado, carregarVocabulario, falarResposta, page, pausarReconhecimento, setPage, voltarParaEscuta])
+
+  const enviarMensagemDigitada = useCallback(async () => {
+    const texto = String(mensagemDigitada || "").trim()
+    if (!texto || enviandoTexto || processandoRef.current) return
+
+    setMensagemDigitada("")
+    await processarComando(texto, { origem: "texto", falar: false })
+  }, [enviandoTexto, mensagemDigitada, processarComando])
 
   const confirmarSugestaoVocabulario = useCallback(async (texto) => {
     const sugestao = sugestaoVocabularioRef.current
@@ -1346,53 +1405,146 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   if (!usuario || usuario.perfil === "Cliente") return null
 
   return (
-    <aside style={{ ...styles.container, ...(expandido ? styles.containerExpanded : {}) }} aria-live="polite">
+    <aside
+      style={{
+        ...styles.container,
+        ...(expandido ? styles.containerExpanded : {}),
+        ...(isMobile ? styles.containerMobile : {}),
+      }}
+      aria-live="polite"
+    >
       <button type="button" style={styles.header} onClick={() => setExpandido((valor) => !valor)}>
         <span style={{ ...styles.dot, ...(estado.ativada ? styles.dotActive : styles.dotPaused) }} />
         <span style={styles.headerText}>
-          <strong>Nexa Voice</strong>
+          <strong>Nexa</strong>
           <small>{nomeStatus(estado.status)}</small>
         </span>
         <span style={styles.chevron}>{expandido ? "−" : "+"}</span>
       </button>
 
       {expandido && (
-        <div style={styles.content}>
-          <p style={styles.detail}>{estado.detalhe}</p>
-          <label style={styles.microphone}>
-            <span>Entrada</span>
-            <select
-              value={microfoneSelecionado}
-              onChange={trocarMicrofone}
-              style={styles.microphoneSelect}
-              aria-label="Selecionar microfone da Nexa Voice"
+        <div style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
+          <div style={styles.quickActions}>
+            <button
+              type="button"
+              style={styles.openFull}
+              onClick={() => setPage?.("Conversa com a Nexa")}
             >
-              {!microfonesDisponiveis.length && <option value="">{microfone}</option>}
-              {microfonesDisponiveis.map((entrada, indice) => (
-                <option key={entrada.deviceId} value={entrada.deviceId}>
-                  {entrada.label || `Microfone ${indice + 1}`}
-                </option>
-              ))}
-            </select>
-            <small style={styles.microphoneCurrent}>Em uso: {microfone}</small>
-          </label>
-          <div style={styles.microphone}><span>Transcrição</span><strong>{transcricaoAtiva}</strong></div>
-          <div style={styles.microphone}><span>Voz</span><strong>{vozAtiva}</strong></div>
-          <div style={styles.vocabulary}>Memória de conversa ativa · vocabulário: {totalVocabulario} termos aprendidos</div>
-          {historicoSalvo && <div style={styles.memoryBadge}>Histórico desta conversa salvo na Nexa</div>}
-          {sessaoAtiva && <div style={styles.sessionBadge}>Conversa aberta — diga “Obrigado” para encerrar</div>}
-          {ultimaFala && <div style={styles.last}><span>Você</span><p>{ultimaFala}</p></div>}
-          {ultimaResposta && <div style={styles.last}><span>Nexa</span><p>{ultimaResposta}</p></div>}
-          <button type="button" style={{ ...styles.control, ...(estado.ativada ? styles.controlPause : styles.controlStart) }} onClick={pausarOuRetomar}>
-            {estado.ativada ? "Pausar escuta" : "Ativar uma vez"}
-          </button>
-          <small style={styles.help}>
-            Abra a conversa dizendo “Bom dia”, “Boa tarde” ou “Nexa”. O áudio é enviado à Groq somente quando a fala é detectada. Diga “Obrigado” para encerrar.
-          </small>
+              Abrir conversa completa
+            </button>
+            <button
+              type="button"
+              style={{ ...styles.voiceToggle, ...(estado.ativada ? styles.voiceToggleActive : {}) }}
+              onClick={pausarOuRetomar}
+              title={estado.ativada ? "Pausar a escuta da Nexa" : "Ativar a escuta da Nexa"}
+            >
+              {estado.ativada ? "Voz ativa" : "Ativar voz"}
+            </button>
+          </div>
+
+          <section style={styles.chatPanel} aria-label="Conversa rápida com a Nexa">
+            {!mensagensPainel.length && (
+              <div style={styles.welcomeMessage}>
+                <strong>Nexa</strong>
+                <p>Digite uma pergunta ou um comando. Posso consultar prioridades e abrir telas sem sair de onde você está.</p>
+              </div>
+            )}
+
+            {mensagensPainel.map((item) => (
+              <article
+                key={item.id}
+                style={{
+                  ...styles.chatMessage,
+                  ...(item.autor === "Você" ? styles.chatMessageUser : styles.chatMessageNexa),
+                  ...(item.erro ? styles.chatMessageError : {}),
+                }}
+              >
+                <div style={styles.chatMessageHeader}>
+                  <strong>{item.autor}</strong>
+                  <span>{formatarHorarioPainel(item.data)}</span>
+                </div>
+                <p style={styles.chatMessageText}>{item.texto}</p>
+                {item.acaoExecutada && <small style={styles.actionDone}>Tela aberta com segurança.</small>}
+              </article>
+            ))}
+
+            {enviandoTexto && <div style={styles.typingText}>A Nexa está respondendo...</div>}
+            <div ref={fimPainelRef} />
+          </section>
+
+          <div style={styles.composer}>
+            <textarea
+              value={mensagemDigitada}
+              onChange={(evento) => setMensagemDigitada(evento.target.value)}
+              onKeyDown={(evento) => {
+                if (evento.key === "Enter" && !evento.shiftKey) {
+                  evento.preventDefault()
+                  enviarMensagemDigitada()
+                }
+              }}
+              placeholder="Digite para a Nexa..."
+              rows={2}
+              style={styles.composerInput}
+              disabled={enviandoTexto}
+            />
+            <button
+              type="button"
+              style={{ ...styles.sendButton, ...(!mensagemDigitada.trim() || enviandoTexto ? styles.sendButtonDisabled : {}) }}
+              onClick={enviarMensagemDigitada}
+              disabled={!mensagemDigitada.trim() || enviandoTexto}
+            >
+              {enviandoTexto ? "..." : "Enviar"}
+            </button>
+          </div>
+
+          <div style={styles.statusRow}>
+            <span>{historicoSalvo ? "Histórico salvo" : "Nova conversa"}</span>
+            <span>{sessaoAtiva ? "Conversa por voz aberta" : estado.ativada ? "Aguardando chamada" : "Voz pausada"}</span>
+          </div>
+
+          <details style={styles.voiceDetails}>
+            <summary style={styles.voiceSummary}>Configurações de voz</summary>
+            <div style={styles.voiceDetailsContent}>
+              <p style={styles.detail}>{estado.detalhe}</p>
+              <label style={styles.microphone}>
+                <span>Entrada</span>
+                <select
+                  value={microfoneSelecionado}
+                  onChange={trocarMicrofone}
+                  style={styles.microphoneSelect}
+                  aria-label="Selecionar microfone da Nexa Voice"
+                >
+                  {!microfonesDisponiveis.length && <option value="">{microfone}</option>}
+                  {microfonesDisponiveis.map((entrada, indice) => (
+                    <option key={entrada.deviceId} value={entrada.deviceId}>
+                      {entrada.label || `Microfone ${indice + 1}`}
+                    </option>
+                  ))}
+                </select>
+                <small style={styles.microphoneCurrent}>Em uso: {microfone}</small>
+              </label>
+              <div style={styles.microphone}><span>Transcrição</span><strong>{transcricaoAtiva}</strong></div>
+              <div style={styles.microphone}><span>Voz</span><strong>{vozAtiva}</strong></div>
+              <div style={styles.vocabulary}>Memória de conversa ativa · vocabulário: {totalVocabulario} termos aprendidos</div>
+              {historicoSalvo && <div style={styles.memoryBadge}>Histórico desta conversa salvo na Nexa</div>}
+              {sessaoAtiva && <div style={styles.sessionBadge}>Conversa aberta — diga “Obrigado” para encerrar</div>}
+              {ultimaFala && <div style={styles.last}><span>Você</span><p>{ultimaFala}</p></div>}
+              {ultimaResposta && <div style={styles.last}><span>Nexa</span><p>{ultimaResposta}</p></div>}
+              <small style={styles.help}>
+                Abra a conversa dizendo “Bom dia”, “Boa tarde” ou “Nexa”. Diga “Obrigado” para encerrar.
+              </small>
+            </div>
+          </details>
         </div>
       )}
     </aside>
   )
+
+}
+
+function formatarHorarioPainel(data) {
+  if (!data) return ""
+  return new Date(data).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 }
 
 const styles = {
@@ -1403,20 +1555,21 @@ const styles = {
     zIndex: 9999,
     width: "250px",
     color: "#f4fbff",
-    background: "rgba(3,22,52,.96)",
+    background: "rgba(3,22,52,.97)",
     border: "1px solid rgba(0,190,255,.34)",
     borderRadius: "16px",
-    boxShadow: "0 18px 45px rgba(0,0,0,.38)",
+    boxShadow: "0 18px 45px rgba(0,0,0,.42)",
     overflow: "hidden",
     backdropFilter: "blur(12px)",
   },
-  containerExpanded: { width: "320px" },
+  containerExpanded: { width: "410px", maxWidth: "calc(100vw - 36px)" },
+  containerMobile: { right: "10px", bottom: "10px", width: "calc(100vw - 20px)", maxWidth: "calc(100vw - 20px)" },
   header: {
     width: "100%",
     display: "flex",
     alignItems: "center",
     gap: "10px",
-    background: "linear-gradient(135deg,rgba(0,168,255,.16),rgba(46,255,120,.08))",
+    background: "linear-gradient(135deg,rgba(0,168,255,.17),rgba(46,255,120,.09))",
     color: "inherit",
     border: 0,
     padding: "12px 14px",
@@ -1428,8 +1581,31 @@ const styles = {
   dotPaused: { background: "#ffbd59", boxShadow: "0 0 10px rgba(255,189,89,.55)" },
   headerText: { display: "flex", flexDirection: "column", gap: "2px", flex: 1 },
   chevron: { fontSize: "20px", color: "#8bd7ff" },
-  content: { padding: "13px", display: "flex", flexDirection: "column", gap: "10px" },
-  detail: { margin: 0, color: "#b9cbe0", fontSize: "12px", lineHeight: 1.45 },
+  content: { padding: "12px", display: "flex", flexDirection: "column", gap: "10px", maxHeight: "78vh", overflowY: "auto" },
+  contentMobile: { maxHeight: "76vh" },
+  quickActions: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "8px" },
+  openFull: { background: "rgba(0,168,255,.11)", color: "#a9ddff", border: "1px solid rgba(0,168,255,.28)", borderRadius: "9px", padding: "9px 10px", cursor: "pointer", fontWeight: 700, fontSize: "11px" },
+  voiceToggle: { background: "rgba(255,184,77,.10)", color: "#ffd298", border: "1px solid rgba(255,184,77,.28)", borderRadius: "9px", padding: "9px 10px", cursor: "pointer", fontWeight: 700, fontSize: "11px", whiteSpace: "nowrap" },
+  voiceToggleActive: { background: "rgba(55,255,116,.10)", color: "#aaffc5", borderColor: "rgba(55,255,116,.28)" },
+  chatPanel: { minHeight: "190px", maxHeight: "290px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "10px", background: "rgba(1,13,34,.66)", border: "1px solid rgba(255,255,255,.09)", borderRadius: "13px" },
+  welcomeMessage: { alignSelf: "flex-start", maxWidth: "90%", background: "rgba(0,168,255,.09)", border: "1px solid rgba(0,168,255,.20)", borderRadius: "12px", padding: "11px", color: "#d9edff" },
+  chatMessage: { maxWidth: "88%", padding: "9px 10px", borderRadius: "12px", border: "1px solid rgba(255,255,255,.09)", overflowWrap: "anywhere" },
+  chatMessageUser: { alignSelf: "flex-end", background: "#07539a" },
+  chatMessageNexa: { alignSelf: "flex-start", background: "#082b5d" },
+  chatMessageError: { borderColor: "rgba(255,95,101,.46)", background: "rgba(104,23,35,.72)" },
+  chatMessageHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", color: "#a9bdd3", fontSize: "10px" },
+  chatMessageText: { margin: "6px 0 0", whiteSpace: "pre-wrap", lineHeight: 1.45, fontSize: "12px" },
+  actionDone: { display: "block", marginTop: "7px", color: "#9effbc", fontWeight: 700 },
+  typingText: { color: "#8bd7ff", fontSize: "11px", fontStyle: "italic" },
+  composer: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "8px", alignItems: "stretch" },
+  composerInput: { width: "100%", boxSizing: "border-box", resize: "none", minHeight: "58px", maxHeight: "110px", background: "#071f43", color: "#f4fbff", border: "1px solid rgba(139,215,255,.22)", borderRadius: "11px", padding: "10px 11px", outline: "none", fontFamily: "inherit", fontSize: "12px", lineHeight: 1.4 },
+  sendButton: { border: 0, borderRadius: "11px", padding: "0 15px", background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", fontWeight: 800, cursor: "pointer" },
+  sendButtonDisabled: { opacity: .48, cursor: "not-allowed" },
+  statusRow: { display: "flex", justifyContent: "space-between", gap: "8px", flexWrap: "wrap", color: "#8fa9c3", fontSize: "10px" },
+  voiceDetails: { background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.08)", borderRadius: "10px", padding: "8px 10px" },
+  voiceSummary: { cursor: "pointer", color: "#a9ddff", fontSize: "11px", fontWeight: 700 },
+  voiceDetailsContent: { paddingTop: "10px", display: "flex", flexDirection: "column", gap: "9px" },
+  detail: { margin: 0, color: "#b9cbe0", fontSize: "11px", lineHeight: 1.45 },
   microphone: { display: "flex", flexDirection: "column", gap: "5px", padding: "9px", background: "rgba(255,255,255,.05)", borderRadius: "9px", fontSize: "11px" },
   microphoneSelect: { width: "100%", minWidth: 0, padding: "7px 8px", borderRadius: "7px", border: "1px solid rgba(139,215,255,.24)", background: "#0b284b", color: "#f4fbff", fontSize: "11px", outline: "none" },
   microphoneCurrent: { color: "#8fb0cf", lineHeight: 1.3 },
@@ -1437,8 +1613,5 @@ const styles = {
   memoryBadge: { padding: "7px 9px", borderRadius: "9px", background: "rgba(0,168,255,.08)", border: "1px solid rgba(0,168,255,.20)", color: "#a9ddff", fontSize: "11px", fontWeight: 700 },
   sessionBadge: { padding: "8px 9px", borderRadius: "9px", background: "rgba(55,255,116,.09)", border: "1px solid rgba(55,255,116,.22)", color: "#aaffc5", fontSize: "11px", fontWeight: 700 },
   last: { padding: "9px", background: "rgba(0,168,255,.08)", border: "1px solid rgba(0,168,255,.17)", borderRadius: "9px" },
-  control: { border: 0, borderRadius: "10px", padding: "10px 12px", fontWeight: "bold", cursor: "pointer" },
-  controlStart: { background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34" },
-  controlPause: { background: "rgba(255,184,77,.13)", color: "#ffd298", border: "1px solid rgba(255,184,77,.30)" },
   help: { color: "#849ab5", lineHeight: 1.4 },
 }
