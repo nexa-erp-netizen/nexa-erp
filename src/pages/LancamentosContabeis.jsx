@@ -17,6 +17,7 @@ export default function LancamentosContabeis() {
     servicoId: "",
     descricao: "",
     tipo: "despesa",
+    quantidade: 1,
     valor: "",
     data: "",
     categoria: "",
@@ -152,6 +153,25 @@ export default function LancamentosContabeis() {
     })
   }
 
+  function quantidadeSegura(valor) {
+    const quantidade = Math.trunc(Number(valor))
+    return Number.isFinite(quantidade) && quantidade > 0 ? quantidade : 1
+  }
+
+  function valorUnitarioLancamento(lancamento) {
+    const quantidade = quantidadeSegura(lancamento?.quantidade)
+
+    if (lancamento?.valorUnitario !== null && lancamento?.valorUnitario !== undefined && lancamento?.valorUnitario !== "") {
+      return valorSeguro(lancamento.valorUnitario)
+    }
+
+    return valorSeguro(lancamento?.valor) / quantidade
+  }
+
+  function totalFormulario() {
+    return quantidadeSegura(form.quantidade) * valorSeguro(form.valor)
+  }
+
   function formatarData(data) {
     if (!data) return "-"
     const d = new Date(data + "T00:00:00")
@@ -228,6 +248,7 @@ export default function LancamentosContabeis() {
         ...form,
         servicoId: "",
         descricao: "",
+        quantidade: 1,
         valor: "",
         categoria: "",
         tipo: "despesa",
@@ -254,6 +275,7 @@ export default function LancamentosContabeis() {
       ...form,
       servicoId,
       descricao: nomeServico,
+      quantidade: quantidadeSegura(form.quantidade),
       valor: formatarMoeda(valorServico),
       categoria: "Serviços Contábeis",
       planoConta: "Serviços Contábeis",
@@ -266,17 +288,21 @@ export default function LancamentosContabeis() {
     e.preventDefault()
 
     if (!form.cliente || !form.descricao || !form.valor || !form.data) {
-      alert("Preencha cliente, descrição, valor e data.")
+      alert("Preencha cliente, descrição, quantidade, valor unitário e data.")
       return
     }
 
-    const valorNumerico = valorSeguro(form.valor)
+    const quantidade = quantidadeSegura(form.quantidade)
+    const valorUnitario = valorSeguro(form.valor)
+    const valorTotal = quantidade * valorUnitario
 
     const dadosLancamento = {
       cliente: form.cliente,
       descricao: form.descricao,
       tipo: form.tipo,
-      valor: valorNumerico,
+      quantidade,
+      valorUnitario,
+      valor: valorTotal,
       data: form.data,
       categoria: form.planoConta || form.categoria,
       planoConta: form.planoConta || form.categoria,
@@ -293,18 +319,6 @@ export default function LancamentosContabeis() {
       } else {
         await api.post("/lancamentos-contabeis", dadosLancamento)
 
-        if (form.origem === "servico") {
-          await api.post("/financeiro", {
-            descricao: form.descricao,
-            cliente: form.cliente,
-            tipo: "Receber",
-            valor: formatarMoeda(valorNumerico),
-            vencimento: form.data,
-            status: "Pendente",
-            anexos: [],
-            origem: "Serviço",
-          })
-        }
       }
 
       limparFormulario()
@@ -323,6 +337,7 @@ export default function LancamentosContabeis() {
       servicoId: "",
       descricao: "",
       tipo: "despesa",
+      quantidade: 1,
       valor: "",
       data: "",
       categoria: "",
@@ -339,7 +354,8 @@ export default function LancamentosContabeis() {
       servicoId: lancamento.servicoId || "",
       descricao: lancamento.descricao || "",
       tipo: String(lancamento.tipo || "despesa").toLowerCase(),
-      valor: formatarMoeda(lancamento.valor || 0),
+      quantidade: quantidadeSegura(lancamento.quantidade),
+      valor: formatarMoeda(valorUnitarioLancamento(lancamento)),
       data: lancamento.data || "",
       categoria: lancamento.planoConta || lancamento.categoria || "",
       planoConta: lancamento.planoConta || lancamento.categoria || "",
@@ -463,16 +479,6 @@ export default function LancamentosContabeis() {
           color: white;
         }
 
-        .lc-title {
-          font-size: 34px;
-          font-weight: 900;
-          margin-bottom: 5px;
-        }
-
-        .lc-subtitle {
-          opacity: .8;
-          margin-bottom: 25px;
-        }
 
         .lc-card {
           background: rgba(255,255,255,.06);
@@ -534,6 +540,42 @@ export default function LancamentosContabeis() {
 
         .lc-input::placeholder {
           color: rgba(255,255,255,.55);
+        }
+
+        .lc-field {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+
+        .lc-field > span {
+          color: #a9b8cc;
+          font-size: 12px;
+          font-weight: 700;
+          padding-left: 4px;
+        }
+
+        .lc-total-preview {
+          min-height: 77px;
+          border: 1px solid rgba(55,255,116,.28);
+          border-radius: 16px;
+          background: rgba(55,255,116,.08);
+          padding: 9px 18px;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 3px;
+        }
+
+        .lc-total-preview span {
+          color: #a9b8cc;
+          font-size: 12px;
+        }
+
+        .lc-total-preview strong {
+          color: #37ff74;
+          font-size: 17px;
         }
 
         .lc-select option {
@@ -740,13 +782,6 @@ export default function LancamentosContabeis() {
         }
       `}</style>
 
-      <div className="lc-title">
-        Lançamentos Contábeis
-      </div>
-
-      <div className="lc-subtitle">
-        Sistema ERP Contábil Inteligente
-      </div>
 
       <form
         onSubmit={salvarLancamento}
@@ -854,17 +889,42 @@ export default function LancamentosContabeis() {
             <option value="despesa">Despesa</option>
           </select>
 
-          <input
-            className="lc-input"
-            placeholder="R$ 0,00"
-            value={form.valor}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                valor: formatarCampoMoeda(e.target.value),
-              })
-            }
-          />
+          <label className="lc-field">
+            <span>Quantidade</span>
+            <input
+              className="lc-input"
+              type="number"
+              min="1"
+              step="1"
+              value={form.quantidade}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  quantidade: e.target.value,
+                })
+              }
+            />
+          </label>
+
+          <label className="lc-field">
+            <span>Valor unitário</span>
+            <input
+              className="lc-input"
+              placeholder="R$ 0,00"
+              value={form.valor}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  valor: formatarCampoMoeda(e.target.value),
+                })
+              }
+            />
+          </label>
+
+          <div className="lc-total-preview">
+            <span>Valor total</span>
+            <strong>{formatarMoeda(totalFormulario())}</strong>
+          </div>
 
           <input
             className="lc-input"
@@ -1100,7 +1160,9 @@ export default function LancamentosContabeis() {
                 <th>Descrição</th>
                 <th>Plano de Contas</th>
                 <th>Tipo</th>
-                <th>Valor</th>
+                <th>Qtd.</th>
+                <th>Valor unitário</th>
+                <th>Total</th>
                 <th>Origem</th>
                 <th>Ações</th>
               </tr>
@@ -1120,7 +1182,9 @@ export default function LancamentosContabeis() {
                   >
                     {tipoNormalizado(lancamento.tipo) === "receita" ? "Receita" : "Despesa"}
                   </td>
-                  <td>{formatarMoeda(lancamento.valor)}</td>
+                  <td>{quantidadeSegura(lancamento.quantidade)}</td>
+                  <td>{formatarMoeda(valorUnitarioLancamento(lancamento))}</td>
+                  <td><strong>{formatarMoeda(lancamento.valor)}</strong></td>
                   <td>{lancamento.origem || "manual"}</td>
                   <td>
                     <div className="lc-actions">

@@ -46,6 +46,7 @@ export default function Clientes({ setPage }) {
   const [observacao, setObservacao] = useState("")
   const [anexos, setAnexos] = useState([])
   const [pesquisaCliente, setPesquisaCliente] = useState("")
+  const [indicePesquisaCliente, setIndicePesquisaCliente] = useState(0)
   const [novaAnotacao, setNovaAnotacao] = useState("")
   const [novaAcao, setNovaAcao] = useState("")
   const [vencimentoAcao, setVencimentoAcao] = useState("")
@@ -768,15 +769,99 @@ export default function Clientes({ setPage }) {
     String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR", { sensitivity: "base" })
   )
 
-  const pesquisaNormalizada = String(pesquisaCliente || "").trim().toLowerCase()
+  const pesquisaNormalizada = normalizarNomeSolicitado(pesquisaCliente)
+  const pesquisaDigitos = String(pesquisaCliente || "").replace(/\D/g, "")
+
   const clientesFiltrados = clientesOrdenados.filter((cliente) => {
-    if (!pesquisaNormalizada) return true
-    const nomeCliente = String(cliente.nome || "").toLowerCase()
-    const codigoCliente = formatarCodigoCliente(cliente.id).toLowerCase()
+    if (!pesquisaNormalizada && !pesquisaDigitos) return true
+
+    const nomeCliente = normalizarNomeSolicitado(cliente.nome)
+    const codigoCliente = normalizarNomeSolicitado(formatarCodigoCliente(cliente.id))
+    const cpfCliente = String(cliente.cpf || "").replace(/\D/g, "")
+    const cnpjCliente = String(cliente.cnpj || "").replace(/\D/g, "")
+    const idCliente = String(cliente.id || "")
+
     return nomeCliente.includes(pesquisaNormalizada)
       || codigoCliente.includes(pesquisaNormalizada)
-      || String(cliente.id) === pesquisaNormalizada.replace(/\D/g, "")
+      || (pesquisaDigitos && idCliente === pesquisaDigitos)
+      || (pesquisaDigitos && cpfCliente.includes(pesquisaDigitos))
+      || (pesquisaDigitos && cnpjCliente.includes(pesquisaDigitos))
   })
+
+  useEffect(() => {
+    setIndicePesquisaCliente(0)
+  }, [pesquisaCliente])
+
+  useEffect(() => {
+    if (clientesFiltrados.length === 0) {
+      setIndicePesquisaCliente(0)
+      return
+    }
+
+    if (indicePesquisaCliente >= clientesFiltrados.length) {
+      setIndicePesquisaCliente(clientesFiltrados.length - 1)
+    }
+  }, [clientesFiltrados.length, indicePesquisaCliente])
+
+  function clienteExatoNaPesquisa() {
+    if (!pesquisaNormalizada && !pesquisaDigitos) return null
+
+    const correspondencias = clientesFiltrados.filter((cliente) => {
+      const nomeCliente = normalizarNomeSolicitado(cliente.nome)
+      const codigoCliente = normalizarNomeSolicitado(formatarCodigoCliente(cliente.id))
+      const cpfCliente = String(cliente.cpf || "").replace(/\D/g, "")
+      const cnpjCliente = String(cliente.cnpj || "").replace(/\D/g, "")
+      const idCliente = String(cliente.id || "")
+
+      return nomeCliente === pesquisaNormalizada
+        || codigoCliente === pesquisaNormalizada
+        || (pesquisaDigitos && idCliente === pesquisaDigitos)
+        || (pesquisaDigitos && cpfCliente === pesquisaDigitos)
+        || (pesquisaDigitos && cnpjCliente === pesquisaDigitos)
+    })
+
+    return correspondencias.length === 1 ? correspondencias[0] : null
+  }
+
+  function abrirClientePelaPesquisa() {
+    if (!pesquisaNormalizada && !pesquisaDigitos) return
+
+    const clienteExato = clienteExatoNaPesquisa()
+    const clienteAlvo = clienteExato
+      || (clientesFiltrados.length === 1 ? clientesFiltrados[0] : clientesFiltrados[indicePesquisaCliente])
+
+    if (clienteAlvo) visualizarCliente(clienteAlvo)
+  }
+
+  function controlarPesquisaPorTeclado(evento) {
+    if (evento.key === "Escape") {
+      evento.preventDefault()
+      setPesquisaCliente("")
+      setIndicePesquisaCliente(0)
+      return
+    }
+
+    if (clientesFiltrados.length === 0) return
+
+    if (evento.key === "ArrowDown") {
+      evento.preventDefault()
+      setIndicePesquisaCliente((atual) => (atual + 1) % clientesFiltrados.length)
+      return
+    }
+
+    if (evento.key === "ArrowUp") {
+      evento.preventDefault()
+      setIndicePesquisaCliente((atual) =>
+        atual <= 0 ? clientesFiltrados.length - 1 : atual - 1
+      )
+      return
+    }
+
+    if (evento.key === "Enter") {
+      evento.preventDefault()
+      abrirClientePelaPesquisa()
+    }
+  }
 
   const proximasAcoesCliente = Array.isArray(clienteSelecionado?.proximasAcoes)
     ? clienteSelecionado.proximasAcoes
@@ -1051,6 +1136,9 @@ export default function Clientes({ setPage }) {
               placeholder="Pesquisar cliente pelo nome ou código..."
               value={pesquisaCliente}
               onChange={(e) => setPesquisaCliente(e.target.value)}
+              onKeyDown={controlarPesquisaPorTeclado}
+              title="Digite nome, código, CPF ou CNPJ. Pressione Enter para abrir; use as setas para escolher."
+              autoFocus
             />
           </div>
 
@@ -1066,8 +1154,13 @@ export default function Clientes({ setPage }) {
             </thead>
 
             <tbody>
-              {clientesFiltrados.map((cliente) => (
-                <tr key={cliente.id}>
+              {clientesFiltrados.map((cliente, index) => (
+                <tr
+                  key={cliente.id}
+                  style={(pesquisaNormalizada || pesquisaDigitos) && index === indicePesquisaCliente ? linhaSelecionadaPesquisa : undefined}
+                  onMouseEnter={() => setIndicePesquisaCliente(index)}
+                  onDoubleClick={() => visualizarCliente(cliente)}
+                >
                   <td style={td}><strong>{formatarCodigoCliente(cliente.id)}</strong></td>
                   <td style={td}>{cliente.nome}</td>
                   <td style={td}>{cliente.cpf}</td>
@@ -2470,6 +2563,12 @@ const observacaoTexto = {
   color: "white",
   lineHeight: "28px",
   margin: 0,
+}
+
+const linhaSelecionadaPesquisa = {
+  background: "rgba(0,168,255,.16)",
+  outline: "1px solid rgba(55,255,116,.32)",
+  outlineOffset: "-1px",
 }
 
 const anotacaoTextarea = {
