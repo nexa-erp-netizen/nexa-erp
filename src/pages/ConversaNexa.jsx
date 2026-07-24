@@ -215,6 +215,7 @@ export default function ConversaNexa({ usuario, setPage }) {
     if (pagina === "Documentos Digitais" && clienteNome) localStorage.setItem("nexaFiltroDocumentoCliente", clienteNome)
     if (pagina === "Pendências Clientes" && clienteNome) localStorage.setItem("nexaFiltroPendenciaCliente", clienteNome)
     if (pagina === "Movimentos Clientes" && clienteNome) localStorage.setItem("nexaFiltroMovimentosCliente", clienteNome)
+    if (pagina === "Movimentos Clientes" && clienteAcaoId) localStorage.setItem("nexaFiltroMovimentosClienteId", clienteAcaoId)
     if (pagina === "Lançamentos Contábeis" && clienteNome) localStorage.setItem("nexaFiltroLancamentosCliente", clienteNome)
     if (pagina === "Serviços Avulsos" && clienteNome) localStorage.setItem("nexaFiltroServicosAvulsosCliente", clienteNome)
     if (pagina === "Serviços Avulsos" && clienteAcaoId) localStorage.setItem("nexaFiltroServicosAvulsosClienteId", clienteAcaoId)

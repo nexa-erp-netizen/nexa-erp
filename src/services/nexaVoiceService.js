@@ -295,6 +295,7 @@ export function executarAcaoDeVoz({ acao, setPage }) {
   if (pagina === "Documentos Digitais" && clienteNome) localStorage.setItem("nexaFiltroDocumentoCliente", clienteNome)
   if (pagina === "Pendências Clientes" && clienteNome) localStorage.setItem("nexaFiltroPendenciaCliente", clienteNome)
   if (pagina === "Movimentos Clientes" && clienteNome) localStorage.setItem("nexaFiltroMovimentosCliente", clienteNome)
+  if (pagina === "Movimentos Clientes" && clienteId) localStorage.setItem("nexaFiltroMovimentosClienteId", clienteId)
   if (pagina === "Lançamentos Contábeis" && clienteNome) localStorage.setItem("nexaFiltroLancamentosCliente", clienteNome)
   if (pagina === "Serviços Avulsos" && clienteNome) localStorage.setItem("nexaFiltroServicosAvulsosCliente", clienteNome)
   if (pagina === "Serviços Avulsos" && clienteId) localStorage.setItem("nexaFiltroServicosAvulsosClienteId", clienteId)

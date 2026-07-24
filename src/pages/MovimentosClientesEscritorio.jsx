@@ -8,11 +8,21 @@ export default function MovimentosClientesEscritorio() {
   const [tipoFiltro, setTipoFiltro] = useState("")
   const [dataInicial, setDataInicial] = useState("")
   const [dataFinal, setDataFinal] = useState("")
+  const [carregando, setCarregando] = useState(false)
 
   useEffect(() => {
     definirPeriodoMesAtual()
-    carregarDados()
+    carregarClientes()
   }, [])
+
+  useEffect(() => {
+    if (!clienteFiltro) {
+      setMovimentos([])
+      return
+    }
+
+    carregarMovimentosDoCliente(clienteFiltro)
+  }, [clienteFiltro, clientes])
 
   function definirPeriodoMesAtual() {
     const hoje = new Date()
@@ -33,31 +43,83 @@ export default function MovimentosClientesEscritorio() {
     return `${ano}-${mes}-${dia}`
   }
 
-  async function carregarDados() {
-    const [movimentosResp, clientesResp] = await Promise.all([
-      api.get("/movimentos-cliente"),
-      api.get("/clientes"),
-    ])
+  function normalizarTexto(valor) {
+    return String(valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase()
+  }
 
-    const movimentosDados = Array.isArray(movimentosResp.data) ? movimentosResp.data : []
-    const clientesDados = Array.isArray(clientesResp.data) ? clientesResp.data : []
-
-    setMovimentos(movimentosDados)
-    setClientes(
-      clientesDados
+  async function carregarClientes() {
+    try {
+      const resposta = await api.get("/clientes")
+      const clientesDados = Array.isArray(resposta.data) ? resposta.data : []
+      const clientesOrdenados = clientesDados
         .slice()
         .sort((a, b) =>
           String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR", {
             sensitivity: "base",
           })
         )
+
+      setClientes(clientesOrdenados)
+
+      const filtroId = localStorage.getItem("nexaFiltroMovimentosClienteId")
+      const filtroNome = localStorage.getItem("nexaFiltroMovimentosCliente")
+
+      let clienteInicial = null
+
+      if (filtroId) {
+        clienteInicial = clientesOrdenados.find(
+          (cliente) => String(cliente.id) === String(filtroId)
+        )
+      }
+
+      if (!clienteInicial && filtroNome) {
+        const nomeNormalizado = normalizarTexto(filtroNome)
+        clienteInicial = clientesOrdenados.find(
+          (cliente) => normalizarTexto(cliente.nome) === nomeNormalizado
+        )
+      }
+
+      if (clienteInicial) {
+        setClienteFiltro(String(clienteInicial.id))
+      }
+
+      localStorage.removeItem("nexaFiltroMovimentosClienteId")
+      localStorage.removeItem("nexaFiltroMovimentosCliente")
+    } catch (error) {
+      console.error("ERRO AO CARREGAR CLIENTES:", error)
+      setClientes([])
+    }
+  }
+
+  async function carregarMovimentosDoCliente(clienteId) {
+    const cliente = clientes.find(
+      (item) => String(item.id) === String(clienteId)
     )
 
-    const filtroCentral = localStorage.getItem("nexaFiltroMovimentosCliente")
+    if (!cliente) {
+      setMovimentos([])
+      return
+    }
 
-    if (filtroCentral) {
-      setClienteFiltro(filtroCentral)
-      localStorage.removeItem("nexaFiltroMovimentosCliente")
+    try {
+      setCarregando(true)
+
+      const resposta = await api.get("/movimentos-cliente", {
+        params: {
+          clienteId: cliente.id,
+        },
+      })
+
+      setMovimentos(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (error) {
+      console.error("ERRO AO CARREGAR MOVIMENTOS DO CLIENTE:", error)
+      setMovimentos([])
+    } finally {
+      setCarregando(false)
     }
   }
 
@@ -86,13 +148,17 @@ export default function MovimentosClientesEscritorio() {
     return new Date(data + "T00:00:00").toLocaleDateString("pt-BR")
   }
 
-  const clienteSelecionado = Boolean(clienteFiltro)
+  const clienteSelecionado = useMemo(
+    () =>
+      clientes.find((cliente) => String(cliente.id) === String(clienteFiltro)) ||
+      null,
+    [clientes, clienteFiltro]
+  )
 
   const movimentosFiltrados = useMemo(() => {
     if (!clienteSelecionado) return []
 
     return movimentos.filter((item) => {
-      if (item.cliente !== clienteFiltro) return false
       if (tipoFiltro && item.tipo !== tipoFiltro) return false
       if (dataInicial && item.data < dataInicial) return false
       if (dataFinal && item.data > dataFinal) return false
@@ -101,11 +167,10 @@ export default function MovimentosClientesEscritorio() {
     })
   }, [
     movimentos,
-    clienteFiltro,
+    clienteSelecionado,
     tipoFiltro,
     dataInicial,
     dataFinal,
-    clienteSelecionado,
   ])
 
   const resumo = useMemo(() => {
@@ -140,17 +205,6 @@ export default function MovimentosClientesEscritorio() {
         .me-page {
           padding: 30px;
           color: white;
-        }
-
-        .me-title {
-          font-size: 34px;
-          font-weight: 900;
-          margin-bottom: 5px;
-        }
-
-        .me-subtitle {
-          opacity: .8;
-          margin-bottom: 25px;
         }
 
         .me-summary {
@@ -304,7 +358,7 @@ export default function MovimentosClientesEscritorio() {
             <option value="">Selecione um cliente</option>
 
             {clientes.map((cliente) => (
-              <option key={cliente.id} value={cliente.nome}>
+              <option key={cliente.id} value={String(cliente.id)}>
                 {cliente.nome}
               </option>
             ))}
@@ -381,7 +435,7 @@ export default function MovimentosClientesEscritorio() {
               <tbody>
                 {movimentosFiltrados.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.cliente}</td>
+                    <td>{item.cliente || clienteSelecionado.nome}</td>
                     <td>{formatarData(item.data)}</td>
 
                     <td
@@ -401,11 +455,19 @@ export default function MovimentosClientesEscritorio() {
                   </tr>
                 ))}
 
-                {movimentosFiltrados.length === 0 && (
+                {!carregando && movimentosFiltrados.length === 0 && (
                   <tr>
                     <td colSpan="6" className="empty">
                       Nenhum movimento encontrado para este cliente no período
                       selecionado.
+                    </td>
+                  </tr>
+                )}
+
+                {carregando && (
+                  <tr>
+                    <td colSpan="6" className="empty">
+                      Carregando lançamentos...
                     </td>
                   </tr>
                 )}

@@ -1105,6 +1105,9 @@ export default function Clientes({ setPage }) {
   function abrirFinanceiroCliente() {
     if (!clienteSelecionado?.nome) return
     localStorage.setItem("nexaFiltroMovimentosCliente", clienteSelecionado.nome)
+    if (clienteSelecionado?.id) {
+      localStorage.setItem("nexaFiltroMovimentosClienteId", String(clienteSelecionado.id))
+    }
     if (typeof setPage === "function") setPage("Movimentos Clientes")
   }
 
