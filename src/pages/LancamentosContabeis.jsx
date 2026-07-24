@@ -306,8 +306,7 @@ export default function LancamentosContabeis() {
       data: form.data,
       categoria: form.planoConta || form.categoria,
       planoConta: form.planoConta || form.categoria,
-      origem: form.origem,
-      servicoId: form.servicoId || null,
+      origem: "manual",
     }
 
     try {
@@ -787,42 +786,9 @@ export default function LancamentosContabeis() {
         onSubmit={salvarLancamento}
         className="lc-card"
       >
-        <div className="lc-tabs">
-          <button
-            type="button"
-            className={`lc-tab ${form.origem === "manual" ? "active" : ""}`}
-            onClick={() =>
-              setForm({
-                ...form,
-                origem: "manual",
-                servicoId: "",
-              })
-            }
-          >
-            Lançamento Manual
-          </button>
-
-          <button
-            type="button"
-            className={`lc-tab ${form.origem === "servico" ? "active" : ""}`}
-            onClick={() =>
-              setForm({
-                ...form,
-                origem: "servico",
-                tipo: "despesa",
-                categoria: "Serviços Contábeis",
-              })
-            }
-          >
-            Serviços
-          </button>
+        <div className="lc-alert">
+          Esta tela registra somente receitas e despesas da empresa do cliente. Serviços prestados pelo escritório devem ser lançados em <strong>Serviços Avulsos</strong>.
         </div>
-
-        {form.origem === "servico" && (
-          <div className="lc-alert">
-            Serviços lançados entram como despesa no cliente e como receita no seu financeiro.
-          </div>
-        )}
 
         <div className="lc-form">
           <select
@@ -844,36 +810,19 @@ export default function LancamentosContabeis() {
             ))}
           </select>
 
-          {form.origem === "servico" ? (
-            <select
-              className="lc-select"
-              value={form.servicoId}
-              onChange={(e) => selecionarServico(e.target.value)}
-            >
-              <option value="">Selecione um serviço</option>
-
-              {servicos.map((servico) => (
-                <option key={servico.id} value={servico.id}>
-                  {servico.nome ||
-                    servico.descricao ||
-                    servico.servico ||
-                    servico.titulo}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              className="lc-input"
-              placeholder="Descrição"
-              value={form.descricao}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  descricao: e.target.value,
-                })
-              }
-            />
-          )}
+          <input
+            className="lc-input"
+            placeholder="Descrição"
+            value={form.descricao}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                origem: "manual",
+                servicoId: "",
+                descricao: e.target.value,
+              })
+            }
+          />
 
           <select
             className="lc-select"

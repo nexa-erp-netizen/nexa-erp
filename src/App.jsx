@@ -9,6 +9,7 @@ import Login from "./pages/Login"
 import Dashboard from "./pages/Dashboard"
 import Clientes from "./pages/Clientes"
 import Servicos from "./pages/Servicos"
+import ServicosAvulsos from "./pages/ServicosAvulsos"
 import PlanoContas from "./pages/PlanoContas"
 import EscritorioDigital from "./pages/EscritorioDigital"
 import Fiscal from "./pages/Fiscal"
@@ -55,6 +56,7 @@ export default function App() {
       "Escritório Digital",
       "Clientes",
       "Serviços",
+      "Serviços Avulsos",
       "Plano de Contas",
       "Lançamentos Contábeis",
       "Fiscal",
@@ -89,6 +91,7 @@ export default function App() {
       "Notificações",
       "Escritório Digital",
       "Clientes",
+      "Serviços Avulsos",
       "Lançamentos Contábeis",
       "Fiscal",
       "Financeiro",
@@ -169,6 +172,9 @@ export default function App() {
 
       case "Serviços":
         return <Servicos />
+
+      case "Serviços Avulsos":
+        return <ServicosAvulsos />
 
       case "Plano de Contas":
         return <PlanoContas />

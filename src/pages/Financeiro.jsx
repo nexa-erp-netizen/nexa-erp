@@ -126,6 +126,13 @@ export default function Financeiro() {
     return ehDespesa(item) ? "Despesa Escritório" : "Avulso"
   }
 
+  function ehServicoAvulso(item) {
+    return (
+      item?.origem === "Serviço Avulso" ||
+      String(item?.referenciaOrigem || "").startsWith("servico-avulso:")
+    )
+  }
+
   function mesmoCliente(nomeA, nomeB) {
     return String(nomeA || "").trim().toLowerCase() === String(nomeB || "").trim().toLowerCase()
   }
@@ -528,11 +535,15 @@ export default function Financeiro() {
                   <td style={tdValor(ehReceita(item))}>{formatarMoeda(item.valorNumber)}</td>
                   <td style={td}><span style={badgeStatus(item.statusCalculado)}>{item.statusCalculado}</span></td>
                   <td style={td}>
-                    <div style={actions}>
-                      {item.statusCalculado !== "Recebido" && item.statusCalculado !== "Pago" && <button style={receiveButton} onClick={() => marcarComoPago(item)}>Confirmar</button>}
-                      <button style={editButton} onClick={() => editarLancamento(item)}>Corrigir</button>
-                      <button style={deleteButton} onClick={() => excluirLancamento(item.id)}>Excluir</button>
-                    </div>
+                    {ehServicoAvulso(item) ? (
+                      <span style={automaticBadge}>Automático</span>
+                    ) : (
+                      <div style={actions}>
+                        {item.statusCalculado !== "Recebido" && item.statusCalculado !== "Pago" && <button style={receiveButton} onClick={() => marcarComoPago(item)}>Confirmar</button>}
+                        <button style={editButton} onClick={() => editarLancamento(item)}>Corrigir</button>
+                        <button style={deleteButton} onClick={() => excluirLancamento(item.id)}>Excluir</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -634,6 +645,7 @@ const tabelaMassaDespesa = { width: "100%", minWidth: "980px", borderCollapse: "
 const thMassa = { textAlign: "left", padding: "12px", background: "#051b3d", color: "#4cc9ff" }
 const tdMassa = { padding: "8px" }
 const inputTabela = { width: "100%", boxSizing: "border-box", padding: "13px", borderRadius: "10px", border: "1px solid rgba(255,255,255,.14)", background: "#092b5d", color: "white", fontSize: "14px" }
+const automaticBadge = { display: "inline-block", padding: "8px 11px", borderRadius: "999px", background: "rgba(55,255,116,.12)", color: "#37ff74", fontWeight: "800", fontSize: "12px" }
 const historicoBox = { background: "#061f47", border: "1px solid rgba(255,255,255,.12)", borderRadius: "18px", padding: "22px" }
 const tabelaHistoricoWrapper = { overflowX: "auto" }
 const table = { width: "100%", minWidth: "1300px", borderCollapse: "collapse" }

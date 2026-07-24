@@ -95,6 +95,7 @@ const DESTINOS_COM_CLIENTE = [
     aliases: ["movimentos dos clientes", "movimentacoes dos clientes", "movimentos clientes", "movimentacoes clientes", "movimentacao", "movimentacoes", "movimento", "movimentos"],
   },
   { pagina: "Lançamentos Contábeis", aliases: ["lancamentos contabeis", "lancamento contabil", "contabilidade", "contabil"] },
+  { pagina: "Serviços Avulsos", aliases: ["servicos avulsos", "servico avulso", "lancar servico avulso", "lancamento de servico avulso"] },
   { pagina: "Documentos Digitais", aliases: ["documentos digitais", "documentos", "documento"] },
   { pagina: "Pendências Clientes", aliases: ["pendencias dos clientes", "pendencias clientes", "pendencias", "pendencia"] },
   { pagina: "DRE Gerencial", aliases: ["dre gerencial", "demonstracao do resultado", "dre"] },
@@ -295,6 +296,8 @@ export function executarAcaoDeVoz({ acao, setPage }) {
   if (pagina === "Pendências Clientes" && clienteNome) localStorage.setItem("nexaFiltroPendenciaCliente", clienteNome)
   if (pagina === "Movimentos Clientes" && clienteNome) localStorage.setItem("nexaFiltroMovimentosCliente", clienteNome)
   if (pagina === "Lançamentos Contábeis" && clienteNome) localStorage.setItem("nexaFiltroLancamentosCliente", clienteNome)
+  if (pagina === "Serviços Avulsos" && clienteNome) localStorage.setItem("nexaFiltroServicosAvulsosCliente", clienteNome)
+  if (pagina === "Serviços Avulsos" && clienteId) localStorage.setItem("nexaFiltroServicosAvulsosClienteId", clienteId)
   if (pagina === "DRE Gerencial" && clienteNome) localStorage.setItem("nexaFiltroDreCliente", clienteNome)
   if (pagina === "Certificados Digitais" && clienteId) localStorage.setItem("nexaCertificadoClienteId", clienteId)
   if (pagina === "Procurações e-CAC" && clienteId) localStorage.setItem("nexaProcuracaoClienteId", clienteId)

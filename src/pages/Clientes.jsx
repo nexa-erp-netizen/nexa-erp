@@ -952,10 +952,18 @@ export default function Clientes({ setPage }) {
     return item.vencimento || item.createdAt || item.updatedAt || ""
   }
 
+  function ehServicoAvulsoDoEscritorio(item) {
+    return (
+      item?.origem === "Serviço Avulso" ||
+      String(item?.referenciaOrigem || "").startsWith("servico-avulso:")
+    )
+  }
+
   const competenciaFinanceiraAtual = new Date().toISOString().slice(0, 7)
 
   const financeiroDoCliente = financeiroLancamentos.filter((item) =>
-    mesmoCliente(item.cliente, clienteSelecionado?.nome)
+    mesmoCliente(item.cliente, clienteSelecionado?.nome) &&
+    !ehServicoAvulsoDoEscritorio(item)
   )
 
   const financeiroMesAtual = financeiroDoCliente.filter((item) => {
