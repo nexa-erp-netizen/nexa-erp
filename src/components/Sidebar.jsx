@@ -77,7 +77,7 @@ export default function Sidebar({ page, setPage, usuario }) {
     {
       titulo: "Financeiro",
       icon: <FaMoneyBillWave />,
-      itens: ["Financeiro", "Serviços Avulsos", "Serviços"],
+      itens: ["Financeiro", "Serviços"],
     },
     {
       titulo: "Atendimento",

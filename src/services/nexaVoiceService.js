@@ -95,7 +95,7 @@ const DESTINOS_COM_CLIENTE = [
     aliases: ["movimentos dos clientes", "movimentacoes dos clientes", "movimentos clientes", "movimentacoes clientes", "movimentacao", "movimentacoes", "movimento", "movimentos"],
   },
   { pagina: "Lançamentos Contábeis", aliases: ["lancamentos contabeis", "lancamento contabil", "contabilidade", "contabil"] },
-  { pagina: "Serviços Avulsos", aliases: ["servicos avulsos", "servico avulso", "lancar servico avulso", "lancamento de servico avulso"] },
+  { pagina: "Clientes", alvo: "central-cliente", secao: "servicos", aliases: ["servicos e cobrancas", "servico e cobranca", "servicos avulsos", "servico avulso", "lancar servico avulso", "lancamento de servico avulso"] },
   { pagina: "Documentos Digitais", aliases: ["documentos digitais", "documentos", "documento"] },
   { pagina: "Pendências Clientes", aliases: ["pendencias dos clientes", "pendencias clientes", "pendencias", "pendencia"] },
   { pagina: "DRE Gerencial", aliases: ["dre gerencial", "demonstracao do resultado", "dre"] },
@@ -160,7 +160,7 @@ function extrairDestinoEClienteDoComando(comando) {
   if (!alvoCompleto || ALVOS_NAO_CLIENTE.has(alvoCompleto)) return null
 
   const destinos = DESTINOS_COM_CLIENTE
-    .flatMap((item) => item.aliases.map((alias) => ({ pagina: item.pagina, alias: normalizarTextoVoz(alias) })))
+    .flatMap((item) => item.aliases.map((alias) => ({ ...item, alias: normalizarTextoVoz(alias) })))
     .sort((a, b) => b.alias.length - a.alias.length)
 
   for (const destino of destinos) {
@@ -173,7 +173,7 @@ function extrairDestinoEClienteDoComando(comando) {
       .trim()
 
     if (!nomeCliente || ALVOS_NAO_CLIENTE.has(nomeCliente)) return null
-    return { pagina: destino.pagina, alvo: "pagina", nomeCliente }
+    return { pagina: destino.pagina, alvo: destino.alvo || "pagina", secao: destino.secao || "", nomeCliente }
   }
 
   alvoCompleto = alvoCompleto
@@ -220,6 +220,7 @@ export async function resolverAcaoAbrirClientePorVoz(comando) {
     tipo: "navegar",
     pagina: destino.pagina,
     alvo: destino.alvo,
+    secao: destino.secao || "",
     segura: true,
     cliente: {
       id: melhor.cliente.id,
@@ -283,6 +284,7 @@ export function executarAcaoDeVoz({ acao, setPage }) {
   if (acao.alvo === "central-cliente" && clienteId) {
     localStorage.setItem("nexaAbrirClienteId", clienteId)
     localStorage.setItem("nexaAbrirClienteNome", clienteNome)
+    if (acao.secao) localStorage.setItem("nexaAbrirSecaoCliente", String(acao.secao))
 
     // Primeiro garante que a tela de Clientes esteja montada. Depois repete o
     // evento por alguns instantes, cobrindo tanto a lista já aberta quanto a
@@ -297,8 +299,6 @@ export function executarAcaoDeVoz({ acao, setPage }) {
   if (pagina === "Movimentos Clientes" && clienteNome) localStorage.setItem("nexaFiltroMovimentosCliente", clienteNome)
   if (pagina === "Movimentos Clientes" && clienteId) localStorage.setItem("nexaFiltroMovimentosClienteId", clienteId)
   if (pagina === "Lançamentos Contábeis" && clienteNome) localStorage.setItem("nexaFiltroLancamentosCliente", clienteNome)
-  if (pagina === "Serviços Avulsos" && clienteNome) localStorage.setItem("nexaFiltroServicosAvulsosCliente", clienteNome)
-  if (pagina === "Serviços Avulsos" && clienteId) localStorage.setItem("nexaFiltroServicosAvulsosClienteId", clienteId)
   if (pagina === "DRE Gerencial" && clienteNome) localStorage.setItem("nexaFiltroDreCliente", clienteNome)
   if (pagina === "Certificados Digitais" && clienteId) localStorage.setItem("nexaCertificadoClienteId", clienteId)
   if (pagina === "Procurações e-CAC" && clienteId) localStorage.setItem("nexaProcuracaoClienteId", clienteId)

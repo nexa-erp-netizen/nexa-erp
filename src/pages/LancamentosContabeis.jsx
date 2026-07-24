@@ -787,7 +787,7 @@ export default function LancamentosContabeis() {
         className="lc-card"
       >
         <div className="lc-alert">
-          Esta tela registra somente receitas e despesas da empresa do cliente. Serviços prestados pelo escritório devem ser lançados em <strong>Serviços Avulsos</strong>.
+          Esta tela registra somente receitas e despesas da empresa do cliente. Serviços prestados pelo escritório devem ser registrados na <strong>Central do Cliente, em Serviços e cobranças</strong>.
         </div>
 
         <div className="lc-form">

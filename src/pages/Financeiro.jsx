@@ -19,7 +19,7 @@ function linhaVazia(tipo = "Receber") {
 export default function Financeiro() {
   const [lancamentos, setLancamentos] = useState([])
   const [clientesCadastrados, setClientesCadastrados] = useState([])
-  const [clienteFiltro, setClienteFiltro] = useState(localStorage.getItem("nexaFiltroFinanceiroCliente") || "")
+  const [clienteFiltro, setClienteFiltro] = useState("")
   const [servicos, setServicos] = useState([])
   const [competencia, setCompetencia] = useState(new Date().toISOString().slice(0, 7))
   const [modoLancamento, setModoLancamento] = useState("Receber")
@@ -30,6 +30,7 @@ export default function Financeiro() {
   const formasPagamento = ["PIX", "Boleto", "Cartão", "Dinheiro", "Transferência"]
   const centrosCustoPadrao = [
     "Honorários",
+    "Serviços e Cobranças",
     "Serviços Avulsos",
     "Abertura MEI",
     "Certificado Digital",
@@ -45,16 +46,23 @@ export default function Financeiro() {
   ]
 
   useEffect(() => {
+    // Um filtro antigo salvo no navegador não pode esconder receitas do escritório.
+    localStorage.removeItem("nexaFiltroFinanceiroCliente")
     carregarLancamentos()
     carregarClientes()
     carregarServicos()
-
-    const filtroCentral = localStorage.getItem("nexaFiltroFinanceiroCliente") || ""
-    if (filtroCentral) setClienteFiltro(filtroCentral)
   }, [])
 
   async function carregarLancamentos() {
     try {
+      // Garante que serviços e cobranças antigos ou recém-alterados sejam
+      // materializados no Financeiro antes de montar o histórico da tela.
+      try {
+        await api.post("/servicos-avulsos/sincronizar-financeiro", {})
+      } catch (syncError) {
+        console.error("Erro ao sincronizar serviços e cobranças com o Financeiro", syncError)
+      }
+
       const resposta = await api.get("/financeiro")
       setLancamentos(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
@@ -82,7 +90,39 @@ export default function Financeiro() {
   }
 
   function valorNumerico(valorFormatado) {
-    return Number(String(valorFormatado || 0).replace("R$", "").replace(/\./g, "").replace(",", ".").trim()) || 0
+    if (typeof valorFormatado === "number") {
+      return Number.isFinite(valorFormatado) ? valorFormatado : 0
+    }
+
+    if (valorFormatado === null || valorFormatado === undefined || valorFormatado === "") {
+      return 0
+    }
+
+    let texto = String(valorFormatado)
+      .replace("R$", "")
+      .replace(/\s/g, "")
+      .trim()
+
+    const ultimaVirgula = texto.lastIndexOf(",")
+    const ultimoPonto = texto.lastIndexOf(".")
+
+    if (ultimaVirgula >= 0 && ultimoPonto >= 0) {
+      // 27.000,00 (pt-BR) ou 27,000.00 (en-US/API).
+      texto = ultimaVirgula > ultimoPonto
+        ? texto.replace(/\./g, "").replace(",", ".")
+        : texto.replace(/,/g, "")
+    } else if (ultimaVirgula >= 0) {
+      texto = texto.replace(",", ".")
+    } else if (ultimoPonto >= 0) {
+      // A API envia DECIMAL como string, por exemplo "270.00".
+      // Só tratamos ponto como milhar quando o formato for realmente 27.000.
+      const pareceMilhar = /^-?\d{1,3}(?:\.\d{3})+$/.test(texto)
+      if (pareceMilhar) texto = texto.replace(/\./g, "")
+    }
+
+    texto = texto.replace(/[^0-9.-]/g, "")
+    const numero = Number(texto)
+    return Number.isFinite(numero) ? numero : 0
   }
 
   function formatarMoeda(valor) {
@@ -128,7 +168,7 @@ export default function Financeiro() {
 
   function ehServicoAvulso(item) {
     return (
-      item?.origem === "Serviço Avulso" ||
+      ["Serviço Avulso", "Serviço do Cliente"].includes(item?.origem) ||
       String(item?.referenciaOrigem || "").startsWith("servico-avulso:")
     )
   }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
 import WhatsAppMenu from "../components/WhatsAppMenu"
+import ServicosCobrancasCliente from "../components/ServicosCobrancasCliente"
 import { analisarPlanejamentoTributario } from "../motorTributario"
 
 function formatarCodigoCliente(id) {
@@ -152,6 +153,14 @@ export default function Clientes({ setPage }) {
       console.error(error)
       return []
     }
+  }
+
+  async function recarregarClienteSelecionado() {
+    if (!clienteSelecionado?.id) return
+
+    const lista = await carregarClientes()
+    const atualizado = lista.find((item) => Number(item.id) === Number(clienteSelecionado.id))
+    if (atualizado) setClienteSelecionado(atualizado)
   }
 
   async function carregarFinanceiroCliente() {
@@ -384,6 +393,12 @@ export default function Clientes({ setPage }) {
     requestAnimationFrame(() => {
       rolarParaTopo()
       setTimeout(rolarParaTopo, 80)
+
+      const secaoSolicitada = localStorage.getItem("nexaAbrirSecaoCliente")
+      if (secaoSolicitada) {
+        localStorage.removeItem("nexaAbrirSecaoCliente")
+        setTimeout(() => rolarParaSecao(secaoSolicitada), 240)
+      }
     })
   }
 
@@ -1552,6 +1567,7 @@ export default function Clientes({ setPage }) {
             <button title="Resumo" style={centralMenuBotao} onClick={() => rolarParaSecao("resumo")}>🏠</button>
             <button title="Próximas Ações" style={centralMenuBotao} onClick={() => rolarParaSecao("acoes")}>⏰</button>
             <button title="Histórico" style={centralMenuBotao} onClick={() => rolarParaSecao("historico")}>📝</button>
+            <button title="Serviços e cobranças" style={centralMenuBotao} onClick={() => rolarParaSecao("servicos")}>🧾</button>
             <button title="Documentos" style={centralMenuBotao} onClick={() => rolarParaSecao("documentos")}>📎</button>
             <button title="Dados" style={centralMenuBotao} onClick={() => rolarParaSecao("dados")}>📋</button>
             <button title="Financeiro do Cliente" style={centralMenuBotao} onClick={() => rolarParaSecao("financeiro")}>💰</button>
@@ -1819,6 +1835,20 @@ export default function Clientes({ setPage }) {
                 Nenhum arquivo anexado.
               </p>
             )}
+          </div>
+
+          <div id="central-servicos" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Serviços e cobranças</span>
+                <p style={secaoDescricao}>Registre os serviços prestados pelo escritório, acompanhe vencimentos e receba os valores sem afetar a contabilidade da empresa do cliente.</p>
+              </div>
+            </div>
+
+            <ServicosCobrancasCliente
+              cliente={clienteSelecionado}
+              onAtualizado={recarregarClienteSelecionado}
+            />
           </div>
 
           <div id="central-financeiro" style={observacaoBox}>

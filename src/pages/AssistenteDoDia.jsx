@@ -252,6 +252,12 @@ export default function AssistenteDoDia({ setPage }) {
       localStorage.setItem("nexaFiltroPendenciaId", String(acao.referenciaId || ""))
     }
 
+    if (acao.destino === "Clientes" && acao.clienteId) {
+      localStorage.setItem("nexaAbrirClienteId", String(acao.clienteId))
+      localStorage.setItem("nexaAbrirClienteNome", acao.cliente || "")
+      if (acao.secao) localStorage.setItem("nexaAbrirSecaoCliente", String(acao.secao))
+    }
+
     setPage(acao.destino || "Dashboard")
   }
 
@@ -338,6 +344,7 @@ export default function AssistenteDoDia({ setPage }) {
     if (acao.destino === "Financeiro") return "Abrir Financeiro"
     if (acao.destino === "Documentos Digitais") return "Abrir Documentos"
     if (acao.destino === "Pendências Clientes") return "Abrir Pendências"
+    if (acao.destino === "Clientes" && acao.secao === "servicos") return "Abrir cobrança"
     return "Abrir"
   }
 

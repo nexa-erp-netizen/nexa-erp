@@ -125,6 +125,7 @@ function criarAcao({
   modeloWhatsApp,
   tipo = "operacional",
   data,
+  secao = "",
 }) {
   return {
     id,
@@ -140,6 +141,7 @@ function criarAcao({
     modeloWhatsApp,
     tipo,
     data,
+    secao,
     status: "pendente",
   }
 }
@@ -191,6 +193,12 @@ export function montarAcoesDoDia({
   procuracoes = [],
 } = {}) {
   const mapaClientes = montarMapaClientes(clientes)
+  const mapaTodosClientes = new Map()
+  clientes.forEach((cliente) => {
+    [cliente?.nome, cliente?.cliente, cliente?.razaoSocial, cliente?.nomeFantasia, cliente?.empresa]
+      .filter(Boolean)
+      .forEach((nome) => mapaTodosClientes.set(normalizarTexto(nome), cliente))
+  })
   const acoes = []
 
   montarAlertasIdentidadeDigital({ clientes, certificados, procuracoes }).forEach((alerta) => {
@@ -440,14 +448,50 @@ export function montarAcoesDoDia({
   financeiro.forEach((item) => {
     const status = normalizarTexto(item.status)
     const tipo = normalizarTexto(item.tipo || item.categoria || item.descricao)
-    const clienteCadastro = localizarCliente(mapaClientes, item.cliente)
+    const origem = normalizarTexto(item.origem)
+    const ehServicoCliente = origem.includes("servico do cliente")
+      || origem.includes("servico avulso")
+      || String(item.referenciaOrigem || "").startsWith("servico-avulso:")
+    const clienteCadastro = ehServicoCliente
+      ? mapaTodosClientes.get(normalizarTexto(item.cliente))
+      : localizarCliente(mapaClientes, item.cliente)
     if (!clienteCadastro) return
     const cliente = item.cliente || obterNomeCliente(clienteCadastro)
     const clienteId = obterClienteId(clienteCadastro) || item.clienteId || item.cliente_id
     const vencimento = item.vencimento || item.dataVencimento || item.data
     const dias = diferencaDias(vencimento)
+    const encerrado = status.includes("pago") || status.includes("recebido") || status.includes("concl") || status.includes("cancel")
 
-    if (tipo.includes("honor") && !status.includes("pago") && !status.includes("concl")) {
+    if (ehServicoCliente && !encerrado) {
+      const prioridade = dias !== null && dias < 0
+        ? 105 + Math.min(Math.abs(dias) * 2, 30)
+        : dias === 0
+          ? 92
+          : dias !== null && dias <= 3
+            ? 76 - dias
+            : 48
+
+      acoes.push(criarAcao({
+        id: `cobranca-servico-${item.id}`,
+        cliente,
+        clienteId,
+        clienteDados: clienteCadastro,
+        modulo: "Cobranças",
+        titulo: item.descricao || "Cobrança de serviço",
+        descricao: dias === null
+          ? "Serviço aguardando recebimento."
+          : `Cobrança de serviço ${textoPrazo(dias).toLowerCase()}.`,
+        prioridade,
+        destino: "Clientes",
+        referenciaId: item.id,
+        tipo: "cobranca-cliente",
+        data: vencimento,
+        secao: "servicos",
+      }))
+      return
+    }
+
+    if (tipo.includes("honor") && !encerrado) {
       acoes.push(criarAcao({
         id: `honorario-${item.id}`,
         cliente,

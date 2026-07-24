@@ -210,6 +210,7 @@ export default function ConversaNexa({ usuario, setPage }) {
     if (acao.alvo === "central-cliente" && clienteAcaoId) {
       localStorage.setItem("nexaAbrirClienteId", clienteAcaoId)
       localStorage.setItem("nexaAbrirClienteNome", clienteNome)
+      if (acao.secao) localStorage.setItem("nexaAbrirSecaoCliente", String(acao.secao))
     }
     if (pagina === "Fiscal" && clienteNome) localStorage.setItem("nexaFiltroFiscalCliente", clienteNome)
     if (pagina === "Documentos Digitais" && clienteNome) localStorage.setItem("nexaFiltroDocumentoCliente", clienteNome)
@@ -217,8 +218,6 @@ export default function ConversaNexa({ usuario, setPage }) {
     if (pagina === "Movimentos Clientes" && clienteNome) localStorage.setItem("nexaFiltroMovimentosCliente", clienteNome)
     if (pagina === "Movimentos Clientes" && clienteAcaoId) localStorage.setItem("nexaFiltroMovimentosClienteId", clienteAcaoId)
     if (pagina === "Lançamentos Contábeis" && clienteNome) localStorage.setItem("nexaFiltroLancamentosCliente", clienteNome)
-    if (pagina === "Serviços Avulsos" && clienteNome) localStorage.setItem("nexaFiltroServicosAvulsosCliente", clienteNome)
-    if (pagina === "Serviços Avulsos" && clienteAcaoId) localStorage.setItem("nexaFiltroServicosAvulsosClienteId", clienteAcaoId)
     if (pagina === "DRE Gerencial" && clienteNome) localStorage.setItem("nexaFiltroDreCliente", clienteNome)
     if (pagina === "Certificados Digitais" && clienteAcaoId) localStorage.setItem("nexaCertificadoClienteId", clienteAcaoId)
     if (pagina === "Procurações e-CAC" && clienteAcaoId) localStorage.setItem("nexaProcuracaoClienteId", clienteAcaoId)
