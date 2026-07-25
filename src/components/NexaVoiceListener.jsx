@@ -597,15 +597,18 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       .slice(0, 35)
 
     const falasRecentes = historicoRef.current
-      .filter((item) => item?.autor === "Você")
-      .map((item) => String(item?.texto || "").trim())
+      .map((item) => {
+        const autor = item?.autor === "Você" ? "Você" : "Nexa"
+        const texto = String(item?.texto || "").trim()
+        return texto ? `${autor}: ${texto}` : ""
+      })
       .filter(Boolean)
-      .slice(-3)
+      .slice(-4)
 
     const contexto = obterContextoVoz()
 
     return [
-      "Nexa, bom dia, boa tarde, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, e-CAC, PGDAS-D, DCTFWeb, DAS, prioridades de hoje, qual é a prioridade para hoje, o que tenho para fazer hoje, iniciar meu dia.",
+      "Nexa, bom dia, boa tarde, contador, contadora, contabilidade, MEI, empresário individual, sociedade limitada unipessoal, SLU, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, e-CAC, PGDAS-D, DCTFWeb, DAS, prioridades de hoje, relatório do dia, relatório para hoje, resumo de hoje, o que tenho para fazer hoje, iniciar meu dia.",
       nomesClientes.length ? `Nomes de clientes do escritório: ${nomesClientes.join(", ")}.` : "",
       contexto.clienteNome ? `Cliente atual: ${contexto.clienteNome}.` : "",
       termos.length ? `Vocabulário aprendido: ${termos.join(", ")}.` : "",
