@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { conversarComNexa } from "../services/conversaNexaService"
+import { abrirConversaNexa, conversarComNexa } from "../services/conversaNexaService"
 import {
   sintetizarVozNeural,
   transcreverVozGroq,
@@ -353,11 +353,61 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const reiniciandoCapturaRef = useRef(false)
   const microfoneSelecionadoRef = useRef(localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
 
+  const carregarHistoricoPainel = useCallback(async (idInformado = null) => {
+    const conversaId = idInformado || conversaIdRef.current || obterContextoVoz().conversaId
+    if (!conversaId) return
+
+    try {
+      const dados = await abrirConversaNexa(conversaId)
+      const mensagens = Array.isArray(dados?.mensagens) ? dados.mensagens : []
+      const mapeadas = mensagens.slice(-30).map((item) => ({
+        id: `db-${item.id}`,
+        autor: item.autor === "usuario" ? "Você" : "Nexa",
+        texto: item.texto,
+        data: item.createdAt || new Date().toISOString(),
+        acaoExecutada: Boolean(item?.dados?.acao),
+      }))
+
+      conversaIdRef.current = String(conversaId)
+      setHistoricoSalvo(true)
+      setMensagensPainel(mapeadas)
+      historicoRef.current = mapeadas.slice(-12).map((item) => ({
+        autor: item.autor,
+        texto: item.texto,
+      }))
+    } catch (error) {
+      console.warn("[Nexa] Não foi possível carregar o histórico da conversa:", error)
+    }
+  }, [])
+
   useEffect(() => {
     const atualizarMobile = () => setIsMobile(window.innerWidth <= 640)
     window.addEventListener("resize", atualizarMobile)
     return () => window.removeEventListener("resize", atualizarMobile)
   }, [])
+
+  useEffect(() => {
+    const contexto = obterContextoVoz()
+    if (contexto.conversaId) carregarHistoricoPainel(contexto.conversaId)
+
+    const sincronizarConversa = (evento) => {
+      const conversaId = evento?.detail?.conversaId || obterContextoVoz().conversaId
+      conversaIdRef.current = conversaId || null
+      setHistoricoSalvo(Boolean(conversaId))
+      if (conversaId && !processandoRef.current) carregarHistoricoPainel(conversaId)
+      if (!conversaId) {
+        setMensagensPainel([])
+        historicoRef.current = []
+      }
+    }
+
+    window.addEventListener("nexa:conversa-atualizada", sincronizarConversa)
+    return () => window.removeEventListener("nexa:conversa-atualizada", sincronizarConversa)
+  }, [carregarHistoricoPainel])
+
+  useEffect(() => {
+    if (expandido && !mensagensPainel.length) carregarHistoricoPainel()
+  }, [carregarHistoricoPainel, expandido, mensagensPainel.length])
 
   useEffect(() => {
     fimPainelRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" })
@@ -1466,11 +1516,11 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
                   <span>{formatarHorarioPainel(item.data)}</span>
                 </div>
                 <p style={styles.chatMessageText}>{item.texto}</p>
-                {item.acaoExecutada && <small style={styles.actionDone}>Tela aberta com segurança.</small>}
+                {item.acaoExecutada && <small style={styles.actionDone}>Pronto.</small>}
               </article>
             ))}
 
-            {enviandoTexto && <div style={styles.typingText}>A Nexa está respondendo...</div>}
+            {enviandoTexto && <div style={styles.typingText}>A Nexa está pensando...</div>}
             <div ref={fimPainelRef} />
           </section>
 

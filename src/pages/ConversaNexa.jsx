@@ -10,6 +10,12 @@ import {
   listarMemoriasNexa,
   verificarProvedores,
 } from "../services/conversaNexaService"
+import {
+  limparConversaVoz,
+  obterContextoVoz,
+  registrarClienteVoz,
+  registrarConversaVoz,
+} from "../services/nexaVoiceService"
 
 const SUGESTOES = [
   "Bom dia",
@@ -41,6 +47,7 @@ export default function ConversaNexa({ usuario, setPage }) {
   const [mostrarMemorias, setMostrarMemorias] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900)
   const fimRef = useRef(null)
+  const contextoInicialAplicadoRef = useRef(false)
 
   useEffect(() => {
     const atualizar = () => setIsMobile(window.innerWidth < 900)
@@ -75,12 +82,48 @@ export default function ConversaNexa({ usuario, setPage }) {
   }, [])
 
   useEffect(() => {
+    if (contextoInicialAplicadoRef.current || !conversas.length) return
+    contextoInicialAplicadoRef.current = true
+
+    const contexto = obterContextoVoz()
+    if (!contexto.conversaId) return
+    const conversaAtual = conversas.find((item) => String(item.id) === String(contexto.conversaId))
+    if (conversaAtual) selecionarConversa(conversaAtual)
+  }, [conversas])
+
+  useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [conversa, enviando])
 
   useEffect(() => {
     carregarMemorias()
   }, [conversaId, clienteId])
+
+  useEffect(() => {
+    const sincronizarConversa = async (evento) => {
+      const id = evento?.detail?.conversaId
+      if (!id || enviando || String(id) === String(conversaId)) return
+
+      try {
+        const dados = await abrirConversaNexa(id)
+        const sessao = dados.conversa
+        if (!sessao) return
+        setConversaId(sessao.id)
+        setTipoContexto(sessao.tipoContexto || "geral")
+        setClienteId(sessao.clienteId ? String(sessao.clienteId) : "")
+        setInteressadoNome(sessao.interessadoNome || "")
+        const mensagens = Array.isArray(dados.mensagens)
+          ? dados.mensagens.map(mapearMensagemPersistida)
+          : []
+        setConversa(mensagens.length ? mensagens : [boasVindas()])
+      } catch (error) {
+        console.warn("[Nexa] Não foi possível sincronizar a conversa ativa:", error)
+      }
+    }
+
+    window.addEventListener("nexa:conversa-atualizada", sincronizarConversa)
+    return () => window.removeEventListener("nexa:conversa-atualizada", sincronizarConversa)
+  }, [conversaId, enviando])
 
   const cliente = useMemo(
     () => clientes.find((item) => String(item.id) === String(clienteId)),
@@ -124,8 +167,13 @@ export default function ConversaNexa({ usuario, setPage }) {
       const dados = await abrirConversaNexa(item.id)
       const sessao = dados.conversa || item
       setConversaId(sessao.id)
+      registrarConversaVoz(sessao.id)
       setTipoContexto(sessao.tipoContexto || "geral")
       setClienteId(sessao.clienteId ? String(sessao.clienteId) : "")
+      if (sessao.clienteId) {
+        const clienteSessao = clientes.find((item) => String(item.id) === String(sessao.clienteId))
+        if (clienteSessao) registrarClienteVoz(clienteSessao)
+      }
       setInteressadoNome(sessao.interessadoNome || "")
 
       const mensagens = Array.isArray(dados.mensagens)
@@ -141,6 +189,7 @@ export default function ConversaNexa({ usuario, setPage }) {
   }
 
   function novaConversa() {
+    limparConversaVoz()
     setConversaId(null)
     setTipoContexto("geral")
     setClienteId("")
@@ -184,6 +233,8 @@ export default function ConversaNexa({ usuario, setPage }) {
 
   async function atualizarClienteContexto(novoClienteId) {
     setClienteId(novoClienteId)
+    const clienteSelecionado = clientes.find((item) => String(item.id) === String(novoClienteId))
+    if (clienteSelecionado) registrarClienteVoz(clienteSelecionado)
     if (conversaId) {
       try {
         await atualizarConversaNexa(conversaId, {
@@ -206,6 +257,7 @@ export default function ConversaNexa({ usuario, setPage }) {
     const clienteAcaoId = clienteAcao?.id ? String(clienteAcao.id) : ""
 
     if (!pagina) return
+    if (clienteAcaoId) registrarClienteVoz(clienteAcao)
 
     if (acao.alvo === "central-cliente" && clienteAcaoId) {
       localStorage.setItem("nexaAbrirClienteId", clienteAcaoId)
@@ -257,9 +309,14 @@ export default function ConversaNexa({ usuario, setPage }) {
         conversaId,
         tipoContexto,
         interessadoNome,
+        origem: "texto",
+        paginaAtual: "Conversa com a Nexa",
       })
 
-      if (resposta.conversaId) setConversaId(resposta.conversaId)
+      if (resposta.conversaId) {
+        setConversaId(resposta.conversaId)
+        registrarConversaVoz(resposta.conversaId)
+      }
 
       setConversa((atual) => [...atual, {
         id: `n-${Date.now()}`,
@@ -308,9 +365,9 @@ export default function ConversaNexa({ usuario, setPage }) {
     <div style={styles.page}>
       <header style={styles.hero}>
         <div>
-          <span style={styles.badge}>Nexa Assist • conversa, memória e ações</span>
+          <span style={styles.badge}>Nexa Conversacional v2 • voz, texto, memória e contexto</span>
           <h2 style={styles.title}>Conversa com a Nexa</h2>
-          <p style={styles.subtitle}>Pergunte de forma natural. A Nexa responde direto e aprofunda somente quando você pedir.</p>
+          <p style={styles.subtitle}>Converse normalmente. A Nexa acompanha o assunto, consulta o ERP e navega sem exigir frases prontas.</p>
         </div>
         <div style={styles.heroActions}>
           <button style={styles.memoryButton} onClick={() => setMostrarMemorias((valor) => !valor)}>
@@ -429,14 +486,14 @@ export default function ConversaNexa({ usuario, setPage }) {
                 <p style={styles.messageText}>{item.texto}</p>
                 {item.fallback && <div style={styles.fallbackNotice}>Resposta gerada pelo Ollama local.</div>}
                 {item.memoriaRegistrada && <div style={styles.memoryNotice}>✓ Informação adicionada à memória.</div>}
-                {item.acao && <div style={styles.actionNotice}>✓ Navegação segura executada — nenhum dado foi alterado.</div>}
+                {item.acao && <div style={styles.actionNotice}>✓ Pronto.</div>}
                 {item.consulta && <ResultadoConsulta consulta={item.consulta} onAbrir={() => executarAcaoNexa(item.consulta.acaoSugerida)} />}
                 {!item.consulta && !!item.pontos?.length && <ul style={styles.list}>{item.pontos.map((ponto) => <li key={ponto}>{ponto}</li>)}</ul>}
                 {item.recomendacao && <div style={styles.recommendation}><span>Recomendação</span><strong>{item.recomendacao}</strong></div>}
                 {!!item.fundamentos?.length && <details style={styles.details}><summary>Ver fundamentos</summary><ul style={styles.list}>{item.fundamentos.map((f) => <li key={f}>{f}</li>)}</ul></details>}
               </article>
             ))}
-            {enviando && <div style={styles.typing}>A Nexa está respondendo...</div>}
+            {enviando && <div style={styles.typing}>A Nexa está pensando...</div>}
             <div ref={fimRef} />
           </section>
 
@@ -524,7 +581,7 @@ function ResultadoConsulta({ consulta, onAbrir }) {
     <div style={styles.consultaCard}>
       <div style={styles.consultaHeader}>
         <div>
-          <span style={styles.consultaBadge}>Consulta inteligente</span>
+          <span style={styles.consultaBadge}>Dados do Nexa</span>
           <strong style={styles.consultaTitle}>{consulta?.titulo || "Resultado da consulta"}</strong>
           {consulta?.resumo && <span style={styles.consultaResumo}>{consulta.resumo}</span>}
         </div>

@@ -247,13 +247,27 @@ export function obterContextoVoz() {
 }
 
 export function registrarConversaVoz(conversaId) {
-  if (conversaId) localStorage.setItem(CONVERSA_ID_KEY, String(conversaId))
+  if (!conversaId) return
+  localStorage.setItem(CONVERSA_ID_KEY, String(conversaId))
+  window.dispatchEvent(new CustomEvent("nexa:conversa-atualizada", {
+    detail: { conversaId: String(conversaId) },
+  }))
+}
+
+export function limparConversaVoz() {
+  localStorage.removeItem(CONVERSA_ID_KEY)
+  window.dispatchEvent(new CustomEvent("nexa:conversa-atualizada", {
+    detail: { conversaId: "" },
+  }))
 }
 
 export function registrarClienteVoz(cliente) {
   if (!cliente?.id) return
   localStorage.setItem(CLIENTE_ID_KEY, String(cliente.id))
   localStorage.setItem(CLIENTE_NOME_KEY, String(cliente.nome || ""))
+  window.dispatchEvent(new CustomEvent("nexa:contexto-cliente-atualizado", {
+    detail: { id: String(cliente.id), nome: String(cliente.nome || "") },
+  }))
 }
 
 export function limparContextoClienteVoz() {
