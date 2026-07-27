@@ -42,6 +42,7 @@ export default function Dashboard({ setPage }) {
   const [pendencias, setPendencias] = useState([])
   const [documentos, setDocumentos] = useState([])
   const [financeiro, setFinanceiro] = useState([])
+  const [servicosCobrancas, setServicosCobrancas] = useState([])
   const [certificados, setCertificados] = useState([])
   const [procuracoes, setProcuracoes] = useState([])
   const [notificacoes, setNotificacoes] = useState(0)
@@ -123,24 +124,31 @@ export default function Dashboard({ setPage }) {
       const usuarioSalvo = JSON.parse(localStorage.getItem("usuario"))
       const token = localStorage.getItem("token") || usuarioSalvo?.token
 
-      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, certificadosResp, procuracoesResp] =
-        await Promise.all([
+      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, servicosResp, certificadosResp, procuracoesResp] =
+        await Promise.allSettled([
           api.get("/clientes"),
           api.get("/fiscal"),
           api.get("/solicitacoes-clientes"),
           api.get("/documentos-digitais"),
           api.get("/financeiro"),
+          api.get("/servicos-avulsos"),
           api.get("/certificados-digitais"),
           api.get("/procuracoes-ecac"),
         ])
 
-      setClientes(Array.isArray(clientesResp.data) ? clientesResp.data : [])
-      setFiscal(Array.isArray(fiscalResp.data) ? fiscalResp.data : [])
-      setPendencias(Array.isArray(pendenciasResp.data) ? pendenciasResp.data : [])
-      setDocumentos(Array.isArray(documentosResp.data) ? documentosResp.data : [])
-      setFinanceiro(Array.isArray(financeiroResp.data) ? financeiroResp.data : [])
-      setCertificados(Array.isArray(certificadosResp.data) ? certificadosResp.data : [])
-      setProcuracoes(Array.isArray(procuracoesResp.data) ? procuracoesResp.data : [])
+      const resultadoArray = (resultado) =>
+        resultado.status === "fulfilled" && Array.isArray(resultado.value.data)
+          ? resultado.value.data
+          : []
+
+      setClientes(resultadoArray(clientesResp))
+      setFiscal(resultadoArray(fiscalResp))
+      setPendencias(resultadoArray(pendenciasResp))
+      setDocumentos(resultadoArray(documentosResp))
+      setFinanceiro(resultadoArray(financeiroResp))
+      setServicosCobrancas(resultadoArray(servicosResp))
+      setCertificados(resultadoArray(certificadosResp))
+      setProcuracoes(resultadoArray(procuracoesResp))
 
       if (token) {
         const resposta = await fetch(`${API_URL}/notificacoes/contador`, {
@@ -656,22 +664,40 @@ export default function Dashboard({ setPage }) {
   }, [fiscal, documentos, pendencias, clientes])
 
   const filaAssistenteDia = useMemo(() => {
+    const idsServicos = new Set(servicosCobrancas.map((item) => Number(item.id)))
+    const financeiroSemEspelhosRepetidos = financeiro.filter((item) => {
+      const correspondencia = /^servico-avulso:(\d+)$/.exec(String(item.referenciaOrigem || ""))
+      return !correspondencia || !idsServicos.has(Number(correspondencia[1]))
+    })
+    const cobrancasDiretas = servicosCobrancas.map((item) => ({
+      id: `servico-${item.id}`,
+      cliente: item.cliente,
+      clienteId: item.clienteId,
+      descricao: item.descricao,
+      tipo: "Receber",
+      origem: "Serviço do Cliente",
+      referenciaOrigem: `servico-avulso:${item.id}`,
+      vencimento: item.vencimento || item.data,
+      data: item.data,
+      status: item.status,
+      valor: item.valorTotal,
+    }))
+
     return montarFilaAssistenteDia({
       clientes,
       fiscal,
       pendencias,
       documentos,
-      financeiro,
+      financeiro: [...financeiroSemEspelhosRepetidos, ...cobrancasDiretas],
       certificados,
       procuracoes,
     })
-  }, [clientes, fiscal, pendencias, documentos, financeiro, certificados, procuracoes])
+  }, [clientes, fiscal, pendencias, documentos, financeiro, servicosCobrancas, certificados, procuracoes])
 
   const pendenciasPainel = useMemo(() => {
     return filaAssistenteDia.flatMap((cliente) =>
       cliente.acoes
         .filter((acao) => {
-          if (progressoDiaSalvo.acoesConcluidas?.[acao.id]) return false
           if (acao.tipo === "checklist") return false
           if (acao.modulo === "WhatsApp") return false
           return true
@@ -682,7 +708,7 @@ export default function Dashboard({ setPage }) {
           nivelCliente: cliente.nivel,
         }))
     )
-  }, [filaAssistenteDia, progressoDiaSalvo])
+  }, [filaAssistenteDia])
 
   const resumoAssistenteDia = useMemo(() => {
     const base = montarResumoAssistenteDia(filaAssistenteDia)
@@ -1572,30 +1598,6 @@ export default function Dashboard({ setPage }) {
           <div className="nexa-daily-metric"><span>Identidade digital</span><strong className="warning">{painelDiario.alertasIdentidade}</strong></div>
         </div>
 
-        <div className="nexa-progress-line">
-          <div className="nexa-progress-label">
-            <span>Progresso do expediente</span>
-            <strong>{resumoAssistenteDia.concluidas || 0}/{resumoAssistenteDia.acoes || 0} ações • {resumoAssistenteDia.progresso}%</strong>
-          </div>
-          <div className="dia-progress">
-            <div className="dia-progress-bar" style={{ width: `${resumoAssistenteDia.progresso}%` }} />
-          </div>
-        </div>
-
-        <div className="nexa-recommendation">
-          <div>
-            <small>Próximo cliente recomendado</small>
-            <strong>
-              {painelDiario.primeiro
-                ? `${painelDiario.primeiro.cliente} — ${painelDiario.primeiro.motivos?.[0] || "atendimento prioritário"}`
-                : "Nenhum atendimento pendente no momento."}
-            </strong>
-          </div>
-          {progressoDiaSalvo.historicoDia?.[0] && (
-            <small>Última ação: {progressoDiaSalvo.historicoDia[0].hora} • {progressoDiaSalvo.historicoDia[0].texto}</small>
-          )}
-        </div>
-
         <div className="nexa-pending-list">
           <div className="nexa-pending-list-title">Todas as pendências para olhar</div>
           {pendenciasPainel.length ? pendenciasPainel.map((acao) => (
@@ -1618,6 +1620,30 @@ export default function Dashboard({ setPage }) {
                 <span>O painel está atualizado.</span>
               </div>
             </div>
+          )}
+        </div>
+
+        <div className="nexa-progress-line">
+          <div className="nexa-progress-label">
+            <span>Progresso do expediente</span>
+            <strong>{resumoAssistenteDia.concluidas || 0}/{resumoAssistenteDia.acoes || 0} ações • {resumoAssistenteDia.progresso}%</strong>
+          </div>
+          <div className="dia-progress">
+            <div className="dia-progress-bar" style={{ width: `${resumoAssistenteDia.progresso}%` }} />
+          </div>
+        </div>
+
+        <div className="nexa-recommendation">
+          <div>
+            <small>Próximo cliente recomendado</small>
+            <strong>
+              {painelDiario.primeiro
+                ? `${painelDiario.primeiro.cliente} — ${painelDiario.primeiro.motivos?.[0] || "atendimento prioritário"}`
+                : "Nenhum atendimento pendente no momento."}
+            </strong>
+          </div>
+          {progressoDiaSalvo.historicoDia?.[0] && (
+            <small>Última ação: {progressoDiaSalvo.historicoDia[0].hora} • {progressoDiaSalvo.historicoDia[0].texto}</small>
           )}
         </div>
       </section>
