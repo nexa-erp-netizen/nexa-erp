@@ -41,6 +41,7 @@ export default function Dashboard({ setPage }) {
   const [fiscal, setFiscal] = useState([])
   const [pendencias, setPendencias] = useState([])
   const [documentos, setDocumentos] = useState([])
+  const [financeiro, setFinanceiro] = useState([])
   const [certificados, setCertificados] = useState([])
   const [procuracoes, setProcuracoes] = useState([])
   const [notificacoes, setNotificacoes] = useState(0)
@@ -122,12 +123,13 @@ export default function Dashboard({ setPage }) {
       const usuarioSalvo = JSON.parse(localStorage.getItem("usuario"))
       const token = localStorage.getItem("token") || usuarioSalvo?.token
 
-      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, certificadosResp, procuracoesResp] =
+      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, certificadosResp, procuracoesResp] =
         await Promise.all([
           api.get("/clientes"),
           api.get("/fiscal"),
           api.get("/solicitacoes-clientes"),
           api.get("/documentos-digitais"),
+          api.get("/financeiro"),
           api.get("/certificados-digitais"),
           api.get("/procuracoes-ecac"),
         ])
@@ -136,6 +138,7 @@ export default function Dashboard({ setPage }) {
       setFiscal(Array.isArray(fiscalResp.data) ? fiscalResp.data : [])
       setPendencias(Array.isArray(pendenciasResp.data) ? pendenciasResp.data : [])
       setDocumentos(Array.isArray(documentosResp.data) ? documentosResp.data : [])
+      setFinanceiro(Array.isArray(financeiroResp.data) ? financeiroResp.data : [])
       setCertificados(Array.isArray(certificadosResp.data) ? certificadosResp.data : [])
       setProcuracoes(Array.isArray(procuracoesResp.data) ? procuracoesResp.data : [])
 
@@ -658,10 +661,28 @@ export default function Dashboard({ setPage }) {
       fiscal,
       pendencias,
       documentos,
+      financeiro,
       certificados,
       procuracoes,
     })
-  }, [clientes, fiscal, pendencias, documentos, certificados, procuracoes])
+  }, [clientes, fiscal, pendencias, documentos, financeiro, certificados, procuracoes])
+
+  const pendenciasPainel = useMemo(() => {
+    return filaAssistenteDia.flatMap((cliente) =>
+      cliente.acoes
+        .filter((acao) => {
+          if (progressoDiaSalvo.acoesConcluidas?.[acao.id]) return false
+          if (acao.tipo === "checklist") return false
+          if (acao.modulo === "WhatsApp") return false
+          return true
+        })
+        .map((acao) => ({
+          ...acao,
+          cliente: cliente.cliente,
+          nivelCliente: cliente.nivel,
+        }))
+    )
+  }, [filaAssistenteDia, progressoDiaSalvo])
 
   const resumoAssistenteDia = useMemo(() => {
     const base = montarResumoAssistenteDia(filaAssistenteDia)
@@ -680,25 +701,28 @@ export default function Dashboard({ setPage }) {
   }, [filaAssistenteDia, progressoDiaSalvo])
 
   const painelDiario = useMemo(() => {
-    const dasProximos = fiscal.filter((item) => {
-      if (!pertenceClienteOperacional(item)) return false
-      const obrigacao = String(item.obrigacao || item.tipo || "").toLowerCase()
-      const dias = diferencaDias(item.vencimento)
-      return obrigacao.includes("das") && dias !== null && dias >= 0 && dias <= 3 && fiscalAguardandoPagamento(item)
+    const textoAcao = (acao) =>
+      String(`${acao.modulo || ""} ${acao.titulo || ""} ${acao.descricao || ""}`).toLowerCase()
+    const diasAcao = (acao) => diferencaDias(acao.data)
+    const clientesCriticos = new Set(
+      pendenciasPainel
+        .filter((acao) => acao.nivelCliente === "urgente" || (diasAcao(acao) !== null && diasAcao(acao) < 0))
+        .map((acao) => acao.cliente)
+    )
+    const dasProximos = pendenciasPainel.filter((acao) => {
+      const dias = diasAcao(acao)
+      return textoAcao(acao).includes("das") && dias !== null && dias <= 3
     }).length
-
-    const honorariosPendentes = fiscal.filter((item) => {
-      if (!pertenceClienteOperacional(item)) return false
-      const obrigacao = String(item.obrigacao || item.tipo || "").toLowerCase()
-      return obrigacao.includes("honor") && fiscalAguardandoPagamento(item)
+    const pagamentosPendentes = pendenciasPainel.filter((acao) => {
+      const texto = textoAcao(acao)
+      return texto.includes("honor") || texto.includes("cobran") || texto.includes("pagamento")
     }).length
-
-    const parcelamentos = fiscal.filter((item) => {
-      if (!pertenceClienteOperacional(item)) return false
-      const obrigacao = String(item.obrigacao || item.tipo || "").toLowerCase()
-      const dias = diferencaDias(item.vencimento)
-      return obrigacao.includes("parcel") && dias !== null && dias <= 3 && fiscalAguardandoPagamento(item)
-    }).length
+    const documentosPendentes = pendenciasPainel.filter((acao) =>
+      String(acao.modulo || "").toLowerCase().includes("document")
+    ).length
+    const parcelamentos = pendenciasPainel.filter((acao) =>
+      textoAcao(acao).includes("parcelamento")
+    ).length
 
     const oportunidades = clientesOperacionais.filter((cliente) => {
       const nota = Number(cliente.saudeTributaria || cliente.indiceSaudeTributaria || 100)
@@ -709,19 +733,17 @@ export default function Dashboard({ setPage }) {
     const primeiro = filaAssistenteDia[0] || null
 
     return {
-      criticos: resumoAssistenteDia.urgentes,
-      hoje: filaAssistenteDia.filter((cliente) =>
-        cliente.acoes.some((acao) => diferencaDias(acao.data) === 0)
-      ).length,
+      criticos: clientesCriticos.size,
+      hoje: pendenciasPainel.filter((acao) => diasAcao(acao) === 0).length,
       dasProximos,
-      honorariosPendentes,
-      documentosPendentes: resumo.documentosPendentes,
+      pagamentosPendentes,
+      documentosPendentes,
       parcelamentos,
       oportunidades,
       alertasIdentidade: resumoIdentidade.total,
       primeiro,
     }
-  }, [clientesOperacionais, mapaClientesOperacionais, fiscal, filaAssistenteDia, resumoAssistenteDia, resumo.documentosPendentes, resumoIdentidade])
+  }, [clientesOperacionais, filaAssistenteDia, pendenciasPainel, resumoIdentidade])
 
   const eventosCalendario = useMemo(() => {
     const eventos = {}
@@ -1204,6 +1226,13 @@ export default function Dashboard({ setPage }) {
         .nexa-recommendation { margin-top: 15px; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; background: rgba(1,17,43,.72); border-radius: 17px; padding: 15px; border: 1px solid rgba(255,255,255,.10); }
         .nexa-recommendation small { display: block; color: #9fb2ca; margin-bottom: 5px; }
         .nexa-recommendation strong { display: block; font-size: 16px; }
+        .nexa-pending-list { margin-top: 15px; display: grid; gap: 9px; }
+        .nexa-pending-list-title { color: #dce8f8; font-size: 13px; font-weight: 800; }
+        .nexa-pending-item { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 14px; text-align: left; color: #fff; background: rgba(1,17,43,.72); border: 1px solid rgba(255,255,255,.10); border-radius: 14px; padding: 12px 14px; cursor: pointer; }
+        .nexa-pending-item:hover { border-color: rgba(32,201,151,.55); background: rgba(6,31,57,.88); }
+        .nexa-pending-item strong { display: block; font-size: 14px; }
+        .nexa-pending-item span { display: block; margin-top: 3px; color: #aebfd3; font-size: 12px; }
+        .nexa-pending-item em { flex: 0 0 auto; color: #20c997; font-size: 12px; font-style: normal; font-weight: 800; }
         .nexa-progress-line { margin-top: 17px; }
         .nexa-progress-label { display: flex; justify-content: space-between; color: #c8d7eb; font-size: 12px; margin-bottom: 7px; }
 
@@ -1536,7 +1565,7 @@ export default function Dashboard({ setPage }) {
           <div className="nexa-daily-metric"><span>Clientes críticos</span><strong className="danger">{painelDiario.criticos}</strong></div>
           <div className="nexa-daily-metric"><span>Atendimentos hoje</span><strong className="warning">{painelDiario.hoje}</strong></div>
           <div className="nexa-daily-metric"><span>DAS em até 3 dias</span><strong className="blue">{painelDiario.dasProximos}</strong></div>
-          <div className="nexa-daily-metric"><span>Honorários pendentes</span><strong className="warning">{painelDiario.honorariosPendentes}</strong></div>
+          <div className="nexa-daily-metric"><span>Pagamentos pendentes</span><strong className="warning">{painelDiario.pagamentosPendentes}</strong></div>
           <div className="nexa-daily-metric"><span>Documentos pendentes</span><strong className="success">{painelDiario.documentosPendentes}</strong></div>
           <div className="nexa-daily-metric"><span>Parcelamentos próximos</span><strong className="blue">{painelDiario.parcelamentos}</strong></div>
           <div className="nexa-daily-metric"><span>Radar tributário</span><strong className="success">{painelDiario.oportunidades}</strong></div>
@@ -1564,6 +1593,31 @@ export default function Dashboard({ setPage }) {
           </div>
           {progressoDiaSalvo.historicoDia?.[0] && (
             <small>Última ação: {progressoDiaSalvo.historicoDia[0].hora} • {progressoDiaSalvo.historicoDia[0].texto}</small>
+          )}
+        </div>
+
+        <div className="nexa-pending-list">
+          <div className="nexa-pending-list-title">Todas as pendências para olhar</div>
+          {pendenciasPainel.length ? pendenciasPainel.map((acao) => (
+            <button
+              type="button"
+              className="nexa-pending-item"
+              key={acao.id}
+              onClick={() => abrirDestino(acao)}
+            >
+              <div>
+                <strong>{acao.cliente} — {acao.titulo}</strong>
+                <span>{acao.descricao}</span>
+              </div>
+              <em>Abrir</em>
+            </button>
+          )) : (
+            <div className="nexa-pending-item">
+              <div>
+                <strong>Nenhuma pendência aberta.</strong>
+                <span>O painel está atualizado.</span>
+              </div>
+            </div>
           )}
         </div>
       </section>
