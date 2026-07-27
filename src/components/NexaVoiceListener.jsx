@@ -11,6 +11,7 @@ import {
   listarVocabularioVoz,
   obterContextoVoz,
   precarregarClientesVoz,
+  registrarClienteVoz,
   registrarConversaVoz,
   resolverEscolhaClientePendente,
 } from "../services/nexaVoiceService"
@@ -813,6 +814,17 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         conversaIdRef.current = resposta.conversaId
         registrarConversaVoz(resposta.conversaId)
         setHistoricoSalvo(Boolean(resposta.historicoSalvo ?? true))
+      }
+
+      if (resposta.clienteIdConfirmado) {
+        registrarClienteVoz({
+          id: resposta.clienteIdConfirmado,
+          nome: resposta.clienteNomeConfirmado
+            || resposta.consulta?.itens?.find(
+              (item) => String(item?.clienteId) === String(resposta.clienteIdConfirmado),
+            )?.cliente
+            || "",
+        })
       }
 
       const textoResposta = limparRespostaDaNexa(resposta.resposta || "Comando concluído.")
