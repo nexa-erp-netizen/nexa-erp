@@ -48,6 +48,7 @@ export default function ConversaNexa({ usuario, setPage }) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900)
   const fimRef = useRef(null)
   const contextoInicialAplicadoRef = useRef(false)
+  const consultaAutomaticaAplicadaRef = useRef(false)
 
   useEffect(() => {
     const atualizar = () => setIsMobile(window.innerWidth < 900)
@@ -94,6 +95,17 @@ export default function ConversaNexa({ usuario, setPage }) {
   useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [conversa, enviando])
+
+  useEffect(() => {
+    if (consultaAutomaticaAplicadaRef.current) return
+
+    const consulta = localStorage.getItem("nexaConsultaAutomatica")
+    if (!consulta) return
+
+    consultaAutomaticaAplicadaRef.current = true
+    localStorage.removeItem("nexaConsultaAutomatica")
+    enviar(consulta)
+  }, [])
 
   useEffect(() => {
     carregarMemorias()

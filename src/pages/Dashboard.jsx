@@ -96,6 +96,23 @@ export default function Dashboard({ setPage }) {
     if (typeof setPage === "function") setPage("Conversa com a Nexa")
   }
 
+  function abrirPendenciasNexa() {
+    localStorage.setItem(
+      "nexaConsultaAutomatica",
+      "Quais são todas as pendências de hoje?"
+    )
+    abrirNexaAssist()
+  }
+
+  function mostrarProximosVencimentos() {
+    localStorage.removeItem("nexaFiltroFiscalCliente")
+    localStorage.removeItem("nexaFiltroFiscalId")
+
+    document
+      .getElementById("nexa-proximos-vencimentos")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
   function abrirAtalhoNexa(pagina) {
     if (typeof setPage === "function") setPage(pagina)
   }
@@ -1492,9 +1509,9 @@ export default function Dashboard({ setPage }) {
 
         <div className="nexa-assist-shortcuts">
           <button type="button" className="nexa-shortcut" onClick={() => abrirAtalhoNexa("Assistente do Dia")}>Iniciar meu dia</button>
-          <button type="button" className="nexa-shortcut" onClick={() => abrirAtalhoNexa("Pendências Clientes")}>Ver pendências</button>
+          <button type="button" className="nexa-shortcut" onClick={abrirPendenciasNexa}>Ver pendências</button>
           <button type="button" className="nexa-shortcut" onClick={() => abrirAtalhoNexa("Clientes")}>Abrir clientes</button>
-          <button type="button" className="nexa-shortcut" onClick={() => abrirAtalhoNexa("Fiscal")}>Próximos vencimentos</button>
+          <button type="button" className="nexa-shortcut" onClick={mostrarProximosVencimentos}>Próximos vencimentos</button>
         </div>
       </section>
 
@@ -1670,7 +1687,7 @@ export default function Dashboard({ setPage }) {
           </div>
         </section>
 
-        <section className="box">
+        <section className="box" id="nexa-proximos-vencimentos">
           <div className="box-title">⏰ Próximos Vencimentos</div>
 
           <div className="due-list">
