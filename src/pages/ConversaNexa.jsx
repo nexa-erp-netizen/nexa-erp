@@ -264,7 +264,13 @@ export default function ConversaNexa({ usuario, setPage }) {
       localStorage.setItem("nexaAbrirClienteNome", clienteNome)
       if (acao.secao) localStorage.setItem("nexaAbrirSecaoCliente", String(acao.secao))
     }
-    if (pagina === "Fiscal" && clienteNome) localStorage.setItem("nexaFiltroFiscalCliente", clienteNome)
+    if (pagina === "Fiscal") {
+      if (clienteNome) localStorage.setItem("nexaFiltroFiscalCliente", clienteNome)
+      else localStorage.removeItem("nexaFiltroFiscalCliente")
+      window.dispatchEvent(new CustomEvent("nexa:filtro-fiscal-atualizado", {
+        detail: { clienteId: clienteAcaoId, clienteNome },
+      }))
+    }
     if (pagina === "Documentos Digitais" && clienteNome) localStorage.setItem("nexaFiltroDocumentoCliente", clienteNome)
     if (pagina === "Pendências Clientes" && clienteNome) localStorage.setItem("nexaFiltroPendenciaCliente", clienteNome)
     if (pagina === "Movimentos Clientes" && clienteNome) localStorage.setItem("nexaFiltroMovimentosCliente", clienteNome)

@@ -14,7 +14,7 @@ function normalizarHistorico(historico) {
   if (!Array.isArray(historico)) return []
 
   return historico
-    .slice(-16)
+    .slice(-24)
     .map((item) => ({
       autor: item?.autor === "Você" ? "usuario" : "nexa",
       texto: String(item?.texto || "").slice(0, 1200),
@@ -54,16 +54,17 @@ function montarPrompt({ instrucoes, contexto, mensagem, historico }) {
 
   const contextoCompacto = compactarContexto(contexto)
 
-  return `Você é a Nexa, assistente de um escritório contábil brasileiro.
-Responda em português do Brasil, com naturalidade, objetividade e profissionalismo.
-Responda somente o que foi perguntado. Perguntas objetivas devem receber poucas palavras ou uma frase.
-Não acrescente detalhes, alertas, regras ou recomendações sem o usuário pedir.
-Quando o usuário pedir explicação ou detalhes, aprofunde com clareza.
-Não invente nomes, datas, valores ou pendências.
-Não use JSON, markdown, listas longas ou blocos de código.
+  return `Você é a Nexa, colega digital de um escritório contábil brasileiro.
+Converse em português do Brasil com a naturalidade de uma colega experiente: direta, contextual, cordial e sem frases de robô.
+Responda perguntas gerais normalmente. Quando a pergunta estiver incompleta, faça uma pergunta curta para obter o dado essencial.
+Use os dados do ERP apenas quando forem relevantes e nunca invente clientes, valores, datas, pagamentos ou pendências.
+O cliente aberto é apenas contexto de tela; pronomes devem seguir principalmente o assunto recente da conversa.
+Você pode usar humor leve quando couber, mas nunca em valores, prazos, obrigações ou riscos.
+Não diga “não consegui confirmar” para uma pergunta geral. Quando um dado atual exigir validação online, explique isso de forma útil.
+Não use JSON nem se apresente a cada resposta.
 
 INSTRUÇÃO:
-${String(instrucoes || "").slice(0, 700)}
+${String(instrucoes || "").slice(0, 1000)}
 
 HISTÓRICO RECENTE:
 ${conversaAnterior || "Sem histórico relevante."}
@@ -72,18 +73,20 @@ DADOS DISPONÍVEIS:
 ${JSON.stringify(contextoCompacto)}
 
 PERGUNTA:
-${String(mensagem || "").slice(0, 700)}
+${String(mensagem || "").slice(0, 1200)}
 
 RESPOSTA:`
 }
 
-async function buscarContexto({ mensagem, clienteId, historico, conversaId, tipoContexto, interessadoNome }) {
+async function buscarContexto({ mensagem, clienteId, historico, conversaId, tipoContexto, interessadoNome, paginaAtual = "", origem = "texto" }) {
   const resposta = await api.post("/conversa/contexto", {
     mensagem,
     clienteId,
     conversaId,
     tipoContexto,
     interessadoNome,
+    paginaAtual,
+    origem,
     historico: normalizarHistorico(historico),
   })
 
@@ -112,9 +115,9 @@ async function gerarComOllama({ prompt }) {
         stream: false,
         keep_alive: "30m",
         options: {
-          temperature: 0.15,
-          num_ctx: 1024,
-          num_predict: 90,
+          temperature: 0.35,
+          num_ctx: 2048,
+          num_predict: 220,
         },
       }),
     })
@@ -217,6 +220,8 @@ export async function conversarComNexa({
       conversaId: conversaIdFallback,
       tipoContexto,
       interessadoNome,
+      paginaAtual,
+      origem,
     })
     const prompt = montarPrompt({
       instrucoes: contextoResposta.instrucoes,
@@ -232,9 +237,13 @@ export async function conversarComNexa({
       tipoContexto,
     }
   } catch (erroOllama) {
-    const mensagemGroq = erroGroq?.response?.data?.message || erroGroq?.message || "Groq indisponível"
-    const mensagemOllama = erroOllama?.message || "Ollama indisponível"
-    throw new Error(`Não foi possível usar a Groq nem o Ollama. Groq: ${mensagemGroq}. Ollama: ${mensagemOllama}`)
+    console.warn("[Nexa/IA] Provedores indisponíveis.", {
+      groq: erroGroq?.response?.data?.message || erroGroq?.message || "indisponível",
+      ollama: erroOllama?.message || "indisponível",
+    })
+    const erroAmigavel = new Error("A conversa geral está temporariamente indisponível. As consultas e navegações da Nexa continuam funcionando normalmente.")
+    erroAmigavel.providerFailure = true
+    throw erroAmigavel
   }
 }
 

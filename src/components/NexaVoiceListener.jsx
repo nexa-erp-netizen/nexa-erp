@@ -608,7 +608,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     const contexto = obterContextoVoz()
 
     return [
-      "Nexa, bom dia, boa tarde, contador, contadora, contabilidade, MEI, empresário individual, sociedade limitada unipessoal, SLU, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, e-CAC, PGDAS-D, DCTFWeb, DAS, prioridades de hoje, relatório do dia, relatório para hoje, resumo de hoje, o que tenho para fazer hoje, iniciar meu dia.",
+      "Nexa, bom dia, boa tarde, contador, contadora, contabilidade, MEI, empresário individual, sociedade limitada unipessoal, SLU, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, e-CAC, PGDAS-D, DCTFWeb, DAS, prioridades de hoje, relatório do dia, relatório para hoje, resumo de hoje, o que tenho para fazer hoje, iniciar meu dia, todas as pendências, mensagens de clientes, pedidos de ajuda, documentos aguardando análise, quem pagou hoje, pagamentos recebidos, pendências resolvidas.",
       nomesClientes.length ? `Nomes de clientes do escritório: ${nomesClientes.join(", ")}.` : "",
       contexto.clienteNome ? `Cliente atual: ${contexto.clienteNome}.` : "",
       termos.length ? `Vocabulário aprendido: ${termos.join(", ")}.` : "",
@@ -875,7 +875,10 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       }
     } catch (error) {
       console.error("[Nexa Voice] Falha ao processar comando:", error)
-      const mensagem = error.response?.data?.message || error.message || "Não consegui processar o comando."
+      const detalheErro = error.response?.data?.message || error.message || "Não consegui processar o comando."
+      const mensagem = /(groq|ollama|rate limit|tokens?|localhost:11434|service tier|console\.groq|api[_ -]?key)/i.test(detalheErro)
+        ? "A conversa geral está temporariamente indisponível. As consultas e navegações da Nexa continuam funcionando normalmente."
+        : detalheErro
       setUltimaResposta(mensagem)
       setMensagensPainel((atual) => [
         ...atual,

@@ -62,6 +62,30 @@ export default function Fiscal() {
     }
   }, [clientesCadastrados])
 
+  useEffect(() => {
+    if (usuario?.perfil === "Cliente") return undefined
+
+    function atualizarFiltroFiscal(evento) {
+      const clienteNome = String(evento?.detail?.clienteNome || "").trim()
+
+      if (!clienteNome) {
+        setCliente("")
+        setClienteFiltro("")
+        return
+      }
+
+      const clienteEncontrado = clientesCadastrados.find(
+        (item) => String(item.nome || "").trim() === clienteNome
+      )
+      const nome = clienteEncontrado?.nome || clienteNome
+      setCliente(nome)
+      setClienteFiltro(nome)
+    }
+
+    window.addEventListener("nexa:filtro-fiscal-atualizado", atualizarFiltroFiscal)
+    return () => window.removeEventListener("nexa:filtro-fiscal-atualizado", atualizarFiltroFiscal)
+  }, [clientesCadastrados, usuario?.perfil])
+
   async function carregarObrigacoes() {
     try {
       const resposta = await api.get("/fiscal")

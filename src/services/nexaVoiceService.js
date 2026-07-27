@@ -307,7 +307,13 @@ export function executarAcaoDeVoz({ acao, setPage }) {
     emitirAberturaCliente(clienteId, clienteNome)
     return true
   }
-  if (pagina === "Fiscal" && clienteNome) localStorage.setItem("nexaFiltroFiscalCliente", clienteNome)
+  if (pagina === "Fiscal") {
+    if (clienteNome) localStorage.setItem("nexaFiltroFiscalCliente", clienteNome)
+    else localStorage.removeItem("nexaFiltroFiscalCliente")
+    window.dispatchEvent(new CustomEvent("nexa:filtro-fiscal-atualizado", {
+      detail: { clienteId, clienteNome },
+    }))
+  }
   if (pagina === "Documentos Digitais" && clienteNome) localStorage.setItem("nexaFiltroDocumentoCliente", clienteNome)
   if (pagina === "Pendências Clientes" && clienteNome) localStorage.setItem("nexaFiltroPendenciaCliente", clienteNome)
   if (pagina === "Movimentos Clientes" && clienteNome) localStorage.setItem("nexaFiltroMovimentosCliente", clienteNome)
