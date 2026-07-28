@@ -336,6 +336,25 @@ export default function ConversaNexa({ usuario, setPage }) {
         registrarConversaVoz(resposta.conversaId)
       }
 
+      if (resposta.clienteIdConfirmado) {
+        const idConfirmado = String(resposta.clienteIdConfirmado)
+        const clienteConfirmado = clientes.find((item) => String(item.id) === idConfirmado)
+        setTipoContexto("cliente")
+        setClienteId(idConfirmado)
+        registrarClienteVoz(clienteConfirmado || {
+          id: resposta.clienteIdConfirmado,
+          nome: resposta.clienteNomeConfirmado || "",
+        })
+
+        const conversaConfirmadaId = resposta.conversaId || conversaId
+        if (conversaConfirmadaId) {
+          await atualizarConversaNexa(conversaConfirmadaId, {
+            tipoContexto: "cliente",
+            clienteId: resposta.clienteIdConfirmado,
+          })
+        }
+      }
+
       setConversa((atual) => [...atual, {
         id: `n-${Date.now()}`,
         autor: "Nexa",
