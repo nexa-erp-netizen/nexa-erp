@@ -5,7 +5,6 @@ import {
   montarResumoAssistenteDia,
 } from "../services/assistenteDiaService"
 import { textoClassificacaoPrioridade } from "../services/priorizacaoService"
-import { garantirPlanejamentoAnual } from "../services/planejamentoAnualService"
 import {
   carregarJornadaDia,
   limparJornadaDia,
@@ -58,12 +57,10 @@ export default function AssistenteDoDia({ setPage }) {
       setFiscal(resultadoArray(fiscalResp))
       setPendencias(resultadoArray(pendenciasResp))
       setDocumentos(resultadoArray(documentosResp))
-      const clientesLista = resultadoArray(clientesResp)
-      const fiscalLista = resultadoArray(fiscalResp)
       setFinanceiro(resultadoArray(financeiroResp))
       setCertificados(resultadoArray(certificadosResp))
       setProcuracoes(resultadoArray(procuracoesResp))
-      setPlanejamento(garantirPlanejamentoAnual({ clientes: clientesLista, fiscal: fiscalLista }))
+      setPlanejamento([])
     } catch (error) {
       console.error("Erro ao carregar Assistente do Dia", error)
       alert("Erro ao carregar Assistente do Dia")

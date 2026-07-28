@@ -20,6 +20,7 @@ export default function Clientes({ setPage }) {
   const [telefone, setTelefone] = useState("")
   const [email, setEmail] = useState("")
   const [cnpj, setCnpj] = useState("")
+  const [ativo, setAtivo] = useState(true)
   const [regime, setRegime] = useState("")
   const [ramoAtividade, setRamoAtividade] = useState("")
   const [anexoSimples, setAnexoSimples] = useState("")
@@ -303,6 +304,7 @@ export default function Clientes({ setPage }) {
       telefone,
       email,
       cnpj,
+      ativo,
       regime,
       ramoAtividade,
       anexoSimples: regime === "Simples Nacional" ? anexoSimples : "",
@@ -423,6 +425,7 @@ export default function Clientes({ setPage }) {
     setTelefone(clienteSelecionado.telefone || "")
     setEmail(clienteSelecionado.email || "")
     setCnpj(clienteSelecionado.cnpj || "")
+    setAtivo(clienteSelecionado.ativo !== false)
     setRegime(clienteSelecionado.regime || "")
     setRamoAtividade(clienteSelecionado.ramoAtividade || "")
     setAnexoSimples(clienteSelecionado.anexoSimples || "")
@@ -752,6 +755,7 @@ export default function Clientes({ setPage }) {
     setTelefone("")
     setEmail("")
     setCnpj("")
+    setAtivo(true)
     setRegime("")
     setRamoAtividade("")
     setAnexoSimples("")
@@ -1175,6 +1179,7 @@ export default function Clientes({ setPage }) {
                 <th style={th}>Cliente</th>
                 <th style={th}>CPF</th>
                 <th style={th}>Telefone</th>
+                <th style={th}>Status</th>
                 <th style={th}>Ações</th>
               </tr>
             </thead>
@@ -1191,6 +1196,11 @@ export default function Clientes({ setPage }) {
                   <td style={td}>{cliente.nome}</td>
                   <td style={td}>{cliente.cpf}</td>
                   <td style={td}>{cliente.telefone}</td>
+                  <td style={td}>
+                    <strong style={{ color: cliente.ativo === false ? "#ff7a8a" : "#37f07a" }}>
+                      {cliente.ativo === false ? "Inativo" : "Ativo"}
+                    </strong>
+                  </td>
 
                   <td style={td}>
                     <button
@@ -1263,6 +1273,11 @@ export default function Clientes({ setPage }) {
               value={cnpj}
               onChange={(e) => setCnpj(formatarCNPJ(e.target.value))}
             />
+
+            <select style={input} value={ativo ? "ativo" : "inativo"} onChange={(e) => setAtivo(e.target.value === "ativo")}>
+              <option value="ativo">Cliente ativo — entra na rotina do escritório</option>
+              <option value="inativo">Cliente inativo — não entra na rotina</option>
+            </select>
 
             <select
               style={input}
@@ -2061,6 +2076,7 @@ export default function Clientes({ setPage }) {
               <Info label="Regime" value={clienteSelecionado.regime} />
               <Info label="Ramo de atividade" value={clienteSelecionado.ramoAtividade} />
               <Info label="Situação da empresa" value={clienteSelecionado.situacaoEmpresa} />
+              <Info label="Status no escritório" value={clienteSelecionado.ativo === false ? "Inativo" : "Ativo"} />
               {clienteSelecionado.regime === "Simples Nacional" && (
                 <>
                   <Info label="Anexo" value={clienteSelecionado.anexoSimples ? `Anexo ${clienteSelecionado.anexoSimples}` : ""} />
