@@ -43,6 +43,7 @@ export default function Dashboard({ setPage }) {
   const [documentos, setDocumentos] = useState([])
   const [financeiro, setFinanceiro] = useState([])
   const [servicosCobrancas, setServicosCobrancas] = useState([])
+  const [pendenciasConsolidadas, setPendenciasConsolidadas] = useState([])
   const [certificados, setCertificados] = useState([])
   const [procuracoes, setProcuracoes] = useState([])
   const [notificacoes, setNotificacoes] = useState(0)
@@ -124,7 +125,7 @@ export default function Dashboard({ setPage }) {
       const usuarioSalvo = JSON.parse(localStorage.getItem("usuario"))
       const token = localStorage.getItem("token") || usuarioSalvo?.token
 
-      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, servicosResp, certificadosResp, procuracoesResp] =
+      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, servicosResp, certificadosResp, procuracoesResp, painelResp] =
         await Promise.allSettled([
           api.get("/clientes"),
           api.get("/fiscal"),
@@ -134,6 +135,7 @@ export default function Dashboard({ setPage }) {
           api.get("/servicos-avulsos"),
           api.get("/certificados-digitais"),
           api.get("/procuracoes-ecac"),
+          api.get("/conversa/painel-diario"),
         ])
 
       const resultadoArray = (resultado) =>
@@ -149,6 +151,11 @@ export default function Dashboard({ setPage }) {
       setServicosCobrancas(resultadoArray(servicosResp))
       setCertificados(resultadoArray(certificadosResp))
       setProcuracoes(resultadoArray(procuracoesResp))
+      setPendenciasConsolidadas(
+        painelResp.status === "fulfilled" && Array.isArray(painelResp.value.data?.itens)
+          ? painelResp.value.data.itens
+          : []
+      )
 
       if (token) {
         const resposta = await fetch(`${API_URL}/notificacoes/contador`, {
@@ -694,7 +701,7 @@ export default function Dashboard({ setPage }) {
     })
   }, [clientes, fiscal, pendencias, documentos, financeiro, servicosCobrancas, certificados, procuracoes])
 
-  const pendenciasPainel = useMemo(() => {
+  const pendenciasPainelLegado = useMemo(() => {
     return filaAssistenteDia.flatMap((cliente) =>
       cliente.acoes
         .filter((acao) => {
@@ -709,6 +716,27 @@ export default function Dashboard({ setPage }) {
         }))
     )
   }, [filaAssistenteDia])
+
+  const pendenciasPainel = useMemo(() => {
+    if (!pendenciasConsolidadas.length) return pendenciasPainelLegado
+
+    return pendenciasConsolidadas.map((item) => ({
+      id: item.id,
+      referenciaId: item.referenciaId,
+      cliente: item.cliente,
+      clienteId: item.clienteId,
+      modulo: item.modulo || item.categoria || "Pendência",
+      titulo: item.titulo || "Pendência",
+      descricao: item.detalhe || item.status || "Aguardando ação",
+      status: item.status,
+      data: item.data,
+      prioridade: Number(item.prioridade || 0),
+      nivelCliente: Number(item.prioridade || 0) >= 110 ? "urgente" : "normal",
+      destino: item.paginaSugerida || "Clientes",
+      secao: item.modulo === "servico-cobranca" ? "servicos" : undefined,
+      valor: item.valor,
+    }))
+  }, [pendenciasConsolidadas, pendenciasPainelLegado])
 
   const resumoAssistenteDia = useMemo(() => {
     const base = montarResumoAssistenteDia(filaAssistenteDia)
