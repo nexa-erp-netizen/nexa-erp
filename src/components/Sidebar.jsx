@@ -92,7 +92,7 @@ export default function Sidebar({ page, setPage, usuario }) {
     {
       titulo: "Configurações",
       icon: <FaCog />,
-      itens: ["Usuários", "Backup Sistema", "Sobre"],
+      itens: ["Usuários", "Backup Sistema", "Google Drive", "Sobre"],
     },
   ]
 

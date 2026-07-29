@@ -42,6 +42,7 @@ import ConsultoraTributaria from "./pages/ConsultoraTributaria"
 import ConversaNexa from "./pages/ConversaNexa"
 import RadarInteligente from "./pages/RadarInteligente"
 import SobreNexa from "./pages/SobreNexa"
+import IntegracaoGoogleDrive from "./pages/IntegracaoGoogleDrive"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -78,6 +79,7 @@ export default function App() {
       "Relatórios",
       "Usuários",
       "Backup Sistema",
+      "Google Drive",
       "Sobre",
       "Calculadora IRPF MEI",
       "Agenda",
@@ -257,6 +259,9 @@ export default function App() {
 
       case "Backup Sistema":
         return <BackupSistema />
+
+      case "Google Drive":
+        return <IntegracaoGoogleDrive />
 
       case "Sobre":
         return <SobreNexa />
