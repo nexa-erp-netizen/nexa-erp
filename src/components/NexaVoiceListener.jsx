@@ -784,6 +784,12 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     const origem = opcoes.origem === "texto" ? "texto" : "voz"
     const deveFalar = opcoes.falar !== false
     const idBase = Date.now()
+    const pedidoDeAbrirDocumento = origem === "texto"
+      && /\b(abra|abre|abrir|visualize|visualizar|veja|ver|exiba|exibir|mostre|mostrar)\b/i.test(comando)
+      && /(document|arquivo|anexo|pdf|imagem|foto|contrato|declar|recibo|comprovante|per[ií]cia)/i.test(comando)
+    const janelaDocumentoPendente = pedidoDeAbrirDocumento
+      ? window.open("", "_blank")
+      : null
 
     processandoRef.current = true
     if (origem === "texto") setEnviandoTexto(true)
@@ -899,6 +905,11 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
             },
           }
         : null
+      if (resposta.acao?.tipo === "abrir-url" && janelaDocumentoPendente) {
+        resposta.acao.janelaPendente = janelaDocumentoPendente
+      } else if (janelaDocumentoPendente && !janelaDocumentoPendente.closed) {
+        janelaDocumentoPendente.close()
+      }
       const acaoExecutada = executarAcaoDeVoz({ acao: resposta.acao || acaoConfirmacaoCliente, setPage })
       if (acaoExecutada && origem === "voz") tocarSinal(690, 55)
       if (deveFalar && textoFalado) await falarResposta(textoFalado)
@@ -911,6 +922,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         atualizarEstado("pausada", "Escuta contínua pausada.")
       }
     } catch (error) {
+      if (janelaDocumentoPendente && !janelaDocumentoPendente.closed) janelaDocumentoPendente.close()
       console.error("[Nexa Voice] Falha ao processar comando:", error)
       const detalheErro = error.response?.data?.message || error.message || "Não consegui processar o comando."
       const mensagem = /(groq|ollama|rate limit|tokens?|localhost:11434|service tier|console\.groq|api[_ -]?key)/i.test(detalheErro)

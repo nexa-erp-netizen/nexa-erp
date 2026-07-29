@@ -278,6 +278,25 @@ export function limparContextoClienteVoz() {
 export function executarAcaoDeVoz({ acao, setPage }) {
   if (!acao) return false
 
+  if (acao.tipo === "abrir-url") {
+    try {
+      const url = new URL(String(acao.url || ""))
+      const hostPermitido = url.protocol === "https:"
+        && (url.hostname === "drive.google.com" || url.hostname.endsWith(".googleusercontent.com"))
+      if (!hostPermitido) return false
+      const janelaPendente = acao.janelaPendente
+      if (janelaPendente && !janelaPendente.closed) {
+        janelaPendente.opener = null
+        janelaPendente.location.replace(url.toString())
+        return true
+      }
+      window.open(url.toString(), "_blank", "noopener,noreferrer")
+      return true
+    } catch {
+      return false
+    }
+  }
+
   if (acao.tipo === "abrir-grupo") {
     const grupo = String(acao.grupo || "").trim()
     if (!grupo) return false
