@@ -8,6 +8,8 @@ export default function IntegracaoGoogleDrive() {
   const [carregando, setCarregando] = useState(true)
   const [mensagem, setMensagem] = useState("")
   const [erro, setErro] = useState("")
+  const [selecoes, setSelecoes] = useState({})
+  const [vinculandoId, setVinculandoId] = useState(null)
 
   const carregar = useCallback(async () => {
     setCarregando(true)
@@ -81,15 +83,23 @@ export default function IntegracaoGoogleDrive() {
     const pasta = dadosVinculos.pastas.find((item) => item.id === pastaId)
     if (!pasta) return
     setErro("")
+    setVinculandoId(clienteId)
     try {
       await api.put(`/google-drive/vinculos/${clienteId}`, {
         pastaId: pasta.id,
         pastaNome: pasta.name,
       })
       setMensagem(`Pasta “${pasta.name}” vinculada.`)
+      setSelecoes((atual) => {
+        const proximo = { ...atual }
+        delete proximo[clienteId]
+        return proximo
+      })
       await carregar()
     } catch (error) {
       setErro(error.response?.data?.message || "Não foi possível vincular a pasta.")
+    } finally {
+      setVinculandoId(null)
     }
   }
 
@@ -168,6 +178,7 @@ export default function IntegracaoGoogleDrive() {
             <div style={styles.lista}>
               {dadosVinculos.itens.map((item) => {
                 const sugestao = item.sugestoes?.[0]
+                const pastaSelecionada = selecoes[item.clienteId] ?? sugestao?.id ?? ""
                 return (
                   <div key={item.clienteId} style={styles.linha}>
                     <div style={styles.cliente}>
@@ -183,8 +194,11 @@ export default function IntegracaoGoogleDrive() {
                       <div style={styles.vinculo}>
                         <select
                           style={styles.select}
-                          defaultValue={sugestao?.id || ""}
-                          onChange={(event) => vincular(item.clienteId, event.target.value)}
+                          value={pastaSelecionada}
+                          onChange={(event) => setSelecoes((atual) => ({
+                            ...atual,
+                            [item.clienteId]: event.target.value,
+                          }))}
                         >
                           <option value="">Selecionar pasta...</option>
                           {dadosVinculos.pastas.map((pasta) => (
@@ -193,6 +207,16 @@ export default function IntegracaoGoogleDrive() {
                             </option>
                           ))}
                         </select>
+                        <button
+                          style={{
+                            ...styles.botaoConfirmar,
+                            opacity: !pastaSelecionada || vinculandoId === item.clienteId ? 0.55 : 1,
+                          }}
+                          disabled={!pastaSelecionada || vinculandoId === item.clienteId}
+                          onClick={() => vincular(item.clienteId, pastaSelecionada)}
+                        >
+                          {vinculandoId === item.clienteId ? "Salvando..." : "Confirmar"}
+                        </button>
                       </div>
                     )}
                   </div>
@@ -225,5 +249,6 @@ const styles = {
   cliente: { display: "flex", flexDirection: "column", gap: 4 },
   vinculo: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 },
   select: { width: "100%", background: "#061a31", color: "#fff", border: "1px solid #315b82", borderRadius: 8, padding: 10 },
+  botaoConfirmar: { background: "#22c98b", color: "#03271e", border: 0, borderRadius: 8, padding: "10px 13px", fontWeight: 700, cursor: "pointer" },
   botaoTexto: { background: "transparent", color: "#ff9aad", border: 0, cursor: "pointer" },
 }
