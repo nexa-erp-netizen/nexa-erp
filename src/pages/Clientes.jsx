@@ -3,6 +3,7 @@ import api from "../services/api"
 import WhatsAppMenu from "../components/WhatsAppMenu"
 import ServicosCobrancasCliente from "../components/ServicosCobrancasCliente"
 import { analisarPlanejamentoTributario } from "../motorTributario"
+import { registrarClienteVoz } from "../services/nexaVoiceService"
 
 function formatarCodigoCliente(id) {
   const numero = Number(id)
@@ -388,6 +389,7 @@ export default function Clientes({ setPage }) {
   }
 
   function visualizarCliente(cliente) {
+    registrarClienteVoz(cliente)
     setClienteSelecionado(cliente)
     setEditandoId(cliente.id)
     setTela("detalhes")
