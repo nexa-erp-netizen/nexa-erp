@@ -332,6 +332,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const ultimaRespostaFaladaRef = useRef("")
   const ignorarEcoAteRef = useRef(0)
   const fimPainelRef = useRef(null)
+  const campoMensagemRef = useRef(null)
 
   const streamRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -413,6 +414,17 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   useEffect(() => {
     fimPainelRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" })
   }, [mensagensPainel, enviandoTexto, expandido])
+
+  const focarCampoMensagem = useCallback(() => {
+    if (!expandido) return
+    window.requestAnimationFrame(() => {
+      campoMensagemRef.current?.focus?.({ preventScroll: true })
+    })
+  }, [expandido])
+
+  useEffect(() => {
+    if (expandido && !enviandoTexto) focarCampoMensagem()
+  }, [enviandoTexto, expandido, focarCampoMensagem])
 
   const atualizarEstado = useCallback((status, detalhe = "") => {
     setEstado((atual) => ({ ...atual, status, detalhe }))
@@ -874,7 +886,20 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         { autor: "Nexa", texto: textoResposta },
       ].slice(-12)
 
-      const acaoExecutada = executarAcaoDeVoz({ acao: resposta.acao, setPage })
+      const acaoConfirmacaoCliente = !resposta.acao && resposta.clienteIdConfirmado
+        ? {
+            tipo: "navegar",
+            pagina: "Clientes",
+            alvo: "central-cliente",
+            secao: "",
+            segura: true,
+            cliente: {
+              id: resposta.clienteIdConfirmado,
+              nome: resposta.clienteNomeConfirmado || "",
+            },
+          }
+        : null
+      const acaoExecutada = executarAcaoDeVoz({ acao: resposta.acao || acaoConfirmacaoCliente, setPage })
       if (acaoExecutada && origem === "voz") tocarSinal(690, 55)
       if (deveFalar && textoFalado) await falarResposta(textoFalado)
 
@@ -909,7 +934,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
     setMensagemDigitada("")
     await processarComando(texto, { origem: "texto", falar: false })
-  }, [enviandoTexto, mensagemDigitada, processarComando])
+    focarCampoMensagem()
+  }, [enviandoTexto, focarCampoMensagem, mensagemDigitada, processarComando])
 
   const confirmarSugestaoVocabulario = useCallback(async (texto) => {
     const sugestao = sugestaoVocabularioRef.current
@@ -1544,6 +1570,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
           <div style={styles.composer}>
             <textarea
+              ref={campoMensagemRef}
               value={mensagemDigitada}
               onChange={(evento) => setMensagemDigitada(evento.target.value)}
               onKeyDown={(evento) => {
@@ -1555,7 +1582,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
               placeholder="Digite para a Nexa..."
               rows={2}
               style={styles.composerInput}
-              disabled={enviandoTexto}
+              readOnly={enviandoTexto}
+              aria-busy={enviandoTexto}
             />
             <button
               type="button"
