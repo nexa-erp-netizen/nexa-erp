@@ -290,8 +290,8 @@ export function executarAcaoDeVoz({ acao, setPage }) {
         janelaPendente.location.replace(url.toString())
         return true
       }
-      window.open(url.toString(), "_blank", "noopener,noreferrer")
-      return true
+      const novaJanela = window.open(url.toString(), "_blank", "noopener,noreferrer")
+      return Boolean(novaJanela)
     } catch {
       return false
     }

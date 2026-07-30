@@ -786,7 +786,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     const idBase = Date.now()
     const pedidoDeAbrirDocumento = origem === "texto"
       && /\b(abra|abre|abrir|visualize|visualizar|veja|ver|exiba|exibir|mostre|mostrar)\b/i.test(comando)
-      && /(document|arquivo|anexo|pdf|imagem|foto|contrato|declar|recibo|comprovante|per[ií]cia)/i.test(comando)
+      && /\b(document\w*|arquivo\w*|anexo\w*|pdf|imagem|foto\w*|contrato\w*|declara\w*|recibo\w*|comprovante\w*|per[ií]cia|rg|cpf|cnh|identidade)\b/i.test(comando)
     const janelaDocumentoPendente = pedidoDeAbrirDocumento
       ? window.open("", "_blank")
       : null
@@ -858,7 +858,15 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           autor: "Nexa",
           texto: textoResposta,
           data: resposta.respondidoEm || new Date().toISOString(),
-          acaoExecutada: Boolean(resposta.acao),
+          acaoExecutada: false,
+          acaoDocumento: resposta.acao?.tipo === "abrir-url"
+            ? {
+                tipo: "abrir-url",
+                url: resposta.acao.url,
+                titulo: resposta.acao.titulo || "Documento",
+                segura: true,
+              }
+            : null,
         },
       ].slice(-30))
 
@@ -911,6 +919,13 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         janelaDocumentoPendente.close()
       }
       const acaoExecutada = executarAcaoDeVoz({ acao: resposta.acao || acaoConfirmacaoCliente, setPage })
+      if (resposta.acao) {
+        setMensagensPainel((atual) => atual.map((item) => (
+          item.id === `nexa-${idBase}`
+            ? { ...item, acaoExecutada, aberturaBloqueada: resposta.acao.tipo === "abrir-url" && !acaoExecutada }
+            : item
+        )))
+      }
       if (acaoExecutada && origem === "voz") tocarSinal(690, 55)
       if (deveFalar && textoFalado) await falarResposta(textoFalado)
 
@@ -1573,6 +1588,29 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
                 </div>
                 <p style={styles.chatMessageText}>{item.texto}</p>
                 {item.acaoExecutada && <small style={styles.actionDone}>Pronto.</small>}
+                {item.acaoDocumento && !item.acaoExecutada && (
+                  <div style={styles.documentFallback}>
+                    {item.aberturaBloqueada && (
+                      <small style={styles.documentFallbackText}>
+                        O navegador bloqueou a nova guia.
+                      </small>
+                    )}
+                    <button
+                      type="button"
+                      style={styles.openDocumentButton}
+                      onClick={() => {
+                        const abriu = executarAcaoDeVoz({ acao: item.acaoDocumento, setPage })
+                        setMensagensPainel((atual) => atual.map((mensagem) => (
+                          mensagem.id === item.id
+                            ? { ...mensagem, acaoExecutada: abriu, aberturaBloqueada: !abriu }
+                            : mensagem
+                        )))
+                      }}
+                    >
+                      Abrir documento
+                    </button>
+                  </div>
+                )}
               </article>
             ))}
 
@@ -1706,6 +1744,9 @@ const styles = {
   chatMessageHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", color: "#a9bdd3", fontSize: "10px" },
   chatMessageText: { margin: "6px 0 0", whiteSpace: "pre-wrap", lineHeight: 1.45, fontSize: "12px" },
   actionDone: { display: "block", marginTop: "7px", color: "#9effbc", fontWeight: 700 },
+  documentFallback: { display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "6px", marginTop: "8px" },
+  documentFallbackText: { color: "#ffd298", lineHeight: 1.35 },
+  openDocumentButton: { border: "1px solid rgba(139,215,255,.36)", borderRadius: "8px", padding: "7px 10px", background: "rgba(0,168,255,.16)", color: "#d9edff", fontWeight: 800, cursor: "pointer", fontSize: "11px" },
   typingText: { color: "#8bd7ff", fontSize: "11px", fontStyle: "italic" },
   composer: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "8px", alignItems: "stretch" },
   composerInput: { width: "100%", boxSizing: "border-box", resize: "none", minHeight: "58px", maxHeight: "110px", background: "#071f43", color: "#f4fbff", border: "1px solid rgba(139,215,255,.22)", borderRadius: "11px", padding: "10px 11px", outline: "none", fontFamily: "inherit", fontSize: "12px", lineHeight: 1.4 },
