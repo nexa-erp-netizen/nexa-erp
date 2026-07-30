@@ -18,6 +18,14 @@ const ROTULOS_METODO = {
   GOV_BR: "Conta gov.br",
 }
 
+function normalizarPerfil(valor) {
+  return String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+}
+
 function diasAte(data) {
   if (!data) return null
   const hoje = new Date(); hoje.setHours(0,0,0,0)
@@ -40,7 +48,7 @@ function formatarData(data) {
   return `${d}/${m}/${a}`
 }
 
-export default function CentralEcac() {
+export default function CentralEcac({ usuarioLogado }) {
   const [clientes,setClientes]=useState([])
   const [certificados,setCertificados]=useState([])
   const [procuracoes,setProcuracoes]=useState([])
@@ -51,8 +59,15 @@ export default function CentralEcac() {
   const [cofreAtivo,setCofreAtivo]=useState(false)
   const [acesso,setAcesso]=useState(ACESSO_INICIAL)
   const [salvandoAcesso,setSalvandoAcesso]=useState(false)
-  const usuario=useMemo(()=>JSON.parse(localStorage.getItem("usuario")||"{}"),[])
-  const administrador=usuario?.perfil==="Administrador"
+  const usuario=useMemo(()=>{
+    if (usuarioLogado) return usuarioLogado
+    try {
+      return JSON.parse(localStorage.getItem("usuario")||"{}")
+    } catch {
+      return {}
+    }
+  },[usuarioLogado])
+  const administrador=normalizarPerfil(usuario?.perfil)==="administrador"
 
   useEffect(()=>{ carregar() },[])
 
@@ -159,7 +174,7 @@ export default function CentralEcac() {
 
       <div style={styles.linksGrid}>{LINKS.map(link=><button key={link.id} style={styles.linkCard} onClick={()=>abrir(link)}><strong style={styles.linkTitle}>{link.titulo}</strong><span style={styles.linkDesc}>{link.descricao}</span><span style={styles.open}>Abrir serviço →</span></button>)}</div>
 
-      {administrador && <div style={styles.card}>
+      {administrador ? <div style={styles.card}>
         <div style={styles.listHeader}>
           <div><h3 style={styles.cardTitle}>Cofre de acessos fiscais</h3><p style={styles.empty}>Vincule o acesso ao cliente. Senhas e certificados nunca retornam da API.</p></div>
           <span style={{...styles.cofreBadge,color:cofreAtivo?"#37ff74":"#ff5f65"}}>{cofreAtivo?"Cofre ativo":"Chave não configurada"}</span>
@@ -183,6 +198,9 @@ export default function CentralEcac() {
           </div>)}
         </div>
         <p style={styles.warning}>Esta etapa não acessa, transmite nem retifica declarações. A conta gov.br fica cadastrada, mas a automação permanece bloqueada.</p>
+      </div> : <div style={styles.card}>
+        <h3 style={styles.cardTitle}>Cofre de acessos fiscais</h3>
+        <p style={styles.warning}>Disponível somente para usuário com perfil Administrador. Perfil atual: {usuario?.perfil || "não identificado"}.</p>
       </div>}
     </>}
 

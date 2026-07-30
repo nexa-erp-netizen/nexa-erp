@@ -231,7 +231,7 @@ export default function App() {
         return <IdentidadeDigital setPage={setPage} />
 
       case "Central e-CAC":
-        return <CentralEcac />
+        return <CentralEcac usuarioLogado={usuario} />
 
       case "Memória da Nexa":
         return <MemoriaNexa />
