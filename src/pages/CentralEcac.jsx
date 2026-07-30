@@ -153,7 +153,7 @@ export default function CentralEcac({ usuarioLogado }) {
 
   return <div style={styles.page}>
     <div style={styles.hero}>
-      <div><span style={styles.badge}>Módulo 3 • Identidade Digital</span><h2 style={styles.title}>Central e-CAC</h2><p style={styles.subtitle}>Acessos tributários organizados por cliente, com certificado, procuração e histórico.</p></div>
+      <div><span style={styles.badge}>Módulo 3 • Identidade Digital • v2.9.2</span><h2 style={styles.title}>Central e-CAC</h2><p style={styles.subtitle}>Acessos tributários organizados por cliente, com certificado, procuração e histórico.</p></div>
       <button style={styles.refresh} onClick={carregar}>Atualizar</button>
     </div>
 
@@ -165,20 +165,12 @@ export default function CentralEcac({ usuarioLogado }) {
       </select>
     </div>
 
-    {cliente && <>
-      <div style={styles.statusGrid}>
-        <Status titulo="Certificado A1" status={stCert} detalhe={certificado?`Validade: ${formatarData(certificado.dataValidade)}`:"Nenhum certificado cadastrado"}/>
-        <Status titulo="Procuração e-CAC" status={stProc} detalhe={procuracao?`Validade: ${formatarData(procuracao.dataValidade)}`:"Nenhuma procuração cadastrada"}/>
-        <Status titulo="Responsável" status={{texto:procuracao?.responsavel||certificado?.responsavel||"Não informado",cor:"#00a8ff"}} detalhe={procuracao?.servicosAutorizados||"Controle interno da Nexa"}/>
+    {administrador ? <div style={styles.card}>
+      <div style={styles.listHeader}>
+        <div><h3 style={styles.cardTitle}>Cofre de acessos fiscais</h3><p style={styles.empty}>{cliente ? `Acessos protegidos de ${cliente.nome}.` : "Selecione um cliente para vincular um acesso fiscal."}</p></div>
+        <span style={{...styles.cofreBadge,color:cofreAtivo?"#37ff74":"#ff5f65"}}>{cofreAtivo?"Cofre ativo":"Chave não configurada"}</span>
       </div>
-
-      <div style={styles.linksGrid}>{LINKS.map(link=><button key={link.id} style={styles.linkCard} onClick={()=>abrir(link)}><strong style={styles.linkTitle}>{link.titulo}</strong><span style={styles.linkDesc}>{link.descricao}</span><span style={styles.open}>Abrir serviço →</span></button>)}</div>
-
-      {administrador ? <div style={styles.card}>
-        <div style={styles.listHeader}>
-          <div><h3 style={styles.cardTitle}>Cofre de acessos fiscais</h3><p style={styles.empty}>Vincule o acesso ao cliente. Senhas e certificados nunca retornam da API.</p></div>
-          <span style={{...styles.cofreBadge,color:cofreAtivo?"#37ff74":"#ff5f65"}}>{cofreAtivo?"Cofre ativo":"Chave não configurada"}</span>
-        </div>
+      {cliente && <>
         <div style={styles.formGrid}>
           <select style={styles.select} value={acesso.metodo} onChange={e=>setAcesso({...ACESSO_INICIAL,metodo:e.target.value})}>
             <option value="A1">Certificado digital A1</option>
@@ -198,10 +190,21 @@ export default function CentralEcac({ usuarioLogado }) {
           </div>)}
         </div>
         <p style={styles.warning}>Esta etapa não acessa, transmite nem retifica declarações. A conta gov.br fica cadastrada, mas a automação permanece bloqueada.</p>
-      </div> : <div style={styles.card}>
-        <h3 style={styles.cardTitle}>Cofre de acessos fiscais</h3>
-        <p style={styles.warning}>Disponível somente para usuário com perfil Administrador. Perfil atual: {usuario?.perfil || "não identificado"}.</p>
-      </div>}
+      </>}
+    </div> : <div style={styles.card}>
+      <h3 style={styles.cardTitle}>Cofre de acessos fiscais</h3>
+      <p style={styles.warning}>Disponível somente para usuário com perfil Administrador. Perfil atual: {usuario?.perfil || "não identificado"}.</p>
+    </div>}
+
+    {cliente && <>
+      <div style={styles.statusGrid}>
+        <Status titulo="Certificado A1" status={stCert} detalhe={certificado?`Validade: ${formatarData(certificado.dataValidade)}`:"Nenhum certificado cadastrado"}/>
+        <Status titulo="Procuração e-CAC" status={stProc} detalhe={procuracao?`Validade: ${formatarData(procuracao.dataValidade)}`:"Nenhuma procuração cadastrada"}/>
+        <Status titulo="Responsável" status={{texto:procuracao?.responsavel||certificado?.responsavel||"Não informado",cor:"#00a8ff"}} detalhe={procuracao?.servicosAutorizados||"Controle interno da Nexa"}/>
+      </div>
+
+      <div style={styles.linksGrid}>{LINKS.map(link=><button key={link.id} style={styles.linkCard} onClick={()=>abrir(link)}><strong style={styles.linkTitle}>{link.titulo}</strong><span style={styles.linkDesc}>{link.descricao}</span><span style={styles.open}>Abrir serviço →</span></button>)}</div>
+
     </>}
 
     <div style={styles.card}>
