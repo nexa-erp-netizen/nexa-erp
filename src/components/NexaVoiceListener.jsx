@@ -1595,20 +1595,21 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
                         O navegador bloqueou a nova guia.
                       </small>
                     )}
-                    <button
-                      type="button"
+                    <a
+                      href={item.acaoDocumento.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       style={styles.openDocumentButton}
                       onClick={() => {
-                        const abriu = executarAcaoDeVoz({ acao: item.acaoDocumento, setPage })
                         setMensagensPainel((atual) => atual.map((mensagem) => (
                           mensagem.id === item.id
-                            ? { ...mensagem, acaoExecutada: abriu, aberturaBloqueada: !abriu }
+                            ? { ...mensagem, acaoExecutada: true, aberturaBloqueada: false }
                             : mensagem
                         )))
                       }}
                     >
                       Abrir documento
-                    </button>
+                    </a>
                   </div>
                 )}
               </article>
@@ -1746,7 +1747,7 @@ const styles = {
   actionDone: { display: "block", marginTop: "7px", color: "#9effbc", fontWeight: 700 },
   documentFallback: { display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "6px", marginTop: "8px" },
   documentFallbackText: { color: "#ffd298", lineHeight: 1.35 },
-  openDocumentButton: { border: "1px solid rgba(139,215,255,.36)", borderRadius: "8px", padding: "7px 10px", background: "rgba(0,168,255,.16)", color: "#d9edff", fontWeight: 800, cursor: "pointer", fontSize: "11px" },
+  openDocumentButton: { display: "inline-block", border: "1px solid rgba(139,215,255,.36)", borderRadius: "8px", padding: "7px 10px", background: "rgba(0,168,255,.16)", color: "#d9edff", fontWeight: 800, cursor: "pointer", fontSize: "11px", textDecoration: "none" },
   typingText: { color: "#8bd7ff", fontSize: "11px", fontStyle: "italic" },
   composer: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "8px", alignItems: "stretch" },
   composerInput: { width: "100%", boxSizing: "border-box", resize: "none", minHeight: "58px", maxHeight: "110px", background: "#071f43", color: "#f4fbff", border: "1px solid rgba(139,215,255,.22)", borderRadius: "11px", padding: "10px 11px", outline: "none", fontFamily: "inherit", fontSize: "12px", lineHeight: 1.4 },
