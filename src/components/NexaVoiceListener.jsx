@@ -1600,13 +1600,6 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
                       target="_blank"
                       rel="noopener noreferrer"
                       style={styles.openDocumentButton}
-                      onClick={() => {
-                        setMensagensPainel((atual) => atual.map((mensagem) => (
-                          mensagem.id === item.id
-                            ? { ...mensagem, acaoExecutada: true, aberturaBloqueada: false }
-                            : mensagem
-                        )))
-                      }}
                     >
                       Abrir documento
                     </a>

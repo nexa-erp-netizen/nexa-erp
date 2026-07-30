@@ -287,7 +287,7 @@ export function executarAcaoDeVoz({ acao, setPage }) {
       const janelaPendente = acao.janelaPendente
       if (janelaPendente && !janelaPendente.closed) {
         janelaPendente.opener = null
-        janelaPendente.location.replace(url.toString())
+        janelaPendente.location.href = url.toString()
         return true
       }
       const novaJanela = window.open(url.toString(), "_blank", "noopener,noreferrer")
