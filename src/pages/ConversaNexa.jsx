@@ -612,6 +612,7 @@ function rotuloEscopo(escopo) {
 
 function ResultadoConsulta({ consulta, onAbrir }) {
   const itens = Array.isArray(consulta?.itens) ? consulta.itens : []
+  const itensVisiveis = consulta?.tipo === "lista-documentos-drive" ? itens : itens.slice(0, 12)
   const podeAbrir = Boolean(consulta?.acaoSugerida && typeof onAbrir === "function")
 
   return (
@@ -627,10 +628,22 @@ function ResultadoConsulta({ consulta, onAbrir }) {
 
       {!!itens.length && (
         <div style={styles.consultaItens}>
-          {itens.slice(0, 12).map((registro, indice) => (
+          {itensVisiveis.map((registro, indice) => (
             <div key={`${registro.id || registro.clienteId || indice}-${registro.titulo || registro.cliente || indice}`} style={styles.consultaItem}>
               <div style={styles.consultaItemTopo}>
-                <strong>{registro.titulo || registro.cliente || "Registro"}</strong>
+                {registro.url ? (
+                  <a
+                    href={registro.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={styles.consultaArquivoLink}
+                    title={`Abrir ${registro.titulo || "documento"} no Google Drive`}
+                  >
+                    📄 {registro.titulo || registro.cliente || "Documento"}
+                  </a>
+                ) : (
+                  <strong>{registro.titulo || registro.cliente || "Registro"}</strong>
+                )}
                 {registro.status && <span style={styles.consultaStatus}>{registro.status}</span>}
               </div>
               {registro.cliente && registro.titulo !== registro.cliente && <span style={styles.consultaCliente}>{registro.cliente}</span>}
@@ -721,6 +734,7 @@ const styles = {
   consultaItens: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: "8px" },
   consultaItem: { background: "rgba(255,255,255,.045)", border: "1px solid rgba(255,255,255,.09)", borderRadius: "10px", padding: "10px", display: "flex", flexDirection: "column", gap: "4px", minWidth: 0 },
   consultaItemTopo: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", fontSize: "12px" },
+  consultaArquivoLink: { color: "#bfe8ff", fontWeight: 800, lineHeight: 1.4, textDecoration: "none", overflowWrap: "anywhere" },
   consultaStatus: { color: "#9decb8", fontSize: "10px", textAlign: "right" },
   consultaCliente: { color: "#8bd7ff", fontSize: "11px", fontWeight: "bold" },
   consultaDetalhe: { color: "#c6d5e8", fontSize: "11px", lineHeight: 1.4, overflowWrap: "anywhere" },

@@ -867,6 +867,9 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
                 segura: true,
               }
             : null,
+          documentosDrive: resposta.consulta?.tipo === "lista-documentos-drive"
+            ? (resposta.consulta.itens || []).filter((arquivo) => arquivo?.url)
+            : [],
         },
       ].slice(-30))
 
@@ -1587,6 +1590,23 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
                   <span>{formatarHorarioPainel(item.data)}</span>
                 </div>
                 <p style={styles.chatMessageText}>{item.texto}</p>
+                {!!item.documentosDrive?.length && (
+                  <div style={styles.driveFileList}>
+                    {item.documentosDrive.map((arquivo) => (
+                      <a
+                        key={arquivo.id || arquivo.url}
+                        href={arquivo.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={styles.driveFileLink}
+                        title={`Abrir ${arquivo.titulo || "documento"} no Google Drive`}
+                      >
+                        <span aria-hidden="true">📄</span>
+                        <span>{arquivo.titulo || "Documento"}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
                 {item.acaoExecutada && <small style={styles.actionDone}>Pronto.</small>}
                 {item.acaoDocumento && !item.acaoExecutada && (
                   <div style={styles.documentFallback}>
@@ -1737,6 +1757,8 @@ const styles = {
   chatMessageError: { borderColor: "rgba(255,95,101,.46)", background: "rgba(104,23,35,.72)" },
   chatMessageHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", color: "#a9bdd3", fontSize: "10px" },
   chatMessageText: { margin: "6px 0 0", whiteSpace: "pre-wrap", lineHeight: 1.45, fontSize: "12px" },
+  driveFileList: { display: "flex", flexDirection: "column", gap: "5px", marginTop: "9px", maxHeight: "260px", overflowY: "auto", paddingRight: "3px" },
+  driveFileLink: { display: "flex", alignItems: "flex-start", gap: "7px", border: "1px solid rgba(139,215,255,.22)", borderRadius: "8px", padding: "7px 9px", background: "rgba(0,168,255,.08)", color: "#d9edff", fontSize: "11px", lineHeight: 1.35, textDecoration: "none", overflowWrap: "anywhere" },
   actionDone: { display: "block", marginTop: "7px", color: "#9effbc", fontWeight: 700 },
   documentFallback: { display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "6px", marginTop: "8px" },
   documentFallbackText: { color: "#ffd298", lineHeight: 1.35 },
