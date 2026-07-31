@@ -354,6 +354,25 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const pararCapturaRef = useRef(null)
   const reiniciandoCapturaRef = useRef(false)
   const microfoneSelecionadoRef = useRef(localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
+  const contextoClienteRef = useRef(obterContextoVoz())
+
+  useEffect(() => {
+    const sincronizarContextoCliente = (evento) => {
+      const idEvento = evento?.detail?.id
+      const nomeEvento = evento?.detail?.nome
+      contextoClienteRef.current = idEvento
+        ? {
+            ...obterContextoVoz(),
+            clienteId: String(idEvento),
+            clienteNome: String(nomeEvento || ""),
+          }
+        : obterContextoVoz()
+    }
+
+    sincronizarContextoCliente()
+    window.addEventListener("nexa:contexto-cliente-atualizado", sincronizarContextoCliente)
+    return () => window.removeEventListener("nexa:contexto-cliente-atualizado", sincronizarContextoCliente)
+  }, [])
 
   const carregarHistoricoPainel = useCallback(async (idInformado = null) => {
     const conversaId = idInformado || conversaIdRef.current || obterContextoVoz().conversaId
@@ -389,7 +408,10 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   }, [])
 
   useEffect(() => {
-    const contexto = obterContextoVoz()
+    const contextoSalvo = obterContextoVoz()
+    const contexto = contextoClienteRef.current?.clienteId
+      ? { ...contextoSalvo, ...contextoClienteRef.current }
+      : contextoSalvo
     if (contexto.conversaId) carregarHistoricoPainel(contexto.conversaId)
 
     const sincronizarConversa = (evento) => {
@@ -805,7 +827,10 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     // páginas, os grupos, os clientes e o contexto atual. Assim, a navegação
     // não depende de uma lista rígida de frases no navegador.
 
-    const contexto = obterContextoVoz()
+    const contextoSalvoAtual = obterContextoVoz()
+    const contexto = contextoClienteRef.current?.clienteId
+      ? { ...contextoSalvoAtual, ...contextoClienteRef.current }
+      : contextoSalvoAtual
     const selecaoClientePendente = selecaoClientePendenteRef.current
     const cancelarSelecaoCliente = Boolean(
       selecaoClientePendente && CANCELAR_SELECAO_CLIENTE_PATTERN.test(comando),
