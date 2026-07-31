@@ -17,6 +17,7 @@ import {
 } from "../services/nexaVoiceService"
 
 const VOICE_ENABLED_KEY = "nexaVoiceEnabled"
+const SPOKEN_RESPONSES_ENABLED_KEY = "nexaSpokenResponsesEnabled"
 const MICROPHONE_DEVICE_KEY = "nexaVoiceMicrophoneDeviceId"
 const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta|nessa)\b[\s,.:;-]*(.*)$/i
 const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.:;-]*(.*)$/i
@@ -304,6 +305,9 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const [microfone, setMicrofone] = useState("Microfone padrão do Windows")
   const [microfonesDisponiveis, setMicrofonesDisponiveis] = useState([])
   const [microfoneSelecionado, setMicrofoneSelecionado] = useState(() => localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
+  const [respostasFaladasAtivas, setRespostasFaladasAtivas] = useState(
+    () => localStorage.getItem(SPOKEN_RESPONSES_ENABLED_KEY) === "true",
+  )
   const [vozAtiva, setVozAtiva] = useState("Preparando voz da Nexa...")
   const [transcricaoAtiva, setTranscricaoAtiva] = useState("Groq Whisper")
   const [expandido, setExpandido] = useState(false)
@@ -311,6 +315,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const [historicoSalvo, setHistoricoSalvo] = useState(() => Boolean(obterContextoVoz().conversaId))
 
   const ativadaRef = useRef(estado.ativada)
+  const respostasFaladasAtivasRef = useRef(respostasFaladasAtivas)
   const sessaoAtivaRef = useRef(false)
   const modoRef = useRef("wake")
   const processandoRef = useRef(false)
@@ -355,6 +360,16 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const reiniciandoCapturaRef = useRef(false)
   const microfoneSelecionadoRef = useRef(localStorage.getItem(MICROPHONE_DEVICE_KEY) || "")
   const contextoClienteRef = useRef(obterContextoVoz())
+
+  useEffect(() => {
+    respostasFaladasAtivasRef.current = respostasFaladasAtivas
+    localStorage.setItem(SPOKEN_RESPONSES_ENABLED_KEY, String(respostasFaladasAtivas))
+
+    if (!respostasFaladasAtivas) {
+      audioVozRef.current?.pause?.()
+      window.speechSynthesis?.cancel?.()
+    }
+  }, [respostasFaladasAtivas])
 
   useEffect(() => {
     const sincronizarContextoCliente = (evento) => {
@@ -988,7 +1003,10 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     if (!texto || enviandoTexto || processandoRef.current) return
 
     setMensagemDigitada("")
-    await processarComando(texto, { origem: "texto", falar: false })
+    await processarComando(texto, {
+      origem: "texto",
+      falar: respostasFaladasAtivasRef.current,
+    })
     focarCampoMensagem()
   }, [enviandoTexto, focarCampoMensagem, mensagemDigitada, processarComando])
 
@@ -1589,7 +1607,21 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
               onClick={pausarOuRetomar}
               title={estado.ativada ? "Pausar a escuta da Nexa" : "Ativar a escuta da Nexa"}
             >
-              {estado.ativada ? "Voz ativa" : "Ativar voz"}
+              {estado.ativada ? "Microfone ativo" : "Ativar microfone"}
+            </button>
+            <button
+              type="button"
+              style={{
+                ...styles.spokenResponsesToggle,
+                ...(respostasFaladasAtivas ? styles.spokenResponsesToggleActive : {}),
+              }}
+              onClick={() => setRespostasFaladasAtivas((ativa) => !ativa)}
+              title={respostasFaladasAtivas
+                ? "Desligar a voz nas respostas digitadas"
+                : "Fazer a Nexa falar as respostas digitadas"}
+              aria-pressed={respostasFaladasAtivas}
+            >
+              {respostasFaladasAtivas ? "🔊 Voz ligada" : "🔇 Voz desligada"}
             </button>
           </div>
 
@@ -1686,7 +1718,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
           <div style={styles.statusRow}>
             <span>{historicoSalvo ? "Histórico salvo" : "Nova conversa"}</span>
-            <span>{sessaoAtiva ? "Conversa por voz aberta" : estado.ativada ? "Aguardando chamada" : "Voz pausada"}</span>
+            <span>{respostasFaladasAtivas ? "Respostas faladas" : "Respostas em texto"}</span>
+            <span>{sessaoAtiva ? "Conversa por voz aberta" : estado.ativada ? "Aguardando chamada" : "Microfone pausado"}</span>
           </div>
 
           <details style={styles.voiceDetails}>
@@ -1770,10 +1803,12 @@ const styles = {
   chevron: { fontSize: "20px", color: "#8bd7ff" },
   content: { padding: "12px", display: "flex", flexDirection: "column", gap: "10px", maxHeight: "78vh", overflowY: "auto" },
   contentMobile: { maxHeight: "76vh" },
-  quickActions: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "8px" },
+  quickActions: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", gap: "8px" },
   openFull: { background: "rgba(0,168,255,.11)", color: "#a9ddff", border: "1px solid rgba(0,168,255,.28)", borderRadius: "9px", padding: "9px 10px", cursor: "pointer", fontWeight: 700, fontSize: "11px" },
   voiceToggle: { background: "rgba(255,184,77,.10)", color: "#ffd298", border: "1px solid rgba(255,184,77,.28)", borderRadius: "9px", padding: "9px 10px", cursor: "pointer", fontWeight: 700, fontSize: "11px", whiteSpace: "nowrap" },
   voiceToggleActive: { background: "rgba(55,255,116,.10)", color: "#aaffc5", borderColor: "rgba(55,255,116,.28)" },
+  spokenResponsesToggle: { background: "rgba(255,255,255,.055)", color: "#b9cbe0", border: "1px solid rgba(255,255,255,.13)", borderRadius: "9px", padding: "9px 10px", cursor: "pointer", fontWeight: 700, fontSize: "11px", whiteSpace: "nowrap" },
+  spokenResponsesToggleActive: { background: "rgba(0,168,255,.14)", color: "#bfe8ff", borderColor: "rgba(0,168,255,.38)" },
   chatPanel: { minHeight: "190px", maxHeight: "290px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "10px", background: "rgba(1,13,34,.66)", border: "1px solid rgba(255,255,255,.09)", borderRadius: "13px" },
   welcomeMessage: { alignSelf: "flex-start", maxWidth: "90%", background: "rgba(0,168,255,.09)", border: "1px solid rgba(0,168,255,.20)", borderRadius: "12px", padding: "11px", color: "#d9edff" },
   chatMessage: { maxWidth: "88%", padding: "9px 10px", borderRadius: "12px", border: "1px solid rgba(255,255,255,.09)", overflowWrap: "anywhere" },
