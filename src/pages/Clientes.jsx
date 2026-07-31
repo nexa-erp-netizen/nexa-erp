@@ -86,6 +86,14 @@ export default function Clientes({ setPage }) {
     carregarProcuracoesEcac()
   }, [])
 
+  // A Central do Cliente pode ser aberta por clique, busca, restauração de
+  // estado ou comando da Nexa. Sincronize sempre o cliente efetivamente
+  // exibido, e não apenas no caminho do botão "visualizar".
+  useEffect(() => {
+    if (tela !== "detalhes" || !clienteSelecionado?.id) return
+    registrarClienteVoz(clienteSelecionado)
+  }, [tela, clienteSelecionado?.id, clienteSelecionado?.nome])
+
   function normalizarNomeSolicitado(valor) {
     return String(valor || "")
       .normalize("NFD")
