@@ -35,7 +35,10 @@ import LaboratorioTributario from "./pages/LaboratorioTributario"
 import CertificadosDigitais from "./pages/CertificadosDigitais"
 import ProcuracoesEcac from "./pages/ProcuracoesEcac"
 import IdentidadeDigital from "./pages/IdentidadeDigital"
-import CentralEcac from "./pages/CentralEcac"
+// O identificador de versão força o Vite a gerar um módulo novo para esta tela.
+// Isso evita que uma implementação antiga da Central e-CAC seja reaproveitada
+// por artefatos previamente publicados.
+import CentralEcac from "./pages/CentralEcac.jsx?central-ecac-v2.9.3"
 import MemoriaNexa from "./pages/MemoriaNexa"
 import SegundoContador from "./pages/SegundoContador"
 import ConsultoraTributaria from "./pages/ConsultoraTributaria"
@@ -231,7 +234,7 @@ export default function App() {
         return <IdentidadeDigital setPage={setPage} />
 
       case "Central e-CAC":
-        return <CentralEcac usuarioLogado={usuario} />
+        return <CentralEcac key="central-ecac-v2.9.3" usuarioLogado={usuario} />
 
       case "Memória da Nexa":
         return <MemoriaNexa />

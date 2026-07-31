@@ -153,7 +153,7 @@ export default function CentralEcac({ usuarioLogado }) {
 
   return <div style={styles.page}>
     <div style={styles.hero}>
-      <div><span style={styles.badge}>Módulo 3 • Identidade Digital • v2.9.2</span><h2 style={styles.title}>Central e-CAC</h2><p style={styles.subtitle}>Acessos tributários organizados por cliente, com certificado, procuração e histórico.</p></div>
+      <div><span style={styles.badge}>Módulo 3 • Identidade Digital • v2.9.3</span><h2 style={styles.title}>Central e-CAC</h2><p style={styles.subtitle}>Acessos tributários organizados por cliente, com certificado, procuração e histórico.</p></div>
       <button style={styles.refresh} onClick={carregar}>Atualizar</button>
     </div>
 
