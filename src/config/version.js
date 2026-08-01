@@ -1,14 +1,25 @@
 const NEXA_VERSION = {
-  version: "3.0.1",
-  build: "301",
-  release: "Assistente do Dia",
-  date: "09/07/2026",
+  version: "3.7.0",
+  build: "370",
+  release: "Base de NF-e modelo 55",
+  date: "01/08/2026",
   status: "Produção",
   frontend: "Vercel",
   backend: "Render",
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.7.0",
+      release: "Base de NF-e modelo 55",
+      date: "01/08/2026",
+      items: [
+        "Configuração fiscal do emitente em homologação",
+        "Cadastro de produtos fiscais",
+        "Rascunhos de NF-e com totais automáticos",
+        "Diagnóstico de prontidão para emissão",
+      ],
+    },
     {
       version: "3.0.1",
       release: "Assistente do Dia",

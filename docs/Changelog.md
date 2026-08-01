@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.7.0 — Base de NF-e modelo 55
+- Cadastro fiscal do emitente em ambiente de homologação.
+- Catálogo de produtos com NCM, CFOP, origem e CSOSN.
+- Rascunhos de NF-e com destinatário, itens e totais automáticos.
+- Diagnóstico de prontidão para emissão.
+- Transmissão real bloqueada até configurar provedor fiscal homologado.
+
 ## v3.4.1 — DNA Empresarial
 - Cadastro do DNA tributário da empresa.
 - Compatibilidade mantida com clientes existentes.
