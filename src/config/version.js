@@ -1,14 +1,20 @@
 const NEXA_VERSION = {
-  version: "3.7.0",
-  build: "370",
-  release: "Base de NF-e modelo 55",
-  date: "01/08/2026",
+  version: "3.9.0",
+  build: "390",
+  release: "Base de NFS-e de serviços",
+  date: "05/08/2026",
   status: "Produção",
   frontend: "Vercel",
   backend: "Render",
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.9.0",
+      release: "Base de NFS-e de serviços",
+      date: "05/08/2026",
+      items: ["Configuração municipal por prestador", "Cadastro fiscal de serviços", "Rascunhos com cálculo de ISS e retenções", "Diagnóstico de prontidão sem exigir inscrição estadual"],
+    },
     {
       version: "3.7.0",
       release: "Base de NF-e modelo 55",

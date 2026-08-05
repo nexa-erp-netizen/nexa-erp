@@ -44,6 +44,7 @@ import RadarInteligente from "./pages/RadarInteligente"
 import SobreNexa from "./pages/SobreNexa"
 import IntegracaoGoogleDrive from "./pages/IntegracaoGoogleDrive"
 import NFe from "./pages/NFe"
+import NFSe from "./pages/NFSe"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -61,6 +62,7 @@ export default function App() {
       "Lançamentos Contábeis",
       "Fiscal",
       "NF-e",
+      "NFS-e",
       "Financeiro",
       "Movimentos Clientes",
       "Pendências Clientes",
@@ -96,6 +98,7 @@ export default function App() {
       "Lançamentos Contábeis",
       "Fiscal",
       "NF-e",
+      "NFS-e",
       "Financeiro",
       "Movimentos Clientes",
       "Pendências Clientes",
@@ -183,6 +186,9 @@ export default function App() {
 
       case "NF-e":
         return <NFe />
+
+      case "NFS-e":
+        return <NFSe />
 
       case "Financeiro":
         return <Financeiro />

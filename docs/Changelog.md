@@ -119,3 +119,11 @@
 - Adicionada comparação preliminar com cenários alternativos informados pelo contador.
 - Incluídos parecer, riscos, oportunidades e memória do cálculo.
 - Reforçado que a decisão final pertence ao contador.
+## v3.9.0 — Base de NFS-e de serviços
+
+- Criado módulo separado de NFS-e no grupo Fiscal.
+- Adicionadas configuração municipal e identificação do regime do prestador.
+- Criado catálogo de serviços com códigos tributários, CNAE, alíquota e retenção de ISS.
+- Adicionados rascunhos com competência, deduções, retenções e totalização automática.
+- Incluído diagnóstico de prontidão sem exigir inscrição estadual.
+- Transmissão real mantida bloqueada até integração com emissor homologado.
