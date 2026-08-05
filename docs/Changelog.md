@@ -127,3 +127,10 @@
 - Adicionados rascunhos com competência, deduções, retenções e totalização automática.
 - Incluído diagnóstico de prontidão sem exigir inscrição estadual.
 - Transmissão real mantida bloqueada até integração com emissor homologado.
+
+## v3.9.1 — Numeração correta da DPS
+
+- Separadas a série e a numeração da DPS da numeração oficial da NFS-e.
+- Configuração inicial da DPS definida como série 70000 e próximo número 3.
+- Número da NFS-e passa a ser preenchido somente pelo retorno do Emissor Nacional.
+- Lista de serviços passa a atualizar imediatamente após salvar.

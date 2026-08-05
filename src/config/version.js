@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.9.0",
-  build: "390",
-  release: "Base de NFS-e de serviços",
+  version: "3.9.1",
+  build: "391",
+  release: "Numeração correta da DPS",
   date: "05/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.9.1",
+      release: "Numeração correta da DPS",
+      date: "05/08/2026",
+      items: ["Série e próximo número vinculados à DPS", "Número da NFS-e reservado ao retorno do Emissor Nacional", "Serviços atualizados imediatamente após salvar"],
+    },
     {
       version: "3.9.0",
       release: "Base de NFS-e de serviços",
