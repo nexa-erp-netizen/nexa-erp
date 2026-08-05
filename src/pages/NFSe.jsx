@@ -13,8 +13,14 @@ export default function NFSe() {
   const [diagnostico, setDiagnostico] = useState(null), [servicos, setServicos] = useState([]), [servico, setServico] = useState(vazio), [editando, setEditando] = useState(null), [notas, setNotas] = useState([])
   const [tomador, setTomador] = useState(tomadorVazio), [itens, setItens] = useState([]), [competencia, setCompetencia] = useState(hoje()), [deducoes, setDeducoes] = useState(0), [retencoes, setRetencoes] = useState(0), [mensagem, setMensagem] = useState("")
 
-  useEffect(() => { api.get("/clientes").then(({ data }) => { const ativos = (data || []).filter((c) => c.ativo !== false && c.cnpj); setClientes(ativos); if (ativos[0]) setClienteId(String(ativos[0].id)) }).catch(() => setMensagem("Não foi possível carregar os prestadores.")) }, [])
-  useEffect(() => { if (clienteId) carregar() }, [clienteId])
+  useEffect(() => { api.get("/clientes").then(({ data }) => { const ativos = (data || []).filter((c) => c.ativo !== false && c.cnpj); setClientes(ativos) }).catch(() => setMensagem("Não foi possível carregar os prestadores.")) }, [])
+  useEffect(() => {
+    if (clienteId) carregar()
+    else {
+      setConfig({ serie: "1", proximoNumero: 1, regimeTributario: "", inscricaoMunicipal: "", municipioIbge: "", optanteSimples: true, incentivadorCultural: false })
+      setDiagnostico(null); setServicos([]); setNotas([]); setServico(vazio); setEditando(null); setTomador(tomadorVazio); setItens([])
+    }
+  }, [clienteId])
   async function carregar() { try { const [c, d, s, n] = await Promise.all([api.get(`/nfse/configuracoes/${clienteId}`), api.get(`/nfse/diagnostico/${clienteId}`), api.get(`/nfse/servicos?clienteId=${clienteId}`), api.get(`/nfse/notas?clienteId=${clienteId}`)]); setConfig(c.data); setDiagnostico(d.data); setServicos(s.data || []); setNotas(n.data || []) } catch { setMensagem("Erro ao carregar o módulo de NFS-e.") } }
   async function salvarConfig() { try { await api.put(`/nfse/configuracoes/${clienteId}`, config); setMensagem("Configuração salva em homologação."); await carregar() } catch (e) { setMensagem(e.response?.data?.message || "Erro ao salvar configuração.") } }
   async function salvarServico() { try { const payload = { ...servico, clienteId }; if (editando) await api.put(`/nfse/servicos/${editando}`, payload); else await api.post("/nfse/servicos", payload); setServico(vazio); setEditando(null); setMensagem("Serviço salvo."); await carregar() } catch (e) { setMensagem(e.response?.data?.message || "Erro ao salvar serviço.") } }
@@ -24,7 +30,7 @@ export default function NFSe() {
   async function salvarNota() { try { await api.post("/nfse/notas", { clienteId, serie: config.serie, tomador, servicos: itens, competencia, valorDeducoes: deducoes, valorRetencoesFederais: retencoes }); setTomador(tomadorVazio); setItens([]); setDeducoes(0); setRetencoes(0); setMensagem("Rascunho de NFS-e salvo."); await carregar() } catch (e) { setMensagem(e.response?.data?.message || "Erro ao salvar rascunho.") } }
 
   return <section className="nfe-page">
-    <div className="nfe-head"><div><h2>NFS-e de serviços</h2><p>Prestação de serviços · ambiente de homologação</p></div><select value={clienteId} onChange={(e) => setClienteId(e.target.value)}>{clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
+    <div className="nfe-head"><div><h2>NFS-e de serviços</h2><p>Prestação de serviços · ambiente de homologação</p></div><select value={clienteId} onChange={(e) => setClienteId(e.target.value)}><option value="">Selecione um cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>
     <div className="nfe-warning">Transmissão real bloqueada até configurar o Emissor Nacional ou provedor homologado. Inscrição estadual não é necessária.</div>
     {mensagem && <button className="nfe-message" onClick={() => setMensagem("")}>{mensagem} ×</button>}
     <nav className="nfe-tabs">{[["notas","Notas"],["servicos","Serviços"],["config","Configuração"]].map(([id,n]) => <button key={id} className={aba === id ? "active" : ""} onClick={() => setAba(id)}>{n}</button>)}</nav>

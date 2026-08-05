@@ -28,11 +28,17 @@ export default function NFe() {
   useEffect(() => {
     Promise.all([api.get("/clientes"), api.get("/certificados-digitais")]).then(([c, cert]) => {
       const ativos = (c.data || []).filter((item) => item.ativo !== false && item.cnpj)
-      setClientes(ativos); setCertificados(cert.data || []); if (ativos[0]) setClienteId(String(ativos[0].id))
+      setClientes(ativos); setCertificados(cert.data || [])
     }).catch(() => setMensagem("Não foi possível carregar os emitentes."))
   }, [])
 
-  useEffect(() => { if (clienteId) carregarModulo() }, [clienteId])
+  useEffect(() => {
+    if (clienteId) carregarModulo()
+    else {
+      setConfig({ serie: 1, proximoNumero: 1, crt: "", naturezaOperacao: "Venda de mercadoria", certificadoDigitalId: "" })
+      setDiagnostico(null); setProdutos([]); setNotas([]); setProduto(produtoVazio); setProdutoEditando(null); setDestinatario(destinatarioVazio); setItens([])
+    }
+  }, [clienteId])
 
   async function carregarModulo() {
     try {
@@ -80,7 +86,7 @@ export default function NFe() {
   return <section className="nfe-page">
     <div className="nfe-head">
       <div><h2>NF-e de produtos</h2><p>Modelo 55 · ambiente de homologação</p></div>
-      <select value={clienteId} onChange={(e) => setClienteId(e.target.value)}>{clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
+      <select value={clienteId} onChange={(e) => setClienteId(e.target.value)}><option value="">Selecione um cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
     </div>
     <div className="nfe-warning">Transmissão real bloqueada até a configuração de um provedor fiscal homologado.</div>
     {mensagem && <button className="nfe-message" onClick={() => setMensagem("")}>{mensagem} ×</button>}
