@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.10.3 — Diagnóstico visível da NFS-e
+- Adicionado o botão **Executar diagnóstico** em NFS-e → Configuração.
+- Exibidos os estados do ambiente de homologação, certificado A1 e cadastro fiscal.
+- Adicionado tratamento visual para carregamento, pendências e falhas da consulta.
+
 ## v3.10.2 — Cofre A1 privado para NFS-e
 - Certificado A1 criptografado antes do armazenamento em bucket privado.
 - Senha mantida cifrada separadamente pela API.

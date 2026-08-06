@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.10.2",
-  build: "3102",
-  release: "Cofre A1 privado para NFS-e",
+  version: "3.10.3",
+  build: "3103",
+  release: "Diagnóstico visível da NFS-e",
   date: "06/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.10.3",
+      release: "Diagnóstico visível da NFS-e",
+      date: "06/08/2026",
+      items: ["Botão Executar diagnóstico na configuração", "Status do ambiente, certificado A1 e cadastro fiscal", "Tratamento de carregamento e falhas da verificação"],
+    },
     {
       version: "3.10.2",
       release: "Cofre A1 privado para NFS-e",
