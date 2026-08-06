@@ -1,14 +1,20 @@
 const NEXA_VERSION = {
-  version: "3.9.1",
-  build: "391",
-  release: "Numeração correta da DPS",
-  date: "05/08/2026",
+  version: "3.10.0",
+  build: "3100",
+  release: "Rascunhos inteligentes de NFS-e",
+  date: "06/08/2026",
   status: "Produção",
   frontend: "Vercel",
   backend: "Render",
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.10.0",
+      release: "Rascunhos inteligentes de NFS-e",
+      date: "06/08/2026",
+      items: ["Edição, exclusão e impressão de rascunhos", "Validação de CPF, CNPJ, e-mail e UF", "Busca de tomador por CPF/CNPJ e preenchimento por CEP", "Visualização marcada como rascunho sem valor fiscal"],
+    },
     {
       version: "3.9.1",
       release: "Numeração correta da DPS",

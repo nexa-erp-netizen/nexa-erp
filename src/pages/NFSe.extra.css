@@ -1,0 +1,5 @@
+.nfe-field-action { display: flex; gap: 6px; }
+.nfe-field-action input { min-width: 0; flex: 1; }
+.nfe-field-action button { padding: 8px 10px; }
+.nfe-actions { display: flex; gap: 6px; white-space: nowrap; }
+.nfe-card button.danger { border-color: #a84655; color: #ffc8cf; background: #4a1720; }

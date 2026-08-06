@@ -134,3 +134,11 @@
 - Configuração inicial da DPS definida como série 70000 e próximo número 3.
 - Número da NFS-e passa a ser preenchido somente pelo retorno do Emissor Nacional.
 - Lista de serviços passa a atualizar imediatamente após salvar.
+
+## v3.10.0 — Rascunhos inteligentes de NFS-e
+
+- Adicionadas edição e exclusão segura de rascunhos.
+- Incluídas validações de CPF/CNPJ, e-mail e UF na API.
+- CPF busca tomadores internos e CNPJ consulta dados cadastrais automaticamente.
+- CEP usa máscara 00.000-000 e preenche endereço, bairro, cidade e UF.
+- Adicionadas visualização e impressão/salvamento em PDF com marca de rascunho sem valor fiscal.
