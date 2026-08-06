@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.10.1",
-  build: "3101",
-  release: "Rascunho no padrão visual DANFSe",
+  version: "3.10.2",
+  build: "3102",
+  release: "Cofre A1 privado para NFS-e",
   date: "06/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.10.2",
+      release: "Cofre A1 privado para NFS-e",
+      date: "06/08/2026",
+      items: ["Certificado A1 criptografado antes do armazenamento privado", "Senha protegida separadamente pela API", "Diagnóstico da NFS-e integrado ao A1 ativo", "Homologação mantida sem transmissão prematura"],
+    },
     {
       version: "3.10.1",
       release: "Rascunho no padrão visual DANFSe",

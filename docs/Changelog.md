@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.10.2 — Cofre A1 privado para NFS-e
+- Certificado A1 criptografado antes do armazenamento em bucket privado.
+- Senha mantida cifrada separadamente pela API.
+- Diagnóstico da NFS-e reconhece o A1 ativo vinculado ao cliente.
+- Transmissão continua restrita à homologação e bloqueada até validar a DPS assinada.
+
 ## v3.7.0 — Base de NF-e modelo 55
 - Cadastro fiscal do emitente em ambiente de homologação.
 - Catálogo de produtos com NCM, CFOP, origem e CSOSN.

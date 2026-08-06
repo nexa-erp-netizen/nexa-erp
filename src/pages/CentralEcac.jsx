@@ -120,7 +120,7 @@ export default function CentralEcac({ usuarioLogado }) {
       const resposta=await api.post("/credenciais-fiscais",dados)
       setCredenciais(atual=>[resposta.data,...atual])
       setAcesso(ACESSO_INICIAL)
-      alert("Acesso protegido e vinculado ao cliente.")
+      alert(acesso.metodo === "A1" ? "Certificado A1 criptografado e salvo no armazenamento privado." : "Acesso protegido e vinculado ao cliente.")
     } catch(e) {
       console.error(e)
       alert(e?.response?.data?.message||"Não foi possível salvar o acesso.")
@@ -185,7 +185,7 @@ export default function CentralEcac({ usuarioLogado }) {
         </div>
         <div style={styles.vaultList}>
           {credenciaisCliente.length===0?<p style={styles.empty}>Nenhum método de acesso vinculado.</p>:credenciaisCliente.map(item=><div key={item.id} style={styles.vaultItem}>
-            <div><strong>{ROTULOS_METODO[item.metodo]||item.metodo}</strong><span style={styles.meta}>{item.nomeArquivo||item.identificador||"Vínculo cadastrado"} • {item.possuiSegredo?"segredo protegido":"sem senha"} • {item.ativo?"ativo":"inativo"}</span></div>
+            <div><strong>{ROTULOS_METODO[item.metodo]||item.metodo}</strong><span style={styles.meta}>{item.nomeArquivo||item.identificador||"Vínculo cadastrado"} • {item.possuiSegredo?"segredo protegido":"sem senha"} • {item.arquivoNoSupabase?"arquivo privado":"sem arquivo privado"} • {item.ativo?"ativo":"inativo"}</span></div>
             <button style={styles.removeButton} onClick={()=>removerCredencial(item)}>Remover</button>
           </div>)}
         </div>
