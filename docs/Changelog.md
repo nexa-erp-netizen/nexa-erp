@@ -142,3 +142,10 @@
 - CPF busca tomadores internos e CNPJ consulta dados cadastrais automaticamente.
 - CEP usa máscara 00.000-000 e preenche endereço, bairro, cidade e UF.
 - Adicionadas visualização e impressão/salvamento em PDF com marca de rascunho sem valor fiscal.
+
+## v3.10.1 — Rascunho no padrão visual DANFSe
+
+- Substituída a pré-visualização simples por documento A4 inspirado no DANFSe v2.0.
+- Organizados dados da DPS, prestador, tomador, serviços, tributação e totais.
+- Mantida marca d'água de rascunho sem valor fiscal em tela e impressão.
+- Chave de acesso e QR Code permanecem indisponíveis até a autorização oficial.

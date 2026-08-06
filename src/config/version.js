@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.10.0",
-  build: "3100",
-  release: "Rascunhos inteligentes de NFS-e",
+  version: "3.10.1",
+  build: "3101",
+  release: "Rascunho no padrão visual DANFSe",
   date: "06/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.10.1",
+      release: "Rascunho no padrão visual DANFSe",
+      date: "06/08/2026",
+      items: ["Modelo A4 inspirado no DANFSe v2.0", "Blocos de DPS, prestador, tomador, serviço, tributação e valores", "Chave e QR Code reservados exclusivamente à nota autorizada"],
+    },
     {
       version: "3.10.0",
       release: "Rascunhos inteligentes de NFS-e",
