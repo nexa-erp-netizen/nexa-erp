@@ -11,7 +11,7 @@ export default function NFe() {
   const [aba, setAba] = useState("notas")
   const [clientes, setClientes] = useState([])
   const [clienteId, setClienteId] = useState("")
-  const [config, setConfig] = useState({ serie: 1, proximoNumero: 1, crt: "", naturezaOperacao: "Venda de mercadoria", certificadoDigitalId: "" })
+  const [config, setConfig] = useState({ serie: 1, proximoNumero: 1, crt: "", naturezaOperacao: "Venda de mercadoria", inscricaoEstadual: "", certificadoDigitalId: "" })
   const [diagnostico, setDiagnostico] = useState(null)
   const [produtos, setProdutos] = useState([])
   const [produto, setProduto] = useState(produtoVazio)
@@ -36,7 +36,7 @@ export default function NFe() {
   useEffect(() => {
     if (clienteId) carregarModulo()
     else {
-      setConfig({ serie: 1, proximoNumero: 1, crt: "", naturezaOperacao: "Venda de mercadoria", certificadoDigitalId: "" })
+      setConfig({ serie: 1, proximoNumero: 1, crt: "", naturezaOperacao: "Venda de mercadoria", inscricaoEstadual: "", certificadoDigitalId: "" })
       setDiagnostico(null); setStatusSefaz(null); setProdutos([]); setNotas([]); setProduto(produtoVazio); setProdutoEditando(null); setDestinatario(destinatarioVazio); setItens([])
     }
   }, [clienteId])
@@ -102,7 +102,7 @@ export default function NFe() {
     <nav className="nfe-tabs">{[["notas","Notas"],["produtos","Produtos"],["config","Configuração"]].map(([id,nome]) => <button className={aba === id ? "active" : ""} onClick={() => setAba(id)} key={id}>{nome}</button>)}</nav>
 
     {aba === "config" && <div className="nfe-grid">
-      <div className="nfe-card"><h3>Emissão</h3><label>Ambiente<input value="Homologação" disabled /></label><label>Série<input type="number" value={config.serie || 1} onChange={(e) => setConfig({ ...config, serie: e.target.value })} /></label><label>Próximo número<input type="number" value={config.proximoNumero || 1} onChange={(e) => setConfig({ ...config, proximoNumero: e.target.value })} /></label><label>CRT<select value={config.crt || ""} onChange={(e) => setConfig({ ...config, crt: e.target.value })}><option value="">Selecione</option><option value="1">1 — Simples Nacional</option><option value="2">2 — Simples, excesso sublimite</option><option value="3">3 — Regime Normal</option><option value="4">4 — MEI</option></select></label><label>Natureza da operação<input value={config.naturezaOperacao || ""} onChange={(e) => setConfig({ ...config, naturezaOperacao: e.target.value })} /></label><div className={diagnostico?.certificadoA1?.configurado ? "nfe-ok" : "nfe-pendency"}>{diagnostico?.certificadoA1?.configurado ? `✓ A1 do cofre: ${diagnostico.certificadoA1.nomeArquivo || "configurado"}` : "⚠ Certificado A1 ainda não localizado no cofre"}</div><button className="primary" onClick={salvarConfiguracao}>Salvar configuração</button></div>
+      <div className="nfe-card"><h3>Emissão</h3><label>Ambiente<input value="Homologação" disabled /></label><label>Inscrição Estadual<input inputMode="numeric" placeholder="Somente números" value={config.inscricaoEstadual || ""} onChange={(e) => setConfig({ ...config, inscricaoEstadual: e.target.value.replace(/\D/g, "") })} /></label><label>Série<input type="number" value={config.serie || 1} onChange={(e) => setConfig({ ...config, serie: e.target.value })} /></label><label>Próximo número<input type="number" value={config.proximoNumero || 1} onChange={(e) => setConfig({ ...config, proximoNumero: e.target.value })} /></label><label>CRT<select value={config.crt || ""} onChange={(e) => setConfig({ ...config, crt: e.target.value })}><option value="">Selecione</option><option value="1">1 — Simples Nacional</option><option value="2">2 — Simples, excesso sublimite</option><option value="3">3 — Regime Normal</option><option value="4">4 — MEI</option></select></label><label>Natureza da operação<input value={config.naturezaOperacao || ""} onChange={(e) => setConfig({ ...config, naturezaOperacao: e.target.value })} /></label><div className={diagnostico?.certificadoA1?.configurado ? "nfe-ok" : "nfe-pendency"}>{diagnostico?.certificadoA1?.configurado ? `✓ A1 do cofre: ${diagnostico.certificadoA1.nomeArquivo || "configurado"}` : "⚠ Certificado A1 ainda não localizado no cofre"}</div><button className="primary" onClick={salvarConfiguracao}>Salvar configuração</button></div>
       <div className="nfe-card"><h3>Diagnóstico SEFA/PR</h3><p>NF-e 4.00 · modelo 55 · homologação</p>{diagnostico?.pendencias?.map((p) => <div className="nfe-pendency" key={p}>⚠ {p}</div>)}{diagnostico?.prontoParaRascunho && <div className="nfe-ok">Cadastro pronto para rascunhos.</div>}{statusSefaz && <div className={statusSefaz.online ? "nfe-ok" : "nfe-pendency"}>{statusSefaz.cStat} — {statusSefaz.xMotivo}</div>}<button className="primary" disabled={!clienteId || !diagnostico?.certificadoA1?.configurado || consultandoSefaz} onClick={testarSefaz}>{consultandoSefaz ? "Consultando SEFA/PR..." : "Testar conexão com a SEFA/PR"}</button></div>
     </div>}
 

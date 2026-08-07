@@ -161,3 +161,10 @@
 - Teste autenticado do serviço da SEFA/PR em homologação.
 - Diagnóstico fiscal separado do fluxo de NFS-e.
 - Transmissão continua bloqueada até a assinatura e validação do XML 4.00.
+
+## v3.10.5 — IE do emitente e cadeia TLS da SEFA/PR
+
+- Adicionado o campo Inscrição Estadual em NF-e → Configuração.
+- A IE informada passa a ser salva automaticamente no cadastro do cliente.
+- A conexão com a SEFA/PR passa a usar também a cadeia confiável do sistema no Render.
+- A validação TLS permanece obrigatória; nenhuma verificação de segurança foi desativada.

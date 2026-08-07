@@ -1,14 +1,20 @@
 const NEXA_VERSION = {
-  version: "3.10.4",
-  build: "3104",
-  release: "Diagnóstico NF-e com a SEFA/PR",
-  date: "06/08/2026",
+  version: "3.10.5",
+  build: "3105",
+  release: "IE do emitente e cadeia TLS da SEFA/PR",
+  date: "07/08/2026",
   status: "Produção",
   frontend: "Vercel",
   backend: "Render",
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.10.5",
+      release: "IE do emitente e cadeia TLS da SEFA/PR",
+      date: "07/08/2026",
+      items: ["Inscrição Estadual editável na configuração da NF-e", "IE salva automaticamente no cadastro do cliente", "Cadeia TLS do sistema adicionada à conexão da SEFA/PR", "Validação de segurança TLS mantida ativa"],
+    },
     {
       version: "3.10.4",
       release: "Diagnóstico NF-e com a SEFA/PR",
