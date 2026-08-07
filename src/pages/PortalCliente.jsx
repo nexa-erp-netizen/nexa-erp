@@ -5,7 +5,10 @@ import {
   FaArrowDown,
   FaWallet,
   FaClipboardList,
+  FaExternalLinkAlt,
 } from "react-icons/fa"
+
+const EMISSOR_NACIONAL_NFSE_URL = "https://www.nfse.gov.br/EmissorNacional"
 
 export default function PortalCliente({ setPage }) {
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}")
@@ -94,6 +97,10 @@ export default function PortalCliente({ setPage }) {
     if (typeof setPage === "function") {
       setPage("Pendências e Guias")
     }
+  }
+
+  function abrirEmissorNacionalNfse() {
+    window.open(EMISSOR_NACIONAL_NFSE_URL, "_blank", "noopener,noreferrer")
   }
 
   const resumo = useMemo(() => {
@@ -272,6 +279,31 @@ export default function PortalCliente({ setPage }) {
           font-size: 15px;
         }
 
+        .pc-actions {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .pc-nfse-btn {
+          border: 1px solid rgba(60,188,255,.55);
+          border-radius: 14px;
+          padding: 15px 24px;
+          background: #061f47;
+          color: white;
+          font-weight: 900;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 15px;
+        }
+
+        .pc-nfse-btn:hover {
+          border-color: #32f06d;
+        }
+
         @media (max-width: 768px) {
           .pc-page {
             padding: 18px 14px;
@@ -317,6 +349,15 @@ export default function PortalCliente({ setPage }) {
             width: 100%;
             justify-content: center;
           }
+
+          .pc-actions,
+          .pc-nfse-btn {
+            width: 100%;
+          }
+
+          .pc-nfse-btn {
+            justify-content: center;
+          }
         }
       `}</style>
 
@@ -349,10 +390,22 @@ export default function PortalCliente({ setPage }) {
           pendência(s) aberta(s). Acesse a área de pendências para visualizar os detalhes enviados pelo escritório.
         </p>
 
-        <button type="button" className="pc-pendencias-btn" onClick={abrirPendencias}>
-          <FaClipboardList />
-          Ver Pendências e Guias
-        </button>
+        <div className="pc-actions">
+          <button type="button" className="pc-pendencias-btn" onClick={abrirPendencias}>
+            <FaClipboardList />
+            Ver Pendências e Guias
+          </button>
+
+          <button
+            type="button"
+            className="pc-nfse-btn"
+            onClick={abrirEmissorNacionalNfse}
+            title="Abrir o portal oficial do Emissor Nacional da NFS-e"
+          >
+            <FaExternalLinkAlt />
+            Acessar Emissor Nacional da NFS-e
+          </button>
+        </div>
       </div>
     </div>
   )

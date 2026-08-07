@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.11.0",
-  build: "3110",
-  release: "NF-e 4.00 em homologação",
+  version: "3.11.1",
+  build: "3111",
+  release: "Atalho NFS-e Nacional no Portal do Cliente",
   date: "07/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.11.1",
+      release: "Atalho NFS-e Nacional no Portal do Cliente",
+      date: "07/08/2026",
+      items: ["Acesso direto ao Emissor Nacional da NFS-e", "Portal oficial aberto em nova aba", "Nenhuma credencial gov.br armazenada na Nexa"],
+    },
     {
       version: "3.11.0",
       release: "NF-e 4.00 em homologação",
