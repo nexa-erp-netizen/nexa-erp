@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.11.1",
-  build: "3111",
-  release: "Atalho NFS-e Nacional no Portal do Cliente",
+  version: "3.12.0",
+  build: "3120",
+  release: "DAS-MEI anual programado",
   date: "07/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.12.0",
+      release: "DAS-MEI anual programado",
+      date: "07/08/2026",
+      items: ["Importação em lote dos PDFs mensais do PGMEI", "Leitura automática de CNPJ, competência, vencimento e valor", "Bloqueio de guia consolidada, CNPJ divergente e duplicidade", "Programação e registro do envio pelo WhatsApp"],
+    },
     {
       version: "3.11.1",
       release: "Atalho NFS-e Nacional no Portal do Cliente",

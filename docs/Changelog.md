@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.12.0 — DAS-MEI anual programado
+- Importação em lote dos PDFs mensais do PGMEI na Central do Cliente.
+- Organização automática por competência, vencimento e valor.
+- Bloqueio de guia consolidada, arquivo duplicado e CNPJ incompatível.
+- Substituição controlada de guia recalculada com histórico.
+- Programação, abertura do PDF, envio pelo WhatsApp e marcação de pagamento.
+
 ## v3.10.2 — Cofre A1 privado para NFS-e
 - Certificado A1 criptografado antes do armazenamento em bucket privado.
 - Senha mantida cifrada separadamente pela API.
@@ -161,10 +168,3 @@
 - Teste autenticado do serviço da SEFA/PR em homologação.
 - Diagnóstico fiscal separado do fluxo de NFS-e.
 - Transmissão continua bloqueada até a assinatura e validação do XML 4.00.
-
-## v3.10.5 — IE do emitente e cadeia TLS da SEFA/PR
-
-- Adicionado o campo Inscrição Estadual em NF-e → Configuração.
-- A IE informada passa a ser salva automaticamente no cadastro do cliente.
-- A conexão com a SEFA/PR passa a usar também a cadeia confiável do sistema no Render.
-- A validação TLS permanece obrigatória; nenhuma verificação de segurança foi desativada.

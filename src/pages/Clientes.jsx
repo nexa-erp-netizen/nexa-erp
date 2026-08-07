@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import api from "../services/api"
 import WhatsAppMenu from "../components/WhatsAppMenu"
 import ServicosCobrancasCliente from "../components/ServicosCobrancasCliente"
+import DasMeiAnual from "../components/DasMeiAnual"
 import { analisarPlanejamentoTributario } from "../motorTributario"
 import { registrarClienteVoz } from "../services/nexaVoiceService"
 
@@ -1597,6 +1598,7 @@ export default function Clientes({ setPage }) {
             <button title="Dados" style={centralMenuBotao} onClick={() => rolarParaSecao("dados")}>📋</button>
             <button title="Financeiro do Cliente" style={centralMenuBotao} onClick={() => rolarParaSecao("financeiro")}>💰</button>
             <button title="Fiscal" style={centralMenuBotao} onClick={() => rolarParaSecao("fiscal")}>🏛</button>
+            <button title="DAS-MEI anual" style={centralMenuBotao} onClick={() => rolarParaSecao("das-mei")}>📅</button>
             <button title="Identidade Digital" style={centralMenuBotao} onClick={() => rolarParaSecao("certificados")}>🔐</button>
             <button title="Procurações e-CAC" style={centralMenuBotao} onClick={() => rolarParaSecao("procuracoes")}>🪪</button>
             <button title="WhatsApp" style={centralMenuBotao} onClick={() => rolarParaSecao("whatsapp")}>💬</button>
@@ -1623,6 +1625,8 @@ export default function Clientes({ setPage }) {
               />
             </div>
           </div>
+
+          <DasMeiAnual cliente={clienteSelecionado} />
 
           <div style={contatoRapido}>
             <Info label="Código Nexa" value={formatarCodigoCliente(clienteSelecionado.id)} />
