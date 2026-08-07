@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.12.0",
-  build: "3120",
-  release: "DAS-MEI anual programado",
+  version: "3.12.1",
+  build: "3121",
+  release: "DAS-MEI com envio fixo no dia 15",
   date: "07/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.12.1",
+      release: "DAS-MEI com envio fixo no dia 15",
+      date: "07/08/2026",
+      items: ["Programação automática para o dia 15 do mês do vencimento", "Remoção da edição manual de data por guia", "Correção da exibição de competência, vencimento e valor"],
+    },
     {
       version: "3.12.0",
       release: "DAS-MEI anual programado",
