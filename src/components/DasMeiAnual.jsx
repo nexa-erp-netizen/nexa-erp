@@ -100,8 +100,8 @@ export default function DasMeiAnual({ cliente }) {
       </div>
 
       <div style={acoes}>
-        <span>{arquivos.length ? `${arquivos.length} arquivo(s) selecionado(s)` : "Nenhum arquivo selecionado"}</span>
-        <label><input type="checkbox" checked={substituir} onChange={(e) => setSubstituir(e.target.checked)} /> Substituir guia recalculada</label>
+        <span style={textoAcao}>{arquivos.length ? `${arquivos.length} arquivo(s) selecionado(s)` : "Nenhum arquivo selecionado"}</span>
+        <label style={checkboxLabel}><input type="checkbox" checked={substituir} onChange={(e) => setSubstituir(e.target.checked)} /> Substituir guia recalculada</label>
         <button style={botaoPrimario} disabled={carregando || !arquivos.length} onClick={importar}>{carregando ? "Analisando..." : "Importar e organizar"}</button>
       </div>
 
@@ -109,15 +109,15 @@ export default function DasMeiAnual({ cliente }) {
 
       <div style={tabelaWrap}>
         <table style={tabela}>
-          <thead><tr><th>Competência</th><th>Vencimento</th><th>Valor</th><th>Envio programado</th><th>Status</th><th>Ações</th></tr></thead>
+          <thead><tr><th style={cabecalho}>Competência</th><th style={cabecalho}>Vencimento</th><th style={cabecalho}>Valor</th><th style={cabecalho}>Envio programado</th><th style={cabecalho}>Status</th><th style={cabecalho}>Ações</th></tr></thead>
           <tbody>
             {guias.map((guia) => <tr key={guia.id}>
-              <td>{nomeCompetencia(campo(guia, "competencia", "competencia"))}</td>
-              <td>{dataBR(campo(guia, "vencimento", "vencimento"))}</td>
-              <td>{moeda(campo(guia, "valor", "valor"))}</td>
-              <td><strong>{dataBR(campo(guia, "dataProgramadaEnvio", "data_programada_envio"))}</strong></td>
-              <td><span style={status}>{campo(guia, "statusCalculado", "status_calculado") || guia.status}</span></td>
-              <td><div style={botoesLinha}><button style={botaoSecundario} onClick={() => abrirGuia(guia)}>Abrir PDF</button><button style={botaoWhats} onClick={() => enviarAgora(guia)}>Enviar agora</button><button style={botaoPago} onClick={() => atualizar(guia, { status: "Paga" })}>Marcar paga</button></div></td>
+              <td style={celula}><strong>{nomeCompetencia(campo(guia, "competencia", "competencia"))}</strong></td>
+              <td style={celula}>{dataBR(campo(guia, "vencimento", "vencimento"))}</td>
+              <td style={celula}>{moeda(campo(guia, "valor", "valor"))}</td>
+              <td style={celula}><strong>{dataBR(campo(guia, "dataProgramadaEnvio", "data_programada_envio"))}</strong></td>
+              <td style={celula}><span style={status}>{campo(guia, "statusCalculado", "status_calculado") || guia.status}</span></td>
+              <td style={celula}><div style={botoesLinha}><button style={botaoSecundario} onClick={() => abrirGuia(guia)}>Abrir PDF</button><button style={botaoWhats} onClick={() => enviarAgora(guia)}>Enviar agora</button><button style={botaoPago} onClick={() => atualizar(guia, { status: "Paga" })}>Marcar paga</button></div></td>
             </tr>)}
             {!guias.length && <tr><td colSpan="6" style={{ padding: 22, textAlign: "center", color: "#64748b" }}>Nenhuma guia importada.</td></tr>}
           </tbody>
@@ -133,11 +133,15 @@ const topo = { display: "flex", gap: 16, justifyContent: "space-between", alignI
 const rotulo = { fontWeight: 800, color: "#0f172a", fontSize: 18 }
 const descricao = { margin: "6px 0 0", color: "#64748b" }
 const acoes = { display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", padding: "16px 0" }
+const textoAcao = { color: "#475569", fontSize: 14 }
+const checkboxLabel = { color: "#334155", fontSize: 14, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }
 const botaoArquivo = { background: "#e8f0ff", color: "#174ea6", borderRadius: 9, padding: "10px 14px", fontWeight: 700, cursor: "pointer" }
 const botaoPrimario = { border: 0, background: "#174ea6", color: "#fff", borderRadius: 9, padding: "10px 14px", fontWeight: 700, cursor: "pointer" }
 const resultadoBox = { background: "#f8fafc", borderRadius: 10, padding: 12, marginBottom: 14, display: "grid", gap: 5 }
 const tabelaWrap = { overflowX: "auto" }
-const tabela = { width: "100%", borderCollapse: "collapse", minWidth: 920 }
+const tabela = { width: "100%", borderCollapse: "collapse", minWidth: 920, background: "#fff", color: "#0f172a" }
+const cabecalho = { background: "#f8fafc", color: "#475569", fontSize: 12, fontWeight: 800, textAlign: "left", padding: "11px 10px", borderBottom: "1px solid #dbe5f0", whiteSpace: "nowrap" }
+const celula = { color: "#0f172a", fontSize: 14, textAlign: "left", padding: "11px 10px", borderBottom: "1px solid #e7edf4", verticalAlign: "middle", background: "#fff", whiteSpace: "nowrap" }
 const status = { background: "#eef2ff", color: "#3730a3", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }
 const botoesLinha = { display: "flex", gap: 6, flexWrap: "wrap" }
 const botaoSecundario = { border: "1px solid #cbd5e1", background: "#fff", borderRadius: 7, padding: "7px 9px", cursor: "pointer" }

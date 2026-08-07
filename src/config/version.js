@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.12.1",
-  build: "3121",
-  release: "DAS-MEI com envio fixo no dia 15",
+  version: "3.12.2",
+  build: "3122",
+  release: "Correção visual da tabela DAS-MEI",
   date: "07/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.12.2",
+      release: "Correção visual da tabela DAS-MEI",
+      date: "07/08/2026",
+      items: ["Cabeçalhos e dados das guias visíveis na Central do Cliente", "Cores e espaçamentos protegidos contra estilos globais"],
+    },
     {
       version: "3.12.1",
       release: "DAS-MEI com envio fixo no dia 15",
