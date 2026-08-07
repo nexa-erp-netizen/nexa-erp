@@ -1,10 +1,5 @@
 # Changelog
 
-## v3.10.3 — Diagnóstico visível da NFS-e
-- Adicionado o botão **Executar diagnóstico** em NFS-e → Configuração.
-- Exibidos os estados do ambiente de homologação, certificado A1 e cadastro fiscal.
-- Adicionado tratamento visual para carregamento, pendências e falhas da consulta.
-
 ## v3.10.2 — Cofre A1 privado para NFS-e
 - Certificado A1 criptografado antes do armazenamento em bucket privado.
 - Senha mantida cifrada separadamente pela API.
@@ -160,3 +155,9 @@
 - Organizados dados da DPS, prestador, tomador, serviços, tributação e totais.
 - Mantida marca d'água de rascunho sem valor fiscal em tela e impressão.
 - Chave de acesso e QR Code permanecem indisponíveis até a autorização oficial.
+# Nexa v3.10.4 — Diagnóstico NF-e com a SEFA/PR
+
+- NF-e modelo 55 usa automaticamente o certificado A1 do cofre privado.
+- Teste autenticado do serviço da SEFA/PR em homologação.
+- Diagnóstico fiscal separado do fluxo de NFS-e.
+- Transmissão continua bloqueada até a assinatura e validação do XML 4.00.

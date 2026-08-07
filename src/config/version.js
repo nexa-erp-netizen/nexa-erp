@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.10.3",
-  build: "3103",
-  release: "Diagnóstico visível da NFS-e",
+  version: "3.10.4",
+  build: "3104",
+  release: "Diagnóstico NF-e com a SEFA/PR",
   date: "06/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -10,10 +10,10 @@ const NEXA_VERSION = {
   storage: "Supabase",
   changelog: [
     {
-      version: "3.10.3",
-      release: "Diagnóstico visível da NFS-e",
+      version: "3.10.4",
+      release: "Diagnóstico NF-e com a SEFA/PR",
       date: "06/08/2026",
-      items: ["Botão Executar diagnóstico na configuração", "Status do ambiente, certificado A1 e cadastro fiscal", "Tratamento de carregamento e falhas da verificação"],
+      items: ["NF-e integrada ao certificado A1 do cofre privado", "Teste autenticado do status da SEFA/PR em homologação", "Diagnóstico separado para NF-e modelo 55", "Transmissão mantida bloqueada até a validação do XML assinado"],
     },
     {
       version: "3.10.2",
