@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.12.2",
-  build: "3122",
-  release: "Correção visual da tabela DAS-MEI",
+  version: "3.13.0",
+  build: "3130",
+  release: "DAS-MEI integrado ao Fiscal e Portal",
   date: "07/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.13.0",
+      release: "DAS-MEI integrado ao Fiscal e Portal",
+      date: "07/08/2026",
+      items: ["Importação anual movida da Central do Cliente para o Fiscal", "Liberação automática no Portal do Cliente no dia 15", "Visual padronizado com o tema escuro da Nexa"],
+    },
     {
       version: "3.12.2",
       release: "Correção visual da tabela DAS-MEI",

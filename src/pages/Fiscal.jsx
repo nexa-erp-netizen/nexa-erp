@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
 import { abrirWhatsAppWeb, montarMensagemWhatsApp } from "../services/whatsappService"
+import DasMeiAnual from "../components/DasMeiAnual"
 
 export default function Fiscal() {
   const [cliente, setCliente] = useState("")
@@ -26,6 +27,7 @@ export default function Fiscal() {
   const [obrigacoes, setObrigacoes] = useState([])
 
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}")
+  const clienteDasMei = clientesCadastrados.find((item) => item.nome === clienteFiltro) || null
 
   useEffect(() => {
     carregarObrigacoes()
@@ -703,6 +705,10 @@ export default function Fiscal() {
             ))}
           </select>
         </div>
+      )}
+
+      {usuario?.perfil !== "Cliente" && clienteDasMei && (
+        <DasMeiAnual cliente={clienteDasMei} />
       )}
 
       <div style={tableWrapper}>

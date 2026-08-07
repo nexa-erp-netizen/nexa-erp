@@ -91,7 +91,7 @@ export default function DasMeiAnual({ cliente }) {
       <div style={topo}>
         <div>
           <span style={rotulo}>DAS-MEI anual</span>
-          <p style={descricao}>Importe as guias mensais do PGMEI. A Nexa programa automaticamente cada envio para o dia 15 do mês do vencimento.</p>
+          <p style={descricao}>Importe as guias mensais do PGMEI para este cliente. Cada guia aparecerá automaticamente no Portal do Cliente no dia 15 do mês do vencimento.</p>
         </div>
         <label style={botaoArquivo}>
           Selecionar PDFs
@@ -119,7 +119,7 @@ export default function DasMeiAnual({ cliente }) {
               <td style={celula}><span style={status}>{campo(guia, "statusCalculado", "status_calculado") || guia.status}</span></td>
               <td style={celula}><div style={botoesLinha}><button style={botaoSecundario} onClick={() => abrirGuia(guia)}>Abrir PDF</button><button style={botaoWhats} onClick={() => enviarAgora(guia)}>Enviar agora</button><button style={botaoPago} onClick={() => atualizar(guia, { status: "Paga" })}>Marcar paga</button></div></td>
             </tr>)}
-            {!guias.length && <tr><td colSpan="6" style={{ padding: 22, textAlign: "center", color: "#64748b" }}>Nenhuma guia importada.</td></tr>}
+            {!guias.length && <tr><td colSpan="6" style={{ padding: 22, textAlign: "center", color: "#b9c9dc" }}>Nenhuma guia importada.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -128,23 +128,23 @@ export default function DasMeiAnual({ cliente }) {
   )
 }
 
-const box = { background: "#fff", border: "1px solid #dbe5f0", borderRadius: 16, padding: 20, marginBottom: 20 }
+const box = { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 18, padding: 20, marginBottom: 20 }
 const topo = { display: "flex", gap: 16, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }
-const rotulo = { fontWeight: 800, color: "#0f172a", fontSize: 18 }
-const descricao = { margin: "6px 0 0", color: "#64748b" }
+const rotulo = { fontWeight: 800, color: "#fff", fontSize: 18 }
+const descricao = { margin: "6px 0 0", color: "#c9d6e6" }
 const acoes = { display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", padding: "16px 0" }
-const textoAcao = { color: "#475569", fontSize: 14 }
-const checkboxLabel = { color: "#334155", fontSize: 14, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }
-const botaoArquivo = { background: "#e8f0ff", color: "#174ea6", borderRadius: 9, padding: "10px 14px", fontWeight: 700, cursor: "pointer" }
-const botaoPrimario = { border: 0, background: "#174ea6", color: "#fff", borderRadius: 9, padding: "10px 14px", fontWeight: 700, cursor: "pointer" }
-const resultadoBox = { background: "#f8fafc", borderRadius: 10, padding: 12, marginBottom: 14, display: "grid", gap: 5 }
+const textoAcao = { color: "#c9d6e6", fontSize: 14 }
+const checkboxLabel = { color: "#dbeafe", fontSize: 14, display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer" }
+const botaoArquivo = { background: "#123e73", color: "#fff", border: "1px solid rgba(255,255,255,.14)", borderRadius: 9, padding: "10px 14px", fontWeight: 700, cursor: "pointer" }
+const botaoPrimario = { border: 0, background: "#2563eb", color: "#fff", borderRadius: 9, padding: "10px 14px", fontWeight: 700, cursor: "pointer" }
+const resultadoBox = { background: "rgba(2,18,43,.55)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 10, padding: 12, marginBottom: 14, display: "grid", gap: 5 }
 const tabelaWrap = { overflowX: "auto" }
-const tabela = { width: "100%", borderCollapse: "collapse", minWidth: 920, background: "#fff", color: "#0f172a" }
-const cabecalho = { background: "#f8fafc", color: "#475569", fontSize: 12, fontWeight: 800, textAlign: "left", padding: "11px 10px", borderBottom: "1px solid #dbe5f0", whiteSpace: "nowrap" }
-const celula = { color: "#0f172a", fontSize: 14, textAlign: "left", padding: "11px 10px", borderBottom: "1px solid #e7edf4", verticalAlign: "middle", background: "#fff", whiteSpace: "nowrap" }
-const status = { background: "#eef2ff", color: "#3730a3", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }
+const tabela = { width: "100%", borderCollapse: "collapse", minWidth: 920, background: "transparent", color: "#fff" }
+const cabecalho = { background: "rgba(2,18,43,.72)", color: "#bcd2ea", fontSize: 12, fontWeight: 800, textAlign: "left", padding: "11px 10px", borderBottom: "1px solid rgba(255,255,255,.12)", whiteSpace: "nowrap" }
+const celula = { color: "#fff", fontSize: 14, textAlign: "left", padding: "11px 10px", borderBottom: "1px solid rgba(255,255,255,.09)", verticalAlign: "middle", background: "transparent", whiteSpace: "nowrap" }
+const status = { background: "rgba(37,99,235,.25)", color: "#bfdbfe", border: "1px solid rgba(96,165,250,.25)", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }
 const botoesLinha = { display: "flex", gap: 6, flexWrap: "wrap" }
-const botaoSecundario = { border: "1px solid #cbd5e1", background: "#fff", borderRadius: 7, padding: "7px 9px", cursor: "pointer" }
+const botaoSecundario = { border: "1px solid rgba(255,255,255,.20)", background: "#123e73", color: "#fff", borderRadius: 7, padding: "7px 9px", cursor: "pointer" }
 const botaoWhats = { border: 0, background: "#16a34a", color: "#fff", borderRadius: 7, padding: "7px 9px", cursor: "pointer" }
 const botaoPago = { border: 0, background: "#0f766e", color: "#fff", borderRadius: 7, padding: "7px 9px", cursor: "pointer" }
-const nota = { color: "#64748b", fontSize: 12, margin: "12px 0 0" }
+const nota = { color: "#b9c9dc", fontSize: 12, margin: "12px 0 0" }

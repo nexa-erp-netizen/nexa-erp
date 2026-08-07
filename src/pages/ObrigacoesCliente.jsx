@@ -77,6 +77,12 @@ export default function ObrigacoesCliente() {
 
   async function baixarGuia(item) {
     try {
+      if (item.dasMeiId) {
+        const resposta = await api.get(`/das-mei/${item.dasMeiId}/arquivo`)
+        window.open(resposta.data.url, "_blank")
+        return
+      }
+
       const url = await obterUrlAnexo(item)
 
       if (!url) {
@@ -99,7 +105,11 @@ export default function ObrigacoesCliente() {
     if (!confirmar) return
 
     try {
-      await api.patch(`/fiscal/${item.id}/marcar-pago-cliente`)
+      if (item.dasMeiId) {
+        await api.patch(`/das-mei/${item.dasMeiId}/marcar-pago-cliente`)
+      } else {
+        await api.patch(`/fiscal/${item.id}/marcar-pago-cliente`)
+      }
       await carregarFiscal()
     } catch (error) {
       console.error(error)
