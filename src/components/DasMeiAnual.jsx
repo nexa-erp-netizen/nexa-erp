@@ -22,7 +22,7 @@ function campo(guia, camel, snake) {
   return guia?.[camel] ?? guia?.[snake] ?? ""
 }
 
-export default function DasMeiAnual({ cliente }) {
+export default function DasMeiAnual({ cliente, onAtualizarFiscal }) {
   const [guias, setGuias] = useState([])
   const [arquivos, setArquivos] = useState([])
   const [substituir, setSubstituir] = useState(false)
@@ -75,6 +75,7 @@ export default function DasMeiAnual({ cliente }) {
       await api.post("/das-mei/publicar-portal", { ids: selecionadas })
       setSelecionadas([])
       await carregar()
+      await onAtualizarFiscal?.()
       alert("DAS enviado ao Portal do Cliente.")
     } catch (error) {
       alert(error.response?.data?.message || "Não foi possível enviar o DAS ao portal.")
@@ -102,6 +103,7 @@ export default function DasMeiAnual({ cliente }) {
       })
       setEditando(null)
       await carregar()
+      await onAtualizarFiscal?.()
     } catch (error) {
       alert(error.response?.data?.message || "Não foi possível salvar a guia.")
     }

@@ -708,7 +708,7 @@ export default function Fiscal() {
       )}
 
       {usuario?.perfil !== "Cliente" && clienteDasMei && (
-        <DasMeiAnual cliente={clienteDasMei} />
+        <DasMeiAnual cliente={clienteDasMei} onAtualizarFiscal={carregarObrigacoes} />
       )}
 
       <div style={tableWrapper}>

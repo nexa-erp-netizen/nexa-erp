@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.14.0",
-  build: "3140",
-  release: "Publicação controlada do DAS-MEI no Portal",
+  version: "3.14.1",
+  build: "3141",
+  release: "DAS-MEI sincronizado com as pendências do escritório",
   date: "07/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.14.1",
+      release: "DAS-MEI sincronizado com as pendências do escritório",
+      date: "07/08/2026",
+      items: ["DAS publicado passa a constar no Fiscal interno", "Assistente do Dia reconhece a guia pendente", "Pagamento e edição permanecem sincronizados sem duplicidade"],
+    },
     {
       version: "3.14.0",
       release: "Publicação controlada do DAS-MEI no Portal",
