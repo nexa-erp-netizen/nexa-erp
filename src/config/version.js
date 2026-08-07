@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.10.5",
-  build: "3105",
-  release: "IE do emitente e cadeia TLS da SEFA/PR",
+  version: "3.11.0",
+  build: "3110",
+  release: "NF-e 4.00 em homologação",
   date: "07/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -10,10 +10,10 @@ const NEXA_VERSION = {
   storage: "Supabase",
   changelog: [
     {
-      version: "3.10.5",
-      release: "IE do emitente e cadeia TLS da SEFA/PR",
+      version: "3.11.0",
+      release: "NF-e 4.00 em homologação",
       date: "07/08/2026",
-      items: ["Inscrição Estadual editável na configuração da NF-e", "IE salva automaticamente no cadastro do cliente", "Cadeia TLS do sistema adicionada à conexão da SEFA/PR", "Validação de segurança TLS mantida ativa"],
+      items: ["XML modelo 55 gerado e assinado com o A1 do cofre", "Autorização síncrona na SEFA/PR em homologação", "Armazenamento do XML autorizado, chave e protocolo", "DANFE de homologação e retorno detalhado das rejeições", "Produção permanece bloqueada"],
     },
     {
       version: "3.10.4",
