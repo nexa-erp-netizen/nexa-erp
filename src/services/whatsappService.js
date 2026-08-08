@@ -42,18 +42,18 @@ const MODELOS_BASE = [
   {
     id: "honorarios",
     icone: "💰",
-    titulo: "Honorários disponíveis",
+    titulo: "Honorários com vencimento",
     categoria: "Financeiro",
     texto:
       "Olá {cliente}, tudo bem?\n\nSeus honorários referentes à competência {competencia} estão disponíveis.\n\nValor: {valor}\nVencimento: {vencimento}\n\nQualquer dúvida, estamos à disposição.\n\nEquipe Nexa Contábil Digital.",
   },
   {
-    id: "honorario_disponivel",
+    id: "honorarios_vencidos",
     icone: "💰",
-    titulo: "Honorário disponível",
+    titulo: "Honorários vencidos",
     categoria: "Financeiro",
     texto:
-      "Olá {cliente}, tudo bem?\n\nSeu honorário referente à competência {competencia} está disponível.\n\nValor: {valor}\nVencimento: {vencimento}\n\nQualquer dúvida, estamos à disposição.\n\nEquipe Nexa Contábil Digital.",
+      "Olá {cliente}, tudo bem?\n\nSeus honorários referentes à competência {competencia}, com vencimento em {vencimento}, estão vencidos há {diasAtraso} dias.\n\nValor: {valor}\n\nPedimos, por gentileza, que regularize o pagamento. Se já realizou, desconsidere esta mensagem.\n\nEquipe Nexa Contábil Digital.",
   },
   {
     id: "mensagem_personalizada",
@@ -144,6 +144,23 @@ export function formatarDataWhatsApp(data) {
   return texto
 }
 
+export function calcularDiasAtraso(data) {
+  if (!data) return 0
+
+  const texto = String(data).slice(0, 10)
+  const partes = texto.split("-").map(Number)
+  const vencimento = partes.length === 3
+    ? new Date(partes[0], partes[1] - 1, partes[2])
+    : new Date(data)
+
+  if (!Number.isFinite(vencimento.getTime())) return 0
+
+  const hoje = new Date()
+  const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
+  const inicioVencimento = new Date(vencimento.getFullYear(), vencimento.getMonth(), vencimento.getDate())
+  return Math.max(0, Math.floor((inicioHoje - inicioVencimento) / 86400000))
+}
+
 function normalizarDados(dados = {}) {
   const clienteObj = dados.cliente && typeof dados.cliente === "object" ? dados.cliente : null
   const extras = dados.dados && typeof dados.dados === "object" ? dados.dados : {}
@@ -158,10 +175,13 @@ function normalizarDados(dados = {}) {
     dados.empresa ||
     "cliente"
 
+  const vencimentoOriginal = dados.vencimento || dados.dataVencimento || extras.vencimento || extras.prazo
+
   return {
     cliente: nomeCliente,
     empresa: clienteObj?.razaoSocial || clienteObj?.nomeFantasia || dados.empresa || dados.razaoSocial || nomeCliente,
-    vencimento: formatarDataWhatsApp(dados.vencimento || dados.dataVencimento || extras.vencimento || extras.prazo),
+    vencimento: formatarDataWhatsApp(vencimentoOriginal),
+    diasAtraso: calcularDiasAtraso(vencimentoOriginal),
     valor: formatarMoedaWhatsApp(dados.valor ?? extras.valor),
     competencia: dados.competencia || extras.competencia || "não informada",
     descricao: dados.descricao || dados.titulo || dados.tipo || extras.descricao || extras.pendencia || extras.obrigacao || "pendência",
@@ -175,7 +195,8 @@ export function obterModeloWhatsApp(idOuModelo) {
   if (!idOuModelo) return MODELOS_BASE[0]
   if (typeof idOuModelo === "object" && idOuModelo.id && idOuModelo.texto) return idOuModelo
 
-  const chave = typeof idOuModelo === "object" ? idOuModelo.modeloId || idOuModelo.id || idOuModelo.modelo : idOuModelo
+  let chave = typeof idOuModelo === "object" ? idOuModelo.modeloId || idOuModelo.id || idOuModelo.modelo : idOuModelo
+  if (chave === "honorario_disponivel") chave = "honorarios"
 
   return (
     MODELOS_BASE.find((modelo) => modelo.id === chave) ||
@@ -220,7 +241,10 @@ export function sugerirModeloWhatsApp(contexto = {}) {
   if (texto.includes("3 dias") || texto.includes("tres dias") || texto.includes("três dias")) return obterModeloWhatsApp("vence_3_dias")
   if (texto.includes("documento") && texto.includes("receb")) return obterModeloWhatsApp("documento_recebido")
   if (texto.includes("documento")) return obterModeloWhatsApp("documento_pendente")
-  if (texto.includes("honor")) return obterModeloWhatsApp("honorarios")
+  if (texto.includes("honor")) {
+    const diasAtraso = calcularDiasAtraso(contexto.vencimento || contexto.dataVencimento || contexto.prazo)
+    return obterModeloWhatsApp(diasAtraso > 0 || texto.includes("atras") || texto.includes("vencid") ? "honorarios_vencidos" : "honorarios")
+  }
   if (texto.includes("das") || texto.includes("guia") || texto.includes("fiscal")) return obterModeloWhatsApp("das_disponivel")
 
   return obterModeloWhatsApp("mensagem_personalizada")

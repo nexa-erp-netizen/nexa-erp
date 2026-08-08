@@ -54,6 +54,7 @@ export default function Clientes({ setPage }) {
   const [novaAcao, setNovaAcao] = useState("")
   const [vencimentoAcao, setVencimentoAcao] = useState("")
   const [financeiroLancamentos, setFinanceiroLancamentos] = useState([])
+  const [financeiroEscritorio, setFinanceiroEscritorio] = useState([])
   const [fiscalObrigacoes, setFiscalObrigacoes] = useState([])
   const [certificadosDigitais, setCertificadosDigitais] = useState([])
   const [procuracoesEcac, setProcuracoesEcac] = useState([])
@@ -81,6 +82,7 @@ export default function Clientes({ setPage }) {
   useEffect(() => {
     carregarClientes()
     carregarFinanceiroCliente()
+    carregarFinanceiroEscritorio()
     carregarFiscalCliente()
     carregarCertificadosDigitais()
     carregarProcuracoesEcac()
@@ -179,6 +181,15 @@ export default function Clientes({ setPage }) {
       setFinanceiroLancamentos(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
       console.error("Erro ao carregar resumo financeiro do cliente", error)
+    }
+  }
+
+  async function carregarFinanceiroEscritorio() {
+    try {
+      const resposta = await api.get("/financeiro")
+      setFinanceiroEscritorio(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (error) {
+      console.error("Erro ao carregar honorários do cliente", error)
     }
   }
 
@@ -1067,6 +1078,31 @@ export default function Clientes({ setPage }) {
     .slice()
     .sort((a, b) => String(dataFiscal(a) || "9999-12-31").localeCompare(String(dataFiscal(b) || "9999-12-31")))[0]
 
+  const honorarioPendente = financeiroEscritorio
+    .filter((item) => {
+      const texto = `${item.centroCusto || ""} ${item.descricao || ""}`.toLowerCase()
+      return mesmoCliente(item.cliente, clienteSelecionado?.nome) && texto.includes("honor") && !estaPago(item)
+    })
+    .slice()
+    .sort((a, b) => String(a.vencimento || a.data || "9999-12-31").localeCompare(String(b.vencimento || b.data || "9999-12-31")))[0]
+
+  const vencimentoHonorario = honorarioPendente?.vencimento || honorarioPendente?.data || ""
+  const competenciaHonorario = honorarioPendente?.competencia || (() => {
+    const partes = String(vencimentoHonorario).slice(0, 10).split("-")
+    return partes.length === 3 ? `${partes[1]}/${partes[0]}` : ""
+  })()
+
+  const contextoHonorario = honorarioPendente
+    ? {
+        descricao: honorarioPendente.descricao || "Honorários contábeis",
+        pendencia: honorarioPendente.descricao || "Honorários contábeis",
+        competencia: competenciaHonorario,
+        vencimento: vencimentoHonorario,
+        valor: honorarioPendente.valor,
+        status: honorarioPendente.status,
+      }
+    : {}
+
   const ultimaObrigacaoFiscal = obrigacoesDoCliente
     .slice()
     .sort((a, b) => new Date(dataFiscal(b) || 0) - new Date(dataFiscal(a) || 0))[0]
@@ -1578,6 +1614,7 @@ export default function Clientes({ setPage }) {
                   vencimento: proximaObrigacaoFiscal?.vencimento || "",
                   valor: proximaObrigacaoFiscal?.valor || "",
                   status: proximaObrigacaoFiscal?.status || "",
+                  honorario: contextoHonorario,
                 }}
                 onRegister={registrarWhatsAppCliente}
               />
@@ -1617,6 +1654,7 @@ export default function Clientes({ setPage }) {
                   vencimento: proximaObrigacaoFiscal?.vencimento || "",
                   valor: proximaObrigacaoFiscal?.valor || "",
                   status: proximaObrigacaoFiscal?.status || "",
+                  honorario: contextoHonorario,
                 }}
                 modo="central"
                 onRegister={registrarWhatsAppCliente}

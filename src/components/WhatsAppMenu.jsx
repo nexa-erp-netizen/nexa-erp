@@ -29,30 +29,35 @@ export default function WhatsAppMenu({
   const [mensagemEditada, setMensagemEditada] = useState("")
   const [aberto, setAberto] = useState(modo === "central")
 
+  const ehModeloHonorarios = modeloId === "honorarios" || modeloId === "honorarios_vencidos"
+  const fonteModelo = ehModeloHonorarios && contextoUnificado.honorario
+    ? contextoUnificado.honorario
+    : contextoUnificado
+
   const dados = useMemo(
     () => ({
       cliente,
-      clienteNome: cliente?.nome || contextoUnificado.cliente || contextoUnificado.nome || "cliente",
-      empresa: cliente?.razaoSocial || cliente?.nomeFantasia || cliente?.nome || contextoUnificado.empresa || "cliente",
+      clienteNome: cliente?.nome || fonteModelo.cliente || fonteModelo.nome || "cliente",
+      empresa: cliente?.razaoSocial || cliente?.nomeFantasia || cliente?.nome || fonteModelo.empresa || "cliente",
       telefone:
         cliente?.whatsapp ||
         cliente?.celular ||
         cliente?.telefone ||
-        contextoUnificado.whatsapp ||
-        contextoUnificado.celular ||
-        contextoUnificado.telefone ||
+        fonteModelo.whatsapp ||
+        fonteModelo.celular ||
+        fonteModelo.telefone ||
         "",
-      descricao: contextoUnificado.descricao || contextoUnificado.pendencia || contextoUnificado.obrigacao || "pendência",
-      pendencia: contextoUnificado.pendencia || contextoUnificado.obrigacao || contextoUnificado.descricao || "pendência",
-      competencia: contextoUnificado.competencia || "07/2026",
-      vencimento: contextoUnificado.vencimento || contextoUnificado.prazo || "2026-07-20",
-      valor: contextoUnificado.valor || "87,05",
-      status: contextoUnificado.status || "",
-      usuario: contextoUnificado.usuario || "Equipe Nexa",
-      mensagem: contextoUnificado.mensagem || "Estamos entrando em contato pelo Nexa ERP.",
-      textoLivre: contextoUnificado.textoLivre || contextoUnificado.mensagem || "Estamos entrando em contato pelo Nexa ERP.",
+      descricao: fonteModelo.descricao || fonteModelo.pendencia || fonteModelo.obrigacao || "pendência",
+      pendencia: fonteModelo.pendencia || fonteModelo.obrigacao || fonteModelo.descricao || "pendência",
+      competencia: fonteModelo.competencia || "não informada",
+      vencimento: fonteModelo.vencimento || fonteModelo.data || fonteModelo.prazo || "",
+      valor: fonteModelo.valor ?? "",
+      status: fonteModelo.status || "",
+      usuario: fonteModelo.usuario || "Equipe Nexa",
+      mensagem: fonteModelo.mensagem || "Estamos entrando em contato pelo Nexa ERP.",
+      textoLivre: fonteModelo.textoLivre || fonteModelo.mensagem || "Estamos entrando em contato pelo Nexa ERP.",
     }),
-    [cliente, contextoUnificado]
+    [cliente, fonteModelo]
   )
 
   const mensagemPronta = useMemo(

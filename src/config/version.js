@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.14.4",
-  build: "3144",
-  release: "Controle compartilhado de mensagens do Nexa Assist WhatsApp",
+  version: "3.14.5",
+  build: "3145",
+  release: "Honorários corretos no WhatsApp Inteligente",
   date: "08/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.14.5",
+      release: "Honorários corretos no WhatsApp Inteligente",
+      date: "08/08/2026",
+      items: ["Modelos financeiros reduzidos a honorários com vencimento e honorários vencidos", "Valor e vencimento obtidos do Financeiro em vez da obrigação fiscal", "Dias de atraso calculados automaticamente"],
+    },
     {
       version: "3.14.4",
       release: "Controle compartilhado de mensagens do Nexa Assist WhatsApp",
