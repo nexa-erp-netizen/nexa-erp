@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import api from "../services/api"
 import WhatsAppMenu from "../components/WhatsAppMenu"
+import ClienteAcessoResumo from "../components/ClienteAcessoResumo"
 import ServicosCobrancasCliente from "../components/ServicosCobrancasCliente"
 import { analisarPlanejamentoTributario } from "../motorTributario"
 import { registrarClienteVoz } from "../services/nexaVoiceService"
@@ -1624,6 +1625,8 @@ export default function Clientes({ setPage }) {
               </button>
             </div>
           </div>
+
+          <ClienteAcessoResumo clienteId={clienteSelecionado.id} />
 
           <div style={centralMenu}>
             <button title="Resumo" style={centralMenuBotao} onClick={() => rolarParaSecao("resumo")}>🏠</button>

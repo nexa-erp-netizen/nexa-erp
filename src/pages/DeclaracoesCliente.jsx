@@ -71,6 +71,7 @@ export default function DeclaracoesCliente() {
         return
       }
 
+      await api.post("/acessos-clientes/atividade", { tipo: "download", pagina: "Declarações", recurso: "Declaração", recursoId: item.id, descricao: `Baixou declaração: ${item.tipo || item.descricao || item.ano || item.id}` })
       window.open(url, "_blank")
     } catch (error) {
       console.error(error)

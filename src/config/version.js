@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.15.2",
-  build: "3152",
-  release: "Login inteligente por perfil",
+  version: "3.16.0",
+  build: "3160",
+  release: "Acessos dos clientes",
   date: "08/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.16.0",
+      release: "Acessos dos clientes",
+      date: "08/08/2026",
+      items: ["Status online e último acesso", "Histórico de entradas, visualizações e downloads", "Resumo na Central do Cliente e em Usuários"],
+    },
     {
       version: "3.15.2",
       release: "Login inteligente por perfil",

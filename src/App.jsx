@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import api from "./services/api"
 
 import Sidebar from "./components/Sidebar"
 import Header from "./components/Header"
@@ -137,6 +138,18 @@ export default function App() {
     localStorage.removeItem("usuario")
     setUsuario(null)
   }, [])
+
+  useEffect(() => {
+    if (usuario?.perfil !== "Cliente") return
+    const registrar = (tipo = "heartbeat", descricao = "Atividade no Portal") => {
+      api.post("/acessos-clientes/atividade", { tipo, pagina: page, descricao }).catch(() => {})
+    }
+    registrar("pagina", `Visualizou: ${page}`)
+    const timer = setInterval(() => registrar(), 60000)
+    const aoFocar = () => registrar()
+    window.addEventListener("focus", aoFocar)
+    return () => { clearInterval(timer); window.removeEventListener("focus", aoFocar) }
+  }, [usuario, page])
 
   useEffect(() => {
     function verificarMobile() {

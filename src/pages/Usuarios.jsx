@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
+import ClienteAcessoResumo from "../components/ClienteAcessoResumo"
 
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([])
@@ -242,6 +243,7 @@ export default function Usuarios() {
             <th style={th}>E-mail</th>
             <th style={th}>Perfil</th>
             <th style={th}>Cliente Vinculado</th>
+            <th style={th}>Acesso ao Portal</th>
             <th style={th}>Ações</th>
           </tr>
         </thead>
@@ -254,6 +256,11 @@ export default function Usuarios() {
               <td style={td}>{usuario.perfil}</td>
               <td style={td}>
                 {usuario.clienteVinculado || "-"}
+              </td>
+              <td style={td}>
+                {usuario.perfil === "Cliente" ? (
+                  <ClienteAcessoResumo compacto clienteId={clientes.find((cliente) => cliente.nome === usuario.clienteVinculado)?.id} />
+                ) : "-"}
               </td>
               <td style={td}>
                 <div style={actions}>
@@ -277,7 +284,7 @@ export default function Usuarios() {
 
           {usuarios.length === 0 && (
             <tr>
-              <td style={td} colSpan="5">
+              <td style={td} colSpan="6">
                 Nenhum usuário cadastrado.
               </td>
             </tr>

@@ -79,6 +79,7 @@ export default function ObrigacoesCliente() {
     try {
       if (item.dasMeiId) {
         const resposta = await api.get(`/das-mei/${item.dasMeiId}/arquivo`)
+        await api.post("/acessos-clientes/atividade", { tipo: "download", pagina: "Pendências e Guias", recurso: "DAS-MEI", recursoId: item.dasMeiId, descricao: `Baixou guia: ${obterTitulo(item)}` })
         window.open(resposta.data.url, "_blank")
         return
       }
@@ -90,6 +91,7 @@ export default function ObrigacoesCliente() {
         return
       }
 
+      await api.post("/acessos-clientes/atividade", { tipo: "download", pagina: "Pendências e Guias", recurso: "Guia fiscal", recursoId: item.id, descricao: `Baixou guia: ${obterTitulo(item)}` })
       window.open(url, "_blank")
     } catch (error) {
       console.error(error)
