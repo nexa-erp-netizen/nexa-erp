@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.15.0",
-  build: "3150",
-  release: "Arquitetura multiempresa isolada",
+  version: "3.15.1",
+  build: "3151",
+  release: "Acesso separado para escritório e cliente",
   date: "08/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.15.1",
+      release: "Acesso separado para escritório e cliente",
+      date: "08/08/2026",
+      items: ["Código do escritório removido do acesso dos clientes", "Seleção clara entre acesso do escritório e acesso do cliente", "Código enviado somente no login de administradores e funcionários", "Isolamento multiempresa preservado"],
+    },
     {
       version: "3.15.0",
       release: "Arquitetura multiempresa isolada",

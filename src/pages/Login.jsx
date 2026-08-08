@@ -4,6 +4,7 @@ import logo from "../assets/logo.png"
 import NEXA_VERSION from "../config/version"
 
 export default function Login({ onLogin }) {
+  const [tipoAcesso, setTipoAcesso] = useState("escritorio")
   const [login, setLogin] = useState("")
   const [senha, setSenha] = useState("")
   const [escritorioCodigo, setEscritorioCodigo] = useState("")
@@ -25,7 +26,10 @@ export default function Login({ onLogin }) {
         login,
         email: login,
         senha,
-        escritorioCodigo: escritorioCodigo.trim() || undefined,
+        escritorioCodigo:
+          tipoAcesso === "escritorio"
+            ? escritorioCodigo.trim() || undefined
+            : undefined,
       })
 
       localStorage.setItem("token", resposta.data.token)
@@ -163,6 +167,35 @@ export default function Login({ onLogin }) {
 
           <p style={subtitle}>Nexa Contábil Digital</p>
 
+          <div style={accessTypeBox}>
+            <button
+              type="button"
+              style={{
+                ...accessTypeButton,
+                ...(tipoAcesso === "escritorio" ? accessTypeButtonActive : {}),
+              }}
+              disabled={carregando}
+              onClick={() => setTipoAcesso("escritorio")}
+            >
+              Acesso do Escritório
+            </button>
+
+            <button
+              type="button"
+              style={{
+                ...accessTypeButton,
+                ...(tipoAcesso === "cliente" ? accessTypeButtonActive : {}),
+              }}
+              disabled={carregando}
+              onClick={() => {
+                setTipoAcesso("cliente")
+                setEscritorioCodigo("")
+              }}
+            >
+              Acesso do Cliente
+            </button>
+          </div>
+
           <input
             style={input}
             placeholder="Usuário, CPF, E-mail ou CNPJ"
@@ -171,13 +204,15 @@ export default function Login({ onLogin }) {
             onChange={(e) => setLogin(e.target.value)}
           />
 
-          <input
-            style={input}
-            placeholder="Código do escritório (opcional no acesso atual)"
-            value={escritorioCodigo}
-            disabled={carregando}
-            onChange={(e) => setEscritorioCodigo(e.target.value.toLowerCase())}
-          />
+          {tipoAcesso === "escritorio" && (
+            <input
+              style={input}
+              placeholder="Código do escritório"
+              value={escritorioCodigo}
+              disabled={carregando}
+              onChange={(e) => setEscritorioCodigo(e.target.value.toLowerCase())}
+            />
+          )}
 
           <div style={passwordBox}>
             <input
@@ -233,6 +268,33 @@ const page = {
   gridTemplateColumns: "430px 1fr",
   color: "white",
   overflowX: "hidden",
+}
+
+const accessTypeBox = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "8px",
+  marginBottom: "14px",
+  padding: "4px",
+  borderRadius: "12px",
+  background: "rgba(255,255,255,0.08)",
+}
+
+const accessTypeButton = {
+  minHeight: "42px",
+  padding: "8px 10px",
+  border: "1px solid transparent",
+  borderRadius: "9px",
+  background: "transparent",
+  color: "#b9cbea",
+  fontWeight: 700,
+  cursor: "pointer",
+}
+
+const accessTypeButtonActive = {
+  borderColor: "rgba(55,255,116,0.7)",
+  background: "rgba(0,168,255,0.22)",
+  color: "#ffffff",
 }
 
 const loginArea = {
