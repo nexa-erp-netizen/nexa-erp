@@ -1,15 +1,39 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import api from "../services/api"
 import logo from "../assets/logo.png"
 import NEXA_VERSION from "../config/version"
 
 export default function Login({ onLogin }) {
-  const [tipoAcesso, setTipoAcesso] = useState("escritorio")
   const [login, setLogin] = useState("")
   const [senha, setSenha] = useState("")
   const [escritorioCodigo, setEscritorioCodigo] = useState("")
   const [mostrarSenha, setMostrarSenha] = useState(false)
   const [carregando, setCarregando] = useState(false)
+  const [exigeCodigoEscritorio, setExigeCodigoEscritorio] = useState(false)
+
+  useEffect(() => {
+    const loginInformado = login.trim()
+    setEscritorioCodigo("")
+
+    if (!loginInformado) {
+      setExigeCodigoEscritorio(false)
+      return undefined
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const resposta = await api.post("/auth/identificar-acesso", {
+          login: loginInformado,
+        })
+        setExigeCodigoEscritorio(Boolean(resposta.data.exigeCodigoEscritorio))
+      } catch {
+        // Um acesso não localizado continua protegido pelo código do escritório.
+        setExigeCodigoEscritorio(true)
+      }
+    }, 450)
+
+    return () => clearTimeout(timer)
+  }, [login])
 
   async function entrar() {
     if (!login || !senha) {
@@ -26,10 +50,9 @@ export default function Login({ onLogin }) {
         login,
         email: login,
         senha,
-        escritorioCodigo:
-          tipoAcesso === "escritorio"
-            ? escritorioCodigo.trim() || undefined
-            : undefined,
+        escritorioCodigo: exigeCodigoEscritorio
+          ? escritorioCodigo.trim() || undefined
+          : undefined,
       })
 
       localStorage.setItem("token", resposta.data.token)
@@ -37,8 +60,7 @@ export default function Login({ onLogin }) {
 
       onLogin(resposta.data.usuario)
     } catch (error) {
-      alert("Usuário ou senha inválidos")
-      setLogin("")
+      alert(error.response?.data?.message || "Usuário ou senha inválidos")
       setSenha("")
       console.error(error)
     } finally {
@@ -167,35 +189,6 @@ export default function Login({ onLogin }) {
 
           <p style={subtitle}>Nexa Contábil Digital</p>
 
-          <div style={accessTypeBox}>
-            <button
-              type="button"
-              style={{
-                ...accessTypeButton,
-                ...(tipoAcesso === "escritorio" ? accessTypeButtonActive : {}),
-              }}
-              disabled={carregando}
-              onClick={() => setTipoAcesso("escritorio")}
-            >
-              Acesso do Escritório
-            </button>
-
-            <button
-              type="button"
-              style={{
-                ...accessTypeButton,
-                ...(tipoAcesso === "cliente" ? accessTypeButtonActive : {}),
-              }}
-              disabled={carregando}
-              onClick={() => {
-                setTipoAcesso("cliente")
-                setEscritorioCodigo("")
-              }}
-            >
-              Acesso do Cliente
-            </button>
-          </div>
-
           <input
             style={input}
             placeholder="Usuário, CPF, E-mail ou CNPJ"
@@ -204,7 +197,7 @@ export default function Login({ onLogin }) {
             onChange={(e) => setLogin(e.target.value)}
           />
 
-          {tipoAcesso === "escritorio" && (
+          {exigeCodigoEscritorio && (
             <input
               style={input}
               placeholder="Código do escritório"
@@ -246,7 +239,7 @@ export default function Login({ onLogin }) {
 
           <p style={aviso}>Acesso exclusivo para usuários autorizados pelo escritório.</p>
 
-          <p style={versionLogin}>v{NEXA_VERSION.version} • {NEXA_VERSION.release}</p>
+          <p style={versionLogin}>v{NEXA_VERSION.version} · 2026</p>
         </div>
       </div>
 
@@ -268,33 +261,6 @@ const page = {
   gridTemplateColumns: "430px 1fr",
   color: "white",
   overflowX: "hidden",
-}
-
-const accessTypeBox = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "8px",
-  marginBottom: "14px",
-  padding: "4px",
-  borderRadius: "12px",
-  background: "rgba(255,255,255,0.08)",
-}
-
-const accessTypeButton = {
-  minHeight: "42px",
-  padding: "8px 10px",
-  border: "1px solid transparent",
-  borderRadius: "9px",
-  background: "transparent",
-  color: "#b9cbea",
-  fontWeight: 700,
-  cursor: "pointer",
-}
-
-const accessTypeButtonActive = {
-  borderColor: "rgba(55,255,116,0.7)",
-  background: "rgba(0,168,255,0.22)",
-  color: "#ffffff",
 }
 
 const loginArea = {

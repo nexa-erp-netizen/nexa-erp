@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.15.1",
-  build: "3151",
-  release: "Acesso separado para escritório e cliente",
+  version: "3.15.2",
+  build: "3152",
+  release: "Login inteligente por perfil",
   date: "08/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.15.2",
+      release: "Login inteligente por perfil",
+      date: "08/08/2026",
+      items: ["Tela única de acesso", "Código exibido automaticamente apenas para usuários do escritório", "Clientes continuam somente com login e senha", "Rodapé público sem descrição interna da atualização"],
+    },
     {
       version: "3.15.1",
       release: "Acesso separado para escritório e cliente",
