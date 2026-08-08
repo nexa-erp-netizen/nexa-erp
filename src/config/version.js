@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.14.2",
-  build: "3142",
-  release: "Troca de cliente nos Lançamentos pela Nexa",
+  version: "3.14.3",
+  build: "3143",
+  release: "Receita bruta por Bancos e Caixa nos Lançamentos",
   date: "08/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.14.3",
+      release: "Receita bruta por Bancos e Caixa nos Lançamentos",
+      date: "08/08/2026",
+      items: ["Vínculo de lançamentos preservado mesmo com diferenças de acentuação no nome do cliente", "Resumo mensal com receita bruta, Bancos, Caixa, despesas e resultado", "Histórico e gráfico contábil exibidos na mesma tela por competência"],
+    },
     {
       version: "3.14.2",
       release: "Troca de cliente nos Lançamentos pela Nexa",

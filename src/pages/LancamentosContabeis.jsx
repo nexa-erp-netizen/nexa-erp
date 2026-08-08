@@ -241,6 +241,22 @@ export default function LancamentosContabeis() {
     return "despesa"
   }
 
+  function normalizarNome(valor) {
+    return String(valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase()
+  }
+
+  function origemFinanceira(lancamento) {
+    const plano = normalizarNome(lancamento?.planoConta || lancamento?.categoria)
+    if (plano.includes("caixa")) return "caixa"
+    if (plano.includes("banco")) return "bancos"
+    return "outros"
+  }
+
   function competenciaDentroDoFiltro(data) {
     const competencia = obterCompetenciaValor(data)
 
@@ -410,10 +426,15 @@ export default function LancamentosContabeis() {
     const grupos = {}
 
     lancamentos.forEach((lancamento) => {
-      const cliente = lancamento.cliente || "Sem cliente"
+      const clienteOriginal = lancamento.cliente || "Sem cliente"
+      const chaveCliente = normalizarNome(clienteOriginal) || "sem cliente"
+      const clienteCadastrado = clientes.find(
+        (item) => normalizarNome(item.nome) === chaveCliente
+      )
+      const cliente = clienteCadastrado?.nome || clienteOriginal
 
-      if (!grupos[cliente]) {
-        grupos[cliente] = {
+      if (!grupos[chaveCliente]) {
+        grupos[chaveCliente] = {
           cliente,
           lancamentos: [],
           totalReceitas: 0,
@@ -427,10 +448,10 @@ export default function LancamentosContabeis() {
       const tipo = tipoNormalizado(lancamento.tipo)
       const mes = nomeMes(lancamento.data)
 
-      grupos[cliente].lancamentos.push(lancamento)
+      grupos[chaveCliente].lancamentos.push(lancamento)
 
-      if (!grupos[cliente].graficoMensal[mes]) {
-        grupos[cliente].graficoMensal[mes] = {
+      if (!grupos[chaveCliente].graficoMensal[mes]) {
+        grupos[chaveCliente].graficoMensal[mes] = {
           mes,
           receitas: 0,
           despesas: 0,
@@ -439,20 +460,20 @@ export default function LancamentosContabeis() {
       }
 
       if (tipo === "receita") {
-        grupos[cliente].totalReceitas += valor
-        grupos[cliente].graficoMensal[mes].receitas += valor
+        grupos[chaveCliente].totalReceitas += valor
+        grupos[chaveCliente].graficoMensal[mes].receitas += valor
       } else {
-        grupos[cliente].totalDespesas += valor
-        grupos[cliente].graficoMensal[mes].despesas += valor
+        grupos[chaveCliente].totalDespesas += valor
+        grupos[chaveCliente].graficoMensal[mes].despesas += valor
       }
 
-      grupos[cliente].saldo =
-        grupos[cliente].totalReceitas -
-        grupos[cliente].totalDespesas
+      grupos[chaveCliente].saldo =
+        grupos[chaveCliente].totalReceitas -
+        grupos[chaveCliente].totalDespesas
 
-      grupos[cliente].graficoMensal[mes].saldo =
-        grupos[cliente].graficoMensal[mes].receitas -
-        grupos[cliente].graficoMensal[mes].despesas
+      grupos[chaveCliente].graficoMensal[mes].saldo =
+        grupos[chaveCliente].graficoMensal[mes].receitas -
+        grupos[chaveCliente].graficoMensal[mes].despesas
     })
 
     const meses = {
@@ -482,13 +503,49 @@ export default function LancamentosContabeis() {
         return new Date(Number(anoA), meses[mesA], 1) - new Date(Number(anoB), meses[mesB], 1)
       }),
     }))
-  }, [lancamentos])
+  }, [lancamentos, clientes])
 
   const gruposFiltrados = clienteFiltro
-    ? clientesAgrupados.filter((grupo) => grupo.cliente === clienteFiltro)
+    ? clientesAgrupados.filter(
+        (grupo) => normalizarNome(grupo.cliente) === normalizarNome(clienteFiltro)
+      )
     : []
 
   const grupo = gruposFiltrados[clienteAtual]
+
+  const resumoCompetencia = useMemo(() => {
+    const resumo = {
+      receitas: 0,
+      bancos: 0,
+      caixa: 0,
+      outrasReceitas: 0,
+      despesas: 0,
+      saldo: 0,
+      quantidade: 0,
+    }
+
+    if (!grupo) return resumo
+
+    grupo.lancamentos
+      .filter((lancamento) => competenciaDentroDoFiltro(lancamento.data))
+      .forEach((lancamento) => {
+        const valor = valorSeguro(lancamento.valor)
+        resumo.quantidade += 1
+
+        if (tipoNormalizado(lancamento.tipo) === "receita") {
+          resumo.receitas += valor
+          const origem = origemFinanceira(lancamento)
+          if (origem === "bancos") resumo.bancos += valor
+          else if (origem === "caixa") resumo.caixa += valor
+          else resumo.outrasReceitas += valor
+        } else {
+          resumo.despesas += valor
+        }
+      })
+
+    resumo.saldo = resumo.receitas - resumo.despesas
+    return resumo
+  }, [grupo, competenciaFiltro])
 
   const planosContasFiltrados = useMemo(() => {
     const filtrados = planoContas.filter((conta) =>
@@ -648,6 +705,7 @@ export default function LancamentosContabeis() {
         .lc-summary {
           display: flex;
           gap: 12px;
+          flex-wrap: wrap;
         }
 
         .lc-box {
@@ -666,6 +724,22 @@ export default function LancamentosContabeis() {
 
         .lc-box strong {
           font-size: 15px;
+        }
+
+        .lc-gross-breakdown {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(135px, 1fr));
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+
+        @media (max-width: 1050px) {
+          .lc-gross-breakdown { grid-template-columns: repeat(3, 1fr); }
+          .lc-form { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 650px) {
+          .lc-gross-breakdown, .lc-form { grid-template-columns: 1fr; }
         }
 
         .green { color: #32f06d; }
@@ -1011,28 +1085,31 @@ export default function LancamentosContabeis() {
               {grupo.cliente}
             </div>
 
-            <div className="lc-summary">
-              <div className="lc-box">
-                <span>Receitas</span>
-                <strong className="green">
-                  {formatarMoeda(grupo.totalReceitas)}
-                </strong>
-              </div>
+          </div>
 
-              <div className="lc-box">
-                <span>Despesas</span>
-                <strong className="red">
-                  {formatarMoeda(grupo.totalDespesas)}
-                </strong>
-              </div>
-
-              <div className="lc-box">
-                <span>Saldo</span>
-                <strong className="blue">
-                  {formatarMoeda(grupo.saldo)}
-                </strong>
-              </div>
+          <div className="lc-card" style={{ marginBottom: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <strong style={{ color: "#c9d6e6", fontSize: "15px" }}>Competência exibida</strong>
+              <input
+                className="lc-input"
+                style={{ maxWidth: "190px" }}
+                type="month"
+                value={competenciaFiltro}
+                onChange={(e) => setCompetenciaFiltro(e.target.value)}
+              />
+              <button type="button" className="btn-edit" onClick={limparFiltrosCompetencia}>
+                Mês atual
+              </button>
             </div>
+          </div>
+
+          <div className="lc-gross-breakdown">
+            <div className="lc-box"><span>Receita bruta do mês</span><strong className="green">{formatarMoeda(resumoCompetencia.receitas)}</strong></div>
+            <div className="lc-box"><span>Receitas — Bancos</span><strong className="green">{formatarMoeda(resumoCompetencia.bancos)}</strong></div>
+            <div className="lc-box"><span>Receitas — Caixa</span><strong className="green">{formatarMoeda(resumoCompetencia.caixa)}</strong></div>
+            <div className="lc-box"><span>Outras receitas</span><strong className="green">{formatarMoeda(resumoCompetencia.outrasReceitas)}</strong></div>
+            <div className="lc-box"><span>Despesas do mês</span><strong className="red">{formatarMoeda(resumoCompetencia.despesas)}</strong></div>
+            <div className="lc-box"><span>Resultado do mês</span><strong className="blue">{formatarMoeda(resumoCompetencia.saldo)}</strong></div>
           </div>
 
           <div className="lc-chart">
@@ -1092,41 +1169,6 @@ export default function LancamentosContabeis() {
                   </div>
                 )
               })}
-            </div>
-          </div>
-
-          <div className="lc-card" style={{ marginBottom: "20px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                flexWrap: "wrap",
-              }}
-            >
-              <strong style={{ color: "#c9d6e6", fontSize: "15px" }}>
-                Filtrar histórico
-              </strong>
-
-              <label style={{ color: "#c9d6e6", fontSize: "13px" }}>
-                Competência
-              </label>
-
-              <input
-                className="lc-input"
-                style={{ maxWidth: "190px" }}
-                type="month"
-                value={competenciaFiltro}
-                onChange={(e) => setCompetenciaFiltro(e.target.value)}
-              />
-
-              <button
-                type="button"
-                className="btn-edit"
-                onClick={limparFiltrosCompetencia}
-              >
-                Mês atual
-              </button>
             </div>
           </div>
 
