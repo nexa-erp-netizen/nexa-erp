@@ -337,7 +337,13 @@ export function executarAcaoDeVoz({ acao, setPage }) {
   if (pagina === "Pendências Clientes" && clienteNome) localStorage.setItem("nexaFiltroPendenciaCliente", clienteNome)
   if (pagina === "Movimentos Clientes" && clienteNome) localStorage.setItem("nexaFiltroMovimentosCliente", clienteNome)
   if (pagina === "Movimentos Clientes" && clienteId) localStorage.setItem("nexaFiltroMovimentosClienteId", clienteId)
-  if (pagina === "Lançamentos Contábeis" && clienteNome) localStorage.setItem("nexaFiltroLancamentosCliente", clienteNome)
+  if (pagina === "Lançamentos Contábeis") {
+    if (clienteNome) localStorage.setItem("nexaFiltroLancamentosCliente", clienteNome)
+    else localStorage.removeItem("nexaFiltroLancamentosCliente")
+    window.dispatchEvent(new CustomEvent("nexa:filtro-lancamentos-atualizado", {
+      detail: { clienteId, clienteNome },
+    }))
+  }
   if (pagina === "DRE Gerencial" && clienteNome) localStorage.setItem("nexaFiltroDreCliente", clienteNome)
   if (pagina === "Certificados Digitais" && clienteId) localStorage.setItem("nexaCertificadoClienteId", clienteId)
   if (pagina === "Procurações e-CAC" && clienteId) localStorage.setItem("nexaProcuracaoClienteId", clienteId)

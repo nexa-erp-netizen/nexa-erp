@@ -1,14 +1,20 @@
 const NEXA_VERSION = {
-  version: "3.14.1",
-  build: "3141",
-  release: "DAS-MEI sincronizado com as pendências do escritório",
-  date: "07/08/2026",
+  version: "3.14.2",
+  build: "3142",
+  release: "Troca de cliente nos Lançamentos pela Nexa",
+  date: "08/08/2026",
   status: "Produção",
   frontend: "Vercel",
   backend: "Render",
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.14.2",
+      release: "Troca de cliente nos Lançamentos pela Nexa",
+      date: "08/08/2026",
+      items: ["Filtro de cliente atualizado sem recarregar a página", "Troca direta entre clientes na mesma tela de Lançamentos", "Formulário anterior limpo com segurança ao mudar de cliente"],
+    },
     {
       version: "3.14.1",
       release: "DAS-MEI sincronizado com as pendências do escritório",

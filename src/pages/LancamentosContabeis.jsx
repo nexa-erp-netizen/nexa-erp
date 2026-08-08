@@ -35,6 +35,34 @@ export default function LancamentosContabeis() {
     carregarTudo()
   }, [])
 
+  useEffect(() => {
+    const atualizarFiltroLancamentos = (evento) => {
+      const clienteNome = String(evento?.detail?.clienteNome || "").trim()
+      if (!clienteNome) return
+
+      setClienteFiltro(clienteNome)
+      setClienteAtual(0)
+      setEditandoId(null)
+      setForm((atual) => ({
+        ...atual,
+        cliente: clienteNome,
+        servicoId: "",
+        descricao: "",
+        tipo: "despesa",
+        quantidade: 1,
+        valor: "",
+        data: "",
+        categoria: "",
+        planoConta: "",
+        origem: "manual",
+      }))
+      localStorage.removeItem("nexaFiltroLancamentosCliente")
+    }
+
+    window.addEventListener("nexa:filtro-lancamentos-atualizado", atualizarFiltroLancamentos)
+    return () => window.removeEventListener("nexa:filtro-lancamentos-atualizado", atualizarFiltroLancamentos)
+  }, [])
+
   async function carregarTudo() {
     await Promise.all([
       carregarLancamentos(),
