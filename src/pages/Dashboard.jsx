@@ -47,6 +47,9 @@ export default function Dashboard({ setPage }) {
   const [certificados, setCertificados] = useState([])
   const [procuracoes, setProcuracoes] = useState([])
   const [notificacoes, setNotificacoes] = useState(0)
+  const [sugestoesEnviadas, setSugestoesEnviadas] = useState(new Set())
+  const [sugestaoAbertaId, setSugestaoAbertaId] = useState("")
+  const [confirmandoEnvioId, setConfirmandoEnvioId] = useState("")
   const [mostrarCalendario, setMostrarCalendario] = useState(false)
   const [dataSelecionada, setDataSelecionada] = useState(new Date())
   const [progressoDiaSalvo, setProgressoDiaSalvo] = useState({
@@ -125,7 +128,7 @@ export default function Dashboard({ setPage }) {
       const usuarioSalvo = JSON.parse(localStorage.getItem("usuario"))
       const token = localStorage.getItem("token") || usuarioSalvo?.token
 
-      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, servicosResp, certificadosResp, procuracoesResp, painelResp] =
+      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, servicosResp, certificadosResp, procuracoesResp, painelResp, enviosWhatsAppResp] =
         await Promise.allSettled([
           api.get("/clientes"),
           api.get("/fiscal"),
@@ -136,6 +139,7 @@ export default function Dashboard({ setPage }) {
           api.get("/certificados-digitais"),
           api.get("/procuracoes-ecac"),
           api.get("/conversa/painel-diario"),
+          api.get("/whatsapp-assist/envios"),
         ])
 
       const resultadoArray = (resultado) =>
@@ -156,6 +160,7 @@ export default function Dashboard({ setPage }) {
           ? painelResp.value.data.itens
           : []
       )
+      setSugestoesEnviadas(new Set(resultadoArray(enviosWhatsAppResp).map((item) => item.sugestaoId)))
 
       if (token) {
         const resposta = await fetch(`${API_URL}/notificacoes/contador`, {
@@ -266,7 +271,35 @@ export default function Dashboard({ setPage }) {
 
     if (!abriu) return
 
+    setSugestaoAbertaId(sugestao.id)
+  }
+
+  async function confirmarEnvioWhatsApp(sugestao) {
+    const clienteCadastrado = localizarClientePorNome(sugestao.cliente)
+    const modelo = obterModeloWhatsApp(sugestao.modeloId)
+    const mensagem = montarMensagemWhatsApp({
+      modeloId: sugestao.modeloId,
+      cliente: clienteCadastrado || { nome: sugestao.cliente },
+      clienteNome: sugestao.cliente,
+      descricao: sugestao.descricao,
+      pendencia: sugestao.pendencia,
+      competencia: sugestao.competencia,
+      vencimento: sugestao.vencimento,
+      valor: sugestao.valor,
+      status: sugestao.status,
+      usuario: usuario?.nome || "Equipe Nexa",
+    })
+
+    setConfirmandoEnvioId(sugestao.id)
+
     try {
+      await api.post("/whatsapp-assist/envios", {
+        sugestaoId: sugestao.id,
+        clienteId: clienteCadastrado?.id || null,
+        cliente: sugestao.cliente,
+        modeloId: sugestao.modeloId,
+      })
+
       if (clienteCadastrado?.id) {
         await registrarHistoricoWhatsApp(api, clienteCadastrado, modelo?.titulo, mensagem)
       } else {
@@ -278,8 +311,15 @@ export default function Dashboard({ setPage }) {
         })
       }
     } catch (error) {
-      console.warn("WhatsApp aberto, mas o histórico não foi atualizado", error)
+      console.error("Não foi possível confirmar o envio do WhatsApp", error)
+      alert(error?.response?.data?.erro || "Não foi possível confirmar o envio. A sugestão continuará visível.")
+      return
+    } finally {
+      setConfirmandoEnvioId("")
     }
+
+    setSugestoesEnviadas((atuais) => new Set([...atuais, sugestao.id]))
+    setSugestaoAbertaId("")
   }
 
   function dataLocalISO(data) {
@@ -660,6 +700,7 @@ export default function Dashboard({ setPage }) {
     const vistos = new Set()
 
     return lista
+      .filter((item) => !sugestoesEnviadas.has(item.id))
       .filter((item) => {
         const chave = `${item.cliente}-${item.modeloId}-${item.pendencia}-${item.vencimento}`
         if (vistos.has(chave)) return false
@@ -668,7 +709,7 @@ export default function Dashboard({ setPage }) {
       })
       .sort((a, b) => a.prioridade - b.prioridade)
       .slice(0, 5)
-  }, [fiscal, documentos, pendencias, clientes])
+  }, [fiscal, documentos, pendencias, clientes, sugestoesEnviadas])
 
   const filaAssistenteDia = useMemo(() => {
     const idsServicos = new Set(servicosCobrancas.map((item) => Number(item.id)))
@@ -1751,13 +1792,24 @@ export default function Dashboard({ setPage }) {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    className="assist-action"
-                    onClick={() => enviarWhatsAppAssist(item)}
-                  >
-                    Abrir WhatsApp com mensagem sugerida
-                  </button>
+                  {sugestaoAbertaId === item.id ? (
+                    <button
+                      type="button"
+                      className="assist-action"
+                      disabled={confirmandoEnvioId === item.id}
+                      onClick={() => confirmarEnvioWhatsApp(item)}
+                    >
+                      {confirmandoEnvioId === item.id ? "Confirmando..." : "Confirmar que enviei"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="assist-action"
+                      onClick={() => enviarWhatsAppAssist(item)}
+                    >
+                      Abrir WhatsApp com mensagem sugerida
+                    </button>
+                  )}
                 </div>
               )
             })}

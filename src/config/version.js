@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.14.3",
-  build: "3143",
-  release: "Receita bruta por Bancos e Caixa nos Lançamentos",
+  version: "3.14.4",
+  build: "3144",
+  release: "Controle compartilhado de mensagens do Nexa Assist WhatsApp",
   date: "08/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.14.4",
+      release: "Controle compartilhado de mensagens do Nexa Assist WhatsApp",
+      date: "08/08/2026",
+      items: ["Confirmação de envio antes de retirar a sugestão", "Card enviado removido para todos os colaboradores", "Nova pendência real volta a gerar uma nova sugestão"],
+    },
     {
       version: "3.14.3",
       release: "Receita bruta por Bancos e Caixa nos Lançamentos",
