@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.14.5",
-  build: "3145",
-  release: "Honorários corretos no WhatsApp Inteligente",
+  version: "3.15.0",
+  build: "3150",
+  release: "Arquitetura multiempresa isolada",
   date: "08/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.15.0",
+      release: "Arquitetura multiempresa isolada",
+      date: "08/08/2026",
+      items: ["Isolamento obrigatório por escritório em todas as entidades", "Migração automática dos dados atuais para o escritório principal", "Criação de novos escritórios com administrador e ambiente vazio", "Código do escritório no acesso e administração exclusiva da plataforma"],
+    },
     {
       version: "3.14.5",
       release: "Honorários corretos no WhatsApp Inteligente",

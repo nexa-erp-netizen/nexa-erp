@@ -42,11 +42,11 @@ export default function Header({
       >
         <div>
           <strong style={styles.userName}>
-            {usuario?.perfil}
+            {usuario?.escritorio?.nome || usuario?.perfil}
           </strong>
 
           <span style={styles.userEmail}>
-            {usuario?.email}
+            {usuario?.perfil} • {usuario?.email}
           </span>
         </div>
 

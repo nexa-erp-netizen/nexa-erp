@@ -6,6 +6,7 @@ import NEXA_VERSION from "../config/version"
 export default function Login({ onLogin }) {
   const [login, setLogin] = useState("")
   const [senha, setSenha] = useState("")
+  const [escritorioCodigo, setEscritorioCodigo] = useState("")
   const [mostrarSenha, setMostrarSenha] = useState(false)
   const [carregando, setCarregando] = useState(false)
 
@@ -24,6 +25,7 @@ export default function Login({ onLogin }) {
         login,
         email: login,
         senha,
+        escritorioCodigo: escritorioCodigo.trim() || undefined,
       })
 
       localStorage.setItem("token", resposta.data.token)
@@ -167,6 +169,14 @@ export default function Login({ onLogin }) {
             value={login}
             disabled={carregando}
             onChange={(e) => setLogin(e.target.value)}
+          />
+
+          <input
+            style={input}
+            placeholder="Código do escritório (opcional no acesso atual)"
+            value={escritorioCodigo}
+            disabled={carregando}
+            onChange={(e) => setEscritorioCodigo(e.target.value.toLowerCase())}
           />
 
           <div style={passwordBox}>

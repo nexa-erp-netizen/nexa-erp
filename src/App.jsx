@@ -45,6 +45,7 @@ import SobreNexa from "./pages/SobreNexa"
 import IntegracaoGoogleDrive from "./pages/IntegracaoGoogleDrive"
 import NFe from "./pages/NFe"
 import NFSe from "./pages/NFSe"
+import EscritoriosNexa from "./pages/EscritoriosNexa"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -82,6 +83,7 @@ export default function App() {
       "Radar Inteligente",
       "Relatórios",
       "Usuários",
+      "Escritórios Nexa",
       "Backup Sistema",
       "Google Drive",
       "Sobre",
@@ -220,6 +222,9 @@ export default function App() {
 
       case "Usuários":
         return <Usuarios />
+
+      case "Escritórios Nexa":
+        return usuario?.plataformaAdmin ? <EscritoriosNexa /> : <Dashboard />
 
       case "Documentos Digitais":
         return <DocumentosDigitais />
