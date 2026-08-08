@@ -967,7 +967,7 @@ export default function Clientes({ setPage }) {
   }
 
   function mesmoCliente(nomeA, nomeB) {
-    return String(nomeA || "").trim().toLowerCase() === String(nomeB || "").trim().toLowerCase()
+    return normalizarNomeSolicitado(nomeA) === normalizarNomeSolicitado(nomeB)
   }
 
   function ehReceitaFinanceira(item) {
@@ -1930,10 +1930,10 @@ export default function Clientes({ setPage }) {
             </div>
 
             <div style={miniResumoGrid}>
-              <Info label="Créditos do mês" value={formatarMoeda(financeiroCreditos)} />
-              <Info label="Débitos do mês" value={formatarMoeda(financeiroDebitos)} />
-              <Info label="Saldo do mês" value={formatarMoeda(financeiroSaldoAtual)} />
-              <Info label="Situação" value={financeiroSituacao} />
+              <Info label="Receitas" value={formatarMoeda(financeiroCreditos)} />
+              <Info label="Despesas" value={formatarMoeda(financeiroDebitos)} />
+              <Info label="Saldo" value={formatarMoeda(financeiroSaldoAtual)} />
+              <Info label="Lançamentos" value={String(financeiroMesAtual.length)} />
             </div>
 
             {ultimoLancamentoFinanceiro ? (

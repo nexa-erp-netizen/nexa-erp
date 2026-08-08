@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.16.0",
-  build: "3160",
-  release: "Acessos dos clientes",
+  version: "3.16.1",
+  build: "3161",
+  release: "Resumo financeiro na Central do Cliente",
   date: "08/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.16.1",
+      release: "Resumo financeiro na Central do Cliente",
+      date: "08/08/2026",
+      items: ["Movimentos reconhecidos mesmo com diferenças de acentuação no cliente", "Resumo mensal alinhado à tela Movimentos", "Receitas, despesas, saldo e quantidade de lançamentos exibidos na Central"],
+    },
     {
       version: "3.16.0",
       release: "Acessos dos clientes",
