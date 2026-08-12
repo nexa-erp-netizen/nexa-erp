@@ -20,6 +20,8 @@ const VOICE_ENABLED_KEY = "nexaVoiceEnabled"
 const SPOKEN_RESPONSES_ENABLED_KEY = "nexaSpokenResponsesEnabled"
 const MICROPHONE_DEVICE_KEY = "nexaVoiceMicrophoneDeviceId"
 const FLOAT_POSITION_KEY = "nexaVoiceFloatPosition"
+const PROTECTED_LISTENING_KEY = "nexaProtectedListeningEnabled"
+const PROTECTED_SESSION_TIMEOUT_MS = 45000
 const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta|nessa)\b[\s,.:;-]*(.*)$/i
 const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.:;-]*(.*)$/i
 const END_SESSION_PATTERN = /^\s*(?:muito\s+)?obrigad[oa][.!?]*\s*$/i
@@ -107,6 +109,20 @@ function falaTemQualidadeMinima(texto, metadados = {}) {
     return duracao >= 620 && pico >= Math.max(0.019, ruido * 2.75)
   }
 
+  return true
+}
+
+function falaPassaEscutaProtegida(texto, metadados = {}) {
+  const duracao = Number(metadados.duracao || 0)
+  const pico = Number(metadados.pico || 0)
+  const ruido = Math.max(Number(metadados.ruido || 0.006), 0.003)
+  const palavras = normalizarComandoLocal(texto).split(" ").filter(Boolean)
+
+  // Música, televisão e conversas ao fundo costumam produzir trechos longos,
+  // contínuos e com pouca separação entre a voz e o ruído ambiente.
+  if (duracao > 6500 || palavras.length > 24) return false
+  if (pico < Math.max(0.021, ruido * 3.15)) return false
+  if (palavras.length <= 2 && duracao < 680) return false
   return true
 }
 
@@ -316,6 +332,9 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const [expandido, setExpandido] = useState(false)
   const [totalVocabulario, setTotalVocabulario] = useState(0)
   const [historicoSalvo, setHistoricoSalvo] = useState(() => Boolean(obterContextoVoz().conversaId))
+  const [escutaProtegida, setEscutaProtegida] = useState(
+    () => localStorage.getItem(PROTECTED_LISTENING_KEY) !== "false",
+  )
   const [posicaoFlutuante, setPosicaoFlutuante] = useState(() => {
     try {
       const salva = JSON.parse(localStorage.getItem(FLOAT_POSITION_KEY) || "null")
@@ -351,6 +370,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const campoMensagemRef = useRef(null)
   const containerFlutuanteRef = useRef(null)
   const arrasteFlutuanteRef = useRef(null)
+  const timeoutSessaoProtegidaRef = useRef(null)
+  const escutaProtegidaRef = useRef(escutaProtegida)
 
   const streamRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -383,6 +404,12 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       window.speechSynthesis?.cancel?.()
     }
   }, [respostasFaladasAtivas])
+
+  useEffect(() => {
+    escutaProtegidaRef.current = escutaProtegida
+    localStorage.setItem(PROTECTED_LISTENING_KEY, String(escutaProtegida))
+    if (!escutaProtegida) clearTimeout(timeoutSessaoProtegidaRef.current)
+  }, [escutaProtegida])
 
   const limitarPosicaoFlutuante = useCallback((x, y) => {
     const elemento = containerFlutuanteRef.current
@@ -893,11 +920,29 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     agendarReinicio(650)
   }, [agendarReinicio, atualizarEstado, falarResposta, pausarReconhecimento])
 
+  const renovarJanelaProtegida = useCallback(() => {
+    clearTimeout(timeoutSessaoProtegidaRef.current)
+    if (!escutaProtegidaRef.current || !sessaoAtivaRef.current) return
+
+    timeoutSessaoProtegidaRef.current = setTimeout(() => {
+      if (processandoRef.current || falandoRef.current) {
+        renovarJanelaProtegida()
+        return
+      }
+      sessaoAtivaRef.current = false
+      setSessaoAtiva(false)
+      modoRef.current = "wake"
+      selecaoClientePendenteRef.current = null
+      atualizarEstado("aguardando", "Sessão protegida encerrada. Diga “Nexa” para conversar novamente.")
+    }, PROTECTED_SESSION_TIMEOUT_MS)
+  }, [atualizarEstado])
+
   const iniciarSessao = useCallback(async (gatilho) => {
     if (processandoRef.current || falandoRef.current) return
     sessaoAtivaRef.current = true
     setSessaoAtiva(true)
     modoRef.current = "session"
+    renovarJanelaProtegida()
     processandoRef.current = true
 
     const resposta = respostaDeAtivacao(gatilho)
@@ -906,11 +951,12 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     pausarReconhecimento()
     await falarResposta(resposta)
     voltarParaEscuta()
-  }, [falarResposta, pausarReconhecimento, voltarParaEscuta])
+  }, [falarResposta, pausarReconhecimento, renovarJanelaProtegida, voltarParaEscuta])
 
   const processarComando = useCallback(async (texto, opcoes = {}) => {
     const comando = String(texto || "").trim()
     if (!comando || processandoRef.current) return
+    if (opcoes.origem !== "texto") renovarJanelaProtegida()
 
     const origem = opcoes.origem === "texto" ? "texto" : "voz"
     const deveFalar = opcoes.falar !== false
@@ -1090,7 +1136,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       atualizarEstado("erro", mensagem)
       if (ativadaRef.current) agendarReinicio(1800)
     }
-  }, [agendarReinicio, atualizarEstado, carregarVocabulario, falarResposta, page, pausarReconhecimento, setPage, voltarParaEscuta])
+  }, [agendarReinicio, atualizarEstado, carregarVocabulario, falarResposta, page, pausarReconhecimento, renovarJanelaProtegida, setPage, voltarParaEscuta])
 
   const enviarMensagemDigitada = useCallback(async () => {
     const texto = String(mensagemDigitada || "").trim()
@@ -1160,6 +1206,12 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         return
       }
 
+      if (escutaProtegidaRef.current && !falaPassaEscutaProtegida(texto, metadados)) {
+        console.info("[Nexa Voice] Áudio ambiente descartado pela escuta protegida:", texto, metadados)
+        voltarParaEscuta()
+        return
+      }
+
       if (TRANSCRICOES_RUIDO_PATTERN.test(texto)) {
         console.info("[Nexa Voice] Frase curta sem comando descartada:", texto)
         voltarParaEscuta()
@@ -1205,6 +1257,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       sessaoAtivaRef.current = true
       setSessaoAtiva(true)
       modoRef.current = "session"
+      renovarJanelaProtegida()
       tocarSinal(720, 90)
 
       if (ativacao.comando) {
@@ -1214,7 +1267,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
       iniciarSessao(ativacao.gatilho)
     }
-  }, [confirmarSugestaoVocabulario, encerrarSessao, iniciarSessao, processarComando, voltarParaEscuta])
+  }, [confirmarSugestaoVocabulario, encerrarSessao, iniciarSessao, processarComando, renovarJanelaProtegida, voltarParaEscuta])
 
   const transcreverTrecho = useCallback(async (blob, metadados = {}) => {
     if (!blob?.size || blob.size < TAMANHO_MINIMO_AUDIO || transcrevendoRef.current) {
@@ -1596,6 +1649,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
   useEffect(() => () => {
     clearTimeout(reinicioRef.current)
+    clearTimeout(timeoutSessaoProtegidaRef.current)
     pararCapturaAudio()
     window.speechSynthesis?.cancel?.()
     try {
@@ -1734,6 +1788,16 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
             </button>
           </div>
 
+          <button
+            type="button"
+            style={{ ...styles.protectedToggle, ...(escutaProtegida ? styles.protectedToggleActive : {}) }}
+            onClick={() => setEscutaProtegida((ativa) => !ativa)}
+            aria-pressed={escutaProtegida}
+            title="Reduz comandos captados de música, televisão e conversas ao fundo"
+          >
+            {escutaProtegida ? "🛡️ Escuta protegida ativa" : "🛡️ Ativar escuta protegida"}
+          </button>
+
           <section style={styles.chatPanel} aria-label="Conversa rápida com a Nexa">
             {!mensagensPainel.length && (
               <div style={styles.welcomeMessage}>
@@ -1828,6 +1892,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           <div style={styles.statusRow}>
             <span>{historicoSalvo ? "Histórico salvo" : "Nova conversa"}</span>
             <span>{respostasFaladasAtivas ? "Respostas faladas" : "Respostas em texto"}</span>
+            <span>{escutaProtegida ? "Ambiente filtrado" : "Escuta padrão"}</span>
             <span>{sessaoAtiva ? "Conversa por voz aberta" : estado.ativada ? "Aguardando chamada" : "Microfone pausado"}</span>
           </div>
 
@@ -1920,6 +1985,8 @@ const styles = {
   voiceToggleActive: { background: "rgba(55,255,116,.10)", color: "#aaffc5", borderColor: "rgba(55,255,116,.28)" },
   spokenResponsesToggle: { background: "rgba(255,255,255,.055)", color: "#b9cbe0", border: "1px solid rgba(255,255,255,.13)", borderRadius: "9px", padding: "9px 10px", cursor: "pointer", fontWeight: 700, fontSize: "11px", whiteSpace: "nowrap" },
   spokenResponsesToggleActive: { background: "rgba(0,168,255,.14)", color: "#bfe8ff", borderColor: "rgba(0,168,255,.38)" },
+  protectedToggle: { width: "100%", background: "rgba(255,255,255,.045)", color: "#a9b8cc", border: "1px solid rgba(255,255,255,.12)", borderRadius: "9px", padding: "9px 11px", cursor: "pointer", fontWeight: 750, fontSize: "11px", textAlign: "left" },
+  protectedToggleActive: { background: "rgba(55,255,116,.09)", color: "#aaffc5", borderColor: "rgba(55,255,116,.28)" },
   chatPanel: { minHeight: "190px", maxHeight: "290px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "10px", background: "rgba(1,13,34,.66)", border: "1px solid rgba(255,255,255,.09)", borderRadius: "13px" },
   welcomeMessage: { alignSelf: "flex-start", maxWidth: "90%", background: "rgba(0,168,255,.09)", border: "1px solid rgba(0,168,255,.20)", borderRadius: "12px", padding: "11px", color: "#d9edff" },
   chatMessage: { maxWidth: "88%", padding: "9px 10px", borderRadius: "12px", border: "1px solid rgba(255,255,255,.09)", overflowWrap: "anywhere" },

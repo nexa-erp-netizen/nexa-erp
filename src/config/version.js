@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.17.1",
-  build: "3171",
-  release: "Abertura prioritária de sites oficiais",
+  version: "3.17.2",
+  build: "3172",
+  release: "Modo de Escuta Protegida",
   date: "12/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.17.2",
+      release: "Modo de Escuta Protegida",
+      date: "12/08/2026",
+      items: ["Filtro reforçado contra música, televisão e conversas ao fundo", "Sessão iniciada somente por Nexa, Bom dia ou Boa tarde", "Encerramento automático após 45 segundos sem interação", "Controle para ativar ou desativar a proteção"],
+    },
     {
       version: "3.17.1",
       release: "Abertura prioritária de sites oficiais",
