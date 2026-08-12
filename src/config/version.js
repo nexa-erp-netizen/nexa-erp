@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.17.3",
-  build: "3173",
-  release: "Correção de ativações indevidas da voz",
+  version: "3.17.4",
+  build: "3174",
+  release: "Voz sem sobreposição e comandos oficiais aprimorados",
   date: "12/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.17.4",
+      release: "Voz sem sobreposição e comandos oficiais aprimorados",
+      date: "12/08/2026",
+      items: ["Uma nova fala cancela completamente a anterior", "Carteira de Trabalho Digital reforçada no reconhecimento de voz", "Variações naturais de CTPS e carteira digital aceitas"],
+    },
     {
       version: "3.17.3",
       release: "Correção de ativações indevidas da voz",

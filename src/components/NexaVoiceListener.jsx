@@ -38,6 +38,7 @@ const TEMPO_CALIBRACAO_RUIDO_MS = 320
 const TEMPO_REARME_MICROFONE_MS = 380
 const TEMPO_BLOQUEIO_ECO_MS = 1050
 const TEMPO_REARME_COMANDO_DIRETO_MS = 180
+const COMANDO_SITE_PATTERN = /\b(carteira(?:\s+de)?\s+trabalho(?:\s+digital)?|carteira\s+digital|ctps(?:\s+digital)?|e-?cac|simples\s+nacional|pgmei|nfs-?e|receita\s+federal|gov\.?\s*br)\b/i
 
 const NAVEGACAO_LOCAL = [
   { tipo: "abrir-grupo", grupo: "Ferramentas", aliases: ["menu ferramentas", "grupo ferramentas", "ferramentas"] },
@@ -100,7 +101,7 @@ function falaTemQualidadeMinima(texto, metadados = {}) {
   const picoMinimo = Math.max(0.014, ruido * 2.25)
   if (duracao < DURACAO_MINIMA_FALA_MS || pico < picoMinimo) return false
 
-  const comandoDireto = Boolean(detectarAcaoLocalDeNavegacao(texto))
+  const comandoDireto = Boolean(detectarAcaoLocalDeNavegacao(texto) || COMANDO_SITE_PATTERN.test(texto))
   if (comandoDireto) return true
 
   // Frases curtas e sem ação conhecida são as mais inventadas pelo Whisper
@@ -364,6 +365,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const vozNeuralNomeRef = useRef("pt-BR-FranciscaNeural")
   const transcricaoDisponivelRef = useRef(false)
   const audioVozRef = useRef(null)
+  const finalizarAudioVozRef = useRef(null)
+  const geracaoFalaRef = useRef(0)
   const ultimaRespostaFaladaRef = useRef("")
   const ignorarEcoAteRef = useRef(0)
   const fimPainelRef = useRef(null)
@@ -400,6 +403,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     localStorage.setItem(SPOKEN_RESPONSES_ENABLED_KEY, String(respostasFaladasAtivas))
 
     if (!respostasFaladasAtivas) {
+      geracaoFalaRef.current += 1
+      finalizarAudioVozRef.current?.(false)
       audioVozRef.current?.pause?.()
       window.speechSynthesis?.cancel?.()
     }
@@ -779,7 +784,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     const contexto = obterContextoVoz()
 
     return [
-      "Nexa, bom dia, boa tarde, contador, contadora, contabilidade, MEI, empresário individual, sociedade limitada unipessoal, SLU, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, e-CAC, PGDAS-D, DCTFWeb, DAS, prioridades de hoje, relatório do dia, relatório para hoje, resumo de hoje, o que tenho para fazer hoje, iniciar meu dia, todas as pendências, mensagens de clientes, pedidos de ajuda, documentos aguardando análise, quem pagou hoje, pagamentos recebidos, pendências resolvidas.",
+      "Nexa, bom dia, boa tarde, contador, contadora, contabilidade, MEI, empresário individual, sociedade limitada unipessoal, SLU, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, Carteira de Trabalho Digital, carteira digital, CTPS Digital, e-CAC, PGDAS-D, DCTFWeb, DAS, PGMEI, NFS-e, Receita Federal, gov.br, prioridades de hoje, relatório do dia, relatório para hoje, resumo de hoje, o que tenho para fazer hoje, iniciar meu dia, todas as pendências, mensagens de clientes, pedidos de ajuda, documentos aguardando análise, quem pagou hoje, pagamentos recebidos, pendências resolvidas.",
       nomesClientes.length ? `Nomes de clientes do escritório: ${nomesClientes.join(", ")}.` : "",
       contexto.clienteNome ? `Cliente atual: ${contexto.clienteNome}.` : "",
       termos.length ? `Vocabulário aprendido: ${termos.join(", ")}.` : "",
@@ -787,7 +792,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     ].filter(Boolean).join(" ").slice(0, 700)
   }, [])
 
-  const falarComVozNeural = useCallback((texto) => new Promise(async (resolve) => {
+  const falarComVozNeural = useCallback((texto, geracao) => new Promise(async (resolve) => {
     if (!vozNeuralDisponivelRef.current || !texto) {
       resolve(false)
       return
@@ -800,6 +805,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     const finalizar = (resultado) => {
       if (concluida) return
       concluida = true
+      if (finalizarAudioVozRef.current === finalizar) finalizarAudioVozRef.current = null
       if (url) URL.revokeObjectURL(url)
       if (audioVozRef.current === audio) audioVozRef.current = null
       resolve(resultado)
@@ -807,10 +813,15 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
     try {
       const blob = await sintetizarVozNeural(texto)
+      if (geracaoFalaRef.current !== geracao) {
+        finalizar(false)
+        return
+      }
       url = URL.createObjectURL(blob)
       audio = new Audio(url)
       audio.preload = "auto"
       audioVozRef.current = audio
+      finalizarAudioVozRef.current = finalizar
       audio.onended = () => finalizar(true)
       audio.onerror = () => finalizar(false)
       setVozAtiva("Nexa — voz neural")
@@ -822,7 +833,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     }
   }), [])
 
-  const falarComVozLocal = useCallback((texto) => new Promise((resolve) => {
+  const falarComVozLocal = useCallback((texto, geracao) => new Promise((resolve) => {
     const sintetizador = window.speechSynthesis
     const CriadorDeFala = window.SpeechSynthesisUtterance
 
@@ -852,6 +863,10 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     fala.onerror = () => finalizar(false)
     sintetizador.cancel()
     setTimeout(() => {
+      if (geracaoFalaRef.current !== geracao) {
+        finalizar(false)
+        return
+      }
       try {
         sintetizador.speak(fala)
       } catch {
@@ -865,20 +880,35 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     const texto = limparRespostaDaNexa(textoOriginal)
     if (!texto) return false
 
+    const geracao = geracaoFalaRef.current + 1
+    geracaoFalaRef.current = geracao
+    finalizarAudioVozRef.current?.(false)
+    try {
+      audioVozRef.current?.pause?.()
+      if (audioVozRef.current) audioVozRef.current.src = ""
+    } catch {
+      // O navegador pode já ter encerrado o áudio anterior.
+    }
+    audioVozRef.current = null
+    window.speechSynthesis?.cancel?.()
     pausarReconhecimento()
     falandoRef.current = true
     ultimaRespostaFaladaRef.current = texto
     atualizarEstado("falando", texto)
 
     try {
-      const neuralFalou = await falarComVozNeural(texto)
+      const neuralFalou = await falarComVozNeural(texto, geracao)
+      if (geracaoFalaRef.current !== geracao) return false
       if (neuralFalou) return true
-      return await falarComVozLocal(texto)
+      const localFalou = await falarComVozLocal(texto, geracao)
+      return geracaoFalaRef.current === geracao && localFalou
     } finally {
-      falandoRef.current = false
-      // Evita que a LifeCam capture o final da própria voz da Nexa e envie
-      // esse eco ao Whisper como se fosse um novo comando do usuário.
-      ignorarEcoAteRef.current = performance.now() + TEMPO_BLOQUEIO_ECO_MS
+      if (geracaoFalaRef.current === geracao) {
+        falandoRef.current = false
+        // Evita que a LifeCam capture o final da própria voz da Nexa e envie
+        // esse eco ao Whisper como se fosse um novo comando do usuário.
+        ignorarEcoAteRef.current = performance.now() + TEMPO_BLOQUEIO_ECO_MS
+      }
     }
   }, [atualizarEstado, falarComVozLocal, falarComVozNeural, pausarReconhecimento])
 
@@ -1259,6 +1289,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         const palavrasProtegidas = normalizarComandoLocal(texto).split(" ").filter(Boolean)
         const fraseCurtaPermitida = Boolean(
           detectarAcaoLocalDeNavegacao(texto)
+          || COMANDO_SITE_PATTERN.test(texto)
           || CONFIRMACAO_SIM_PATTERN.test(texto)
           || CONFIRMACAO_NAO_PATTERN.test(texto)
           || selecaoClientePendenteRef.current
@@ -1653,6 +1684,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     setSessaoAtiva(false)
     selecaoClientePendenteRef.current = null
     window.speechSynthesis?.cancel?.()
+    geracaoFalaRef.current += 1
+    finalizarAudioVozRef.current?.(false)
     modoRef.current = "wake"
     pararCapturaAudio()
   }, [atualizarEstado, estado.ativada, iniciarCapturaAudio, pararCapturaAudio])
@@ -1675,6 +1708,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     clearTimeout(timeoutSessaoProtegidaRef.current)
     pararCapturaAudio()
     window.speechSynthesis?.cancel?.()
+    geracaoFalaRef.current += 1
+    finalizarAudioVozRef.current?.(false)
     try {
       audioVozRef.current?.pause?.()
     } catch {
