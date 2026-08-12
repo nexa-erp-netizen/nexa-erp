@@ -1226,6 +1226,16 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       }
 
       if (sessaoAtivaRef.current || modoRef.current === "session") {
+        const wakeDuranteSessao = texto.match(WAKE_WORD_PATTERN)
+        if (wakeDuranteSessao && !String(wakeDuranteSessao[1] || "").trim()) {
+          renovarJanelaProtegida()
+          setUltimaFala("Nexa")
+          setUltimaResposta("Estou ouvindo.")
+          tocarSinal(720, 70)
+          voltarParaEscuta()
+          return
+        }
+
         if (sugestaoVocabularioRef.current) {
           confirmarSugestaoVocabulario(texto).then((tratada) => {
             if (!tratada) {
@@ -1246,7 +1256,20 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           return
         }
 
-        const semWakeWord = texto.match(WAKE_WORD_PATTERN)?.[1]?.trim() || texto
+        const palavrasProtegidas = normalizarComandoLocal(texto).split(" ").filter(Boolean)
+        const fraseCurtaPermitida = Boolean(
+          detectarAcaoLocalDeNavegacao(texto)
+          || CONFIRMACAO_SIM_PATTERN.test(texto)
+          || CONFIRMACAO_NAO_PATTERN.test(texto)
+          || selecaoClientePendenteRef.current
+        )
+        if (escutaProtegidaRef.current && palavrasProtegidas.length <= 2 && !fraseCurtaPermitida) {
+          console.info("[Nexa Voice] Palavra curta sem intenção descartada:", texto)
+          voltarParaEscuta()
+          return
+        }
+
+        const semWakeWord = wakeDuranteSessao?.[1]?.trim() || texto
         processarComando(semWakeWord)
         return
       }

@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.17.2",
-  build: "3172",
-  release: "Modo de Escuta Protegida",
+  version: "3.17.3",
+  build: "3173",
+  release: "Correção de ativações indevidas da voz",
   date: "12/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.17.3",
+      release: "Correção de ativações indevidas da voz",
+      date: "12/08/2026",
+      items: ["Nexa isolado apenas ativa a escuta", "Ativação não consulta automaticamente o cliente anterior", "Palavras curtas sem intenção são descartadas", "Confirmações e nomes em seleções pendentes continuam aceitos"],
+    },
     {
       version: "3.17.2",
       release: "Modo de Escuta Protegida",
