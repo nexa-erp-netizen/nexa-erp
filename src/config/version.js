@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.17.0",
-  build: "3170",
-  release: "Abertura segura de sites pela Nexa",
+  version: "3.17.1",
+  build: "3171",
+  release: "Abertura prioritária de sites oficiais",
   date: "12/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.17.1",
+      release: "Abertura prioritária de sites oficiais",
+      date: "12/08/2026",
+      items: ["Comandos de site processados antes da resposta livre", "Link correto da Carteira de Trabalho Digital", "Abertura real preservada mesmo quando o classificador identifica navegação"],
+    },
     {
       version: "3.17.0",
       release: "Abertura segura de sites pela Nexa",
