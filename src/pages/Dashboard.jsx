@@ -399,11 +399,6 @@ export default function Dashboard({ setPage }) {
       (item) => item.status === "Pago pelo cliente"
     ).length
 
-    const emAtraso = fiscalAtivo.filter((item) => {
-      const dias = diferencaDias(item.vencimento)
-      return dias !== null && dias < 0
-    }).length
-
     const documentosPendentes = documentos.filter((item) => documentoPendente(item) && pertenceClienteOperacional(item)).length
 
     const aguardandoAcao =
@@ -415,7 +410,6 @@ export default function Dashboard({ setPage }) {
       clientes: clientesOperacionais.length,
       obrigacoesPendentes,
       aguardandoAcao,
-      emAtraso,
       documentosPendentes,
       notificacoes,
     }
@@ -778,6 +772,13 @@ export default function Dashboard({ setPage }) {
       valor: item.valor,
     }))
   }, [pendenciasConsolidadas, pendenciasPainelLegado])
+
+  const totalEmAtraso = useMemo(() => {
+    return pendenciasPainel.filter((acao) => {
+      const dias = diferencaDias(acao.data)
+      return dias !== null && dias < 0
+    }).length
+  }, [pendenciasPainel])
 
   const resumoAssistenteDia = useMemo(() => {
     const base = montarResumoAssistenteDia(filaAssistenteDia)
@@ -1721,7 +1722,7 @@ export default function Dashboard({ setPage }) {
         <ResumoCard icon={<FaUsers />} label="Clientes Ativos" value={resumo.clientes} color="blue" />
         <ResumoCard icon={<FaClipboardList />} label="Obrigações Pendentes" value={resumo.obrigacoesPendentes} color="warning" />
         <ResumoCard icon={<FaBolt />} label="Aguardando Ação" value={resumo.aguardandoAcao} color="warning" />
-        <ResumoCard icon={<FaExclamationTriangle />} label="Em Atraso" value={resumo.emAtraso} color="danger" />
+        <ResumoCard icon={<FaExclamationTriangle />} label="Em Atraso" value={totalEmAtraso} color="danger" />
         <ResumoCard icon={<FaFileAlt />} label="Documentos Pendentes" value={resumo.documentosPendentes} color="success" />
         <ResumoCard icon={<FaBell />} label="Notificações" value={resumo.notificacoes} color="warning" />
         <ResumoCard icon={<FaKey />} label="Alertas Digitais" value={resumoIdentidade.total} color="warning" />
