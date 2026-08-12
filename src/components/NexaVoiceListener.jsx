@@ -19,6 +19,7 @@ import {
 const VOICE_ENABLED_KEY = "nexaVoiceEnabled"
 const SPOKEN_RESPONSES_ENABLED_KEY = "nexaSpokenResponsesEnabled"
 const MICROPHONE_DEVICE_KEY = "nexaVoiceMicrophoneDeviceId"
+const FLOAT_POSITION_KEY = "nexaVoiceFloatPosition"
 const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta|nessa)\b[\s,.:;-]*(.*)$/i
 const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.:;-]*(.*)$/i
 const END_SESSION_PATTERN = /^\s*(?:muito\s+)?obrigad[oa][.!?]*\s*$/i
@@ -126,7 +127,9 @@ function detectarAcaoLocalDeNavegacao(textoOriginal) {
     .flatMap((item) => item.aliases.map((alias) => ({ ...item, alias: normalizarComandoLocal(alias) })))
     .sort((a, b) => b.alias.length - a.alias.length)
 
-  const encontrado = candidatos.find(({ alias }) => texto === alias || (temVerbo && texto.includes(alias)))
+  const encontrado = candidatos.find(({ alias }) =>
+    texto === alias || (temVerbo && ` ${texto} `.includes(` ${alias} `))
+  )
   if (!encontrado) return null
 
   if (encontrado.tipo === "abrir-grupo") {
@@ -313,6 +316,14 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const [expandido, setExpandido] = useState(false)
   const [totalVocabulario, setTotalVocabulario] = useState(0)
   const [historicoSalvo, setHistoricoSalvo] = useState(() => Boolean(obterContextoVoz().conversaId))
+  const [posicaoFlutuante, setPosicaoFlutuante] = useState(() => {
+    try {
+      const salva = JSON.parse(localStorage.getItem(FLOAT_POSITION_KEY) || "null")
+      return Number.isFinite(salva?.x) && Number.isFinite(salva?.y) ? salva : null
+    } catch {
+      return null
+    }
+  })
 
   const ativadaRef = useRef(estado.ativada)
   const respostasFaladasAtivasRef = useRef(respostasFaladasAtivas)
@@ -338,6 +349,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const ignorarEcoAteRef = useRef(0)
   const fimPainelRef = useRef(null)
   const campoMensagemRef = useRef(null)
+  const containerFlutuanteRef = useRef(null)
+  const arrasteFlutuanteRef = useRef(null)
 
   const streamRef = useRef(null)
   const audioContextRef = useRef(null)
@@ -370,6 +383,87 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       window.speechSynthesis?.cancel?.()
     }
   }, [respostasFaladasAtivas])
+
+  const limitarPosicaoFlutuante = useCallback((x, y) => {
+    const elemento = containerFlutuanteRef.current
+    const largura = elemento?.offsetWidth || 250
+    const altura = elemento?.offsetHeight || 54
+    const margem = 8
+
+    return {
+      x: Math.min(Math.max(margem, x), Math.max(margem, window.innerWidth - largura - margem)),
+      y: Math.min(Math.max(margem, y), Math.max(margem, window.innerHeight - altura - margem)),
+    }
+  }, [])
+
+  const iniciarArrasteFlutuante = useCallback((evento) => {
+    if (evento.button !== undefined && evento.button !== 0) return
+
+    const retangulo = containerFlutuanteRef.current?.getBoundingClientRect()
+    if (!retangulo) return
+
+    arrasteFlutuanteRef.current = {
+      pointerId: evento.pointerId,
+      inicioX: evento.clientX,
+      inicioY: evento.clientY,
+      origemX: retangulo.left,
+      origemY: retangulo.top,
+      moveu: false,
+    }
+    evento.currentTarget.setPointerCapture?.(evento.pointerId)
+  }, [])
+
+  const moverFlutuante = useCallback((evento) => {
+    const arraste = arrasteFlutuanteRef.current
+    if (!arraste || arraste.pointerId !== evento.pointerId) return
+
+    const deltaX = evento.clientX - arraste.inicioX
+    const deltaY = evento.clientY - arraste.inicioY
+    if (!arraste.moveu && Math.hypot(deltaX, deltaY) < 5) return
+
+    arraste.moveu = true
+    evento.preventDefault()
+    setPosicaoFlutuante(limitarPosicaoFlutuante(arraste.origemX + deltaX, arraste.origemY + deltaY))
+  }, [limitarPosicaoFlutuante])
+
+  const finalizarArrasteFlutuante = useCallback((evento) => {
+    const arraste = arrasteFlutuanteRef.current
+    if (!arraste || arraste.pointerId !== evento.pointerId) return
+
+    evento.currentTarget.releasePointerCapture?.(evento.pointerId)
+    arrasteFlutuanteRef.current = null
+
+    if (arraste.moveu) {
+      setPosicaoFlutuante((atual) => {
+        if (atual) localStorage.setItem(FLOAT_POSITION_KEY, JSON.stringify(atual))
+        return atual
+      })
+      return
+    }
+
+    setExpandido((valor) => !valor)
+  }, [])
+
+  useEffect(() => {
+    const reposicionar = () => {
+      setPosicaoFlutuante((atual) => {
+        if (!atual) return atual
+        const ajustada = limitarPosicaoFlutuante(atual.x, atual.y)
+        localStorage.setItem(FLOAT_POSITION_KEY, JSON.stringify(ajustada))
+        return ajustada
+      })
+    }
+
+    window.addEventListener("resize", reposicionar)
+    return () => window.removeEventListener("resize", reposicionar)
+  }, [limitarPosicaoFlutuante])
+
+  useEffect(() => {
+    if (!posicaoFlutuante) return
+    const ajustada = limitarPosicaoFlutuante(posicaoFlutuante.x, posicaoFlutuante.y)
+    setPosicaoFlutuante(ajustada)
+    localStorage.setItem(FLOAT_POSITION_KEY, JSON.stringify(ajustada))
+  }, [expandido])
 
   useEffect(() => {
     const sincronizarContextoCliente = (evento) => {
@@ -1575,14 +1669,29 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
   return (
     <aside
+      ref={containerFlutuanteRef}
       style={{
         ...styles.container,
         ...(expandido ? styles.containerExpanded : {}),
         ...(isMobile ? styles.containerMobile : {}),
+        ...(posicaoFlutuante ? {
+          left: `${posicaoFlutuante.x}px`,
+          top: `${posicaoFlutuante.y}px`,
+          right: "auto",
+          bottom: "auto",
+        } : {}),
       }}
       aria-live="polite"
     >
-      <button type="button" style={styles.header} onClick={() => setExpandido((valor) => !valor)}>
+      <button
+        type="button"
+        style={styles.header}
+        onPointerDown={iniciarArrasteFlutuante}
+        onPointerMove={moverFlutuante}
+        onPointerUp={finalizarArrasteFlutuante}
+        onPointerCancel={finalizarArrasteFlutuante}
+        title="Clique para abrir ou arraste para reposicionar"
+      >
         <span style={{ ...styles.dot, ...(estado.ativada ? styles.dotActive : styles.dotPaused) }} />
         <span style={styles.headerText}>
           <strong>Nexa</strong>
@@ -1793,7 +1902,9 @@ const styles = {
     color: "inherit",
     border: 0,
     padding: "12px 14px",
-    cursor: "pointer",
+    cursor: "grab",
+    touchAction: "none",
+    userSelect: "none",
     textAlign: "left",
   },
   dot: { width: "11px", height: "11px", borderRadius: "50%", flex: "0 0 auto" },

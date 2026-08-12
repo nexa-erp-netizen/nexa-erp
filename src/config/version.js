@@ -1,14 +1,44 @@
 const NEXA_VERSION = {
-  version: "3.16.1",
-  build: "3161",
-  release: "Resumo financeiro na Central do Cliente",
-  date: "08/08/2026",
+  version: "3.16.8",
+  build: "3168",
+  release: "Inicialização estável da API",
+  date: "12/08/2026",
   status: "Produção",
   frontend: "Vercel",
   backend: "Render",
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.16.8",
+      release: "Inicialização estável da API",
+      date: "12/08/2026",
+      items: ["Índice do histórico tributário com nome curto e estável", "Reinicialização da API sem colisão de índice", "Correção de roteamento da Andreia preservada"],
+    },
+    {
+      version: "3.16.7",
+      release: "Roteamento correto de clientes na Nexa",
+      date: "12/08/2026",
+      items: ["Correção aplicada também no roteador da API", "Andreia e Andreia Pardo não são confundidas com DRE", "Nomes de clientes têm prioridade correta nos comandos de abertura"],
+    },
+    {
+      version: "3.16.6",
+      release: "Reconhecimento seguro de nomes de clientes",
+      date: "12/08/2026",
+      items: ["Siglas de módulos exigem palavras inteiras", "Andreia não é mais confundida com DRE", "Comandos para abrir clientes seguem para a identificação correta"],
+    },
+    {
+      version: "3.16.5",
+      release: "Nexa flutuante e contagem consolidada de atrasos",
+      date: "12/08/2026",
+      items: ["Painel da Nexa pode ser arrastado livremente", "Posição escolhida preservada entre telas e novos acessos", "Movimento limitado à área visível", "Card Em Atraso alinhado ao Painel Diário"],
+    },
+    {
+      version: "3.16.4",
+      release: "Contagem consolidada de ações em atraso",
+      date: "12/08/2026",
+      items: ["Card Em Atraso alinhado ao Painel Diário da Nexa", "Ações vencidas de todos os módulos contabilizadas sem limitar ao Fiscal"],
+    },
     {
       version: "3.16.1",
       release: "Resumo financeiro na Central do Cliente",
