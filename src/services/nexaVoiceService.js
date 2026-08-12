@@ -281,8 +281,18 @@ export function executarAcaoDeVoz({ acao, setPage }) {
   if (acao.tipo === "abrir-url") {
     try {
       const url = new URL(String(acao.url || ""))
+      const host = url.hostname.toLowerCase()
       const hostPermitido = url.protocol === "https:"
-        && (url.hostname === "drive.google.com" || url.hostname.endsWith(".googleusercontent.com"))
+        && (
+          host === "drive.google.com"
+          || host.endsWith(".googleusercontent.com")
+          || host === "gov.br"
+          || host.endsWith(".gov.br")
+          || host === "receita.fazenda.gov.br"
+          || host.endsWith(".receita.fazenda.gov.br")
+          || host === "nfse.gov.br"
+          || host.endsWith(".nfse.gov.br")
+        )
       if (!hostPermitido) return false
       const janelaPendente = acao.janelaPendente
       if (janelaPendente && !janelaPendente.closed) {

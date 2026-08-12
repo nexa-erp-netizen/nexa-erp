@@ -917,7 +917,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     const idBase = Date.now()
     const pedidoDeAbrirDocumento = origem === "texto"
       && /\b(abra|abre|abrir|visualize|visualizar|veja|ver|exiba|exibir|mostre|mostrar)\b/i.test(comando)
-      && /\b(document\w*|arquivo\w*|anexo\w*|pdf|imagem|foto\w*|contrato\w*|declara\w*|recibo\w*|comprovante\w*|per[ií]cia|rg|cpf|cnh|identidade)\b/i.test(comando)
+      && /\b(document\w*|arquivo\w*|anexo\w*|pdf|imagem|foto\w*|contrato\w*|declara\w*|recibo\w*|comprovante\w*|per[ií]cia|rg|cpf|cnh|identidade|link|site|portal|carteira de trabalho|ctps|e-?cac|simples nacional|pgmei|nfs-?e|receita federal|gov\.br)\b/i.test(comando)
     const janelaDocumentoPendente = pedidoDeAbrirDocumento
       ? window.open("", "_blank")
       : null
@@ -997,7 +997,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
             ? {
                 tipo: "abrir-url",
                 url: resposta.acao.url,
-                titulo: resposta.acao.titulo || "Documento",
+                titulo: resposta.acao.titulo || "Abrir link",
                 segura: true,
               }
             : null,
@@ -1787,7 +1787,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
                       rel="noopener noreferrer"
                       style={styles.openDocumentButton}
                     >
-                      Abrir documento
+                      Abrir {item.acaoDocumento.titulo || "link"}
                     </a>
                   </div>
                 )}

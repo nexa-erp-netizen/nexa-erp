@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.16.8",
-  build: "3168",
-  release: "Inicialização estável da API",
+  version: "3.17.0",
+  build: "3170",
+  release: "Abertura segura de sites pela Nexa",
   date: "12/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,12 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.17.0",
+      release: "Abertura segura de sites pela Nexa",
+      date: "12/08/2026",
+      items: ["Abertura direta de portais oficiais", "Carteira de Trabalho Digital, e-CAC, Simples Nacional, PGMEI e NFS-e", "Botão alternativo quando a nova guia for bloqueada", "Validação obrigatória de HTTPS e domínio oficial"],
+    },
     {
       version: "3.16.8",
       release: "Inicialização estável da API",
