@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.19.2",
-  build: "3192",
-  release: "Holerite em duas vias",
+  version: "3.19.3",
+  build: "3193",
+  release: "Holerite vertical em duas vias",
   date: "13/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.19.3", release: "Holerite vertical em duas vias", date: "13/08/2026", items: ["PDF A4 na orientação vertical", "Duas vias no padrão clássico", "Assinatura e data em orientação vertical", "Tabela redimensionada e alinhada"] },
     { version: "3.19.2", release: "Holerite em duas vias", date: "13/08/2026", items: ["Duas vias em uma página", "Percentuais efetivos de INSS e IRRF", "Textos alinhados e nome em destaque", "Área exclusiva para assinatura e data", "Cursor de mão no botão Holerite PDF"] },
     { version: "3.19.1", release: "Holerite no padrão profissional", date: "13/08/2026", items: ["Layout tradicional em verde", "Tabela de vencimentos e descontos", "Bases de INSS, FGTS e IRRF", "Comprovante com assinatura e data"] },
     { version: "3.19.0", release: "Folha de pagamento e holerite", date: "13/08/2026", items: ["Cálculo mensal por funcionário", "INSS e IRRF 2026", "FGTS e salário-família", "Proventos, descontos e fechamento", "Holerite em PDF"] },
