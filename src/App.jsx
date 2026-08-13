@@ -49,6 +49,7 @@ import NFSe from "./pages/NFSe"
 import EscritoriosNexa from "./pages/EscritoriosNexa"
 import Funcionarios from "./pages/Funcionarios"
 import FolhaPagamento from "./pages/FolhaPagamento"
+import ProLabore from "./pages/ProLabore"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -63,6 +64,7 @@ export default function App() {
       "Clientes",
       "Funcionários",
       "Folha de Pagamento",
+      "Pró-labore",
       "Serviços",
       "Plano de Contas",
       "Lançamentos Contábeis",
@@ -104,6 +106,7 @@ export default function App() {
       "Clientes",
       "Funcionários",
       "Folha de Pagamento",
+      "Pró-labore",
       "Lançamentos Contábeis",
       "Fiscal",
       "NF-e",
@@ -201,6 +204,9 @@ export default function App() {
 
       case "Folha de Pagamento":
         return <FolhaPagamento />
+
+      case "Pró-labore":
+        return <ProLabore />
 
       case "Serviços":
         return <Servicos />
