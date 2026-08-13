@@ -50,6 +50,7 @@ import EscritoriosNexa from "./pages/EscritoriosNexa"
 import Funcionarios from "./pages/Funcionarios"
 import FolhaPagamento from "./pages/FolhaPagamento"
 import ProLabore from "./pages/ProLabore"
+import CalculadoraRescisao from "./pages/CalculadoraRescisao"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -95,6 +96,7 @@ export default function App() {
       "Google Drive",
       "Sobre",
       "Calculadora IRPF MEI",
+      "Calculadora de Rescisão",
       "Agenda",
       "DRE Gerencial",
     ],
@@ -130,6 +132,7 @@ export default function App() {
       "Radar Inteligente",
       "Relatórios",
       "Calculadora IRPF MEI",
+      "Calculadora de Rescisão",
       "Agenda",
       "Sobre",
     ],
@@ -207,6 +210,9 @@ export default function App() {
 
       case "Pró-labore":
         return <ProLabore />
+
+      case "Calculadora de Rescisão":
+        return <CalculadoraRescisao />
 
       case "Serviços":
         return <Servicos />

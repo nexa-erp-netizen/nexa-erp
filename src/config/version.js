@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.20.0",
-  build: "3200",
-  release: "Pró-labore e recibo em duas vias",
+  version: "3.21.0",
+  build: "3210",
+  release: "Calculadora de rescisão trabalhista",
   date: "13/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.21.0", release: "Calculadora de rescisão trabalhista", date: "13/08/2026", items: ["Cálculo avulso ou por funcionário cadastrado", "Modalidades de desligamento e aviso prévio", "Férias, 13º, INSS, IRRF e FGTS", "Multa rescisória e prazo de pagamento", "Demonstrativo detalhado para PDF"] },
     { version: "3.20.0", release: "Pró-labore e recibo em duas vias", date: "13/08/2026", items: ["Cadastro de sócios por empresa", "Cálculo mensal de INSS e IRRF", "Controle de outros vínculos previdenciários", "Fechamento mensal", "Recibo A4 vertical em duas vias"] },
     { version: "3.19.3", release: "Holerite vertical em duas vias", date: "13/08/2026", items: ["PDF A4 na orientação vertical", "Duas vias no padrão clássico", "Assinatura e data em orientação vertical", "Tabela redimensionada e alinhada"] },
     { version: "3.19.2", release: "Holerite em duas vias", date: "13/08/2026", items: ["Duas vias em uma página", "Percentuais efetivos de INSS e IRRF", "Textos alinhados e nome em destaque", "Área exclusiva para assinatura e data", "Cursor de mão no botão Holerite PDF"] },

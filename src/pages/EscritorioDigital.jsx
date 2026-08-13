@@ -255,6 +255,13 @@ export default function EscritorioDigital({ setPage }) {
 
             <button
               style={button}
+              onClick={() => setPage("Calculadora de Rescisão")}
+            >
+              Calculadora de Rescisão
+            </button>
+
+            <button
+              style={button}
               onClick={() => setPage("Documentos Digitais")}
             >
               Acessar Documentos
