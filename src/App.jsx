@@ -51,6 +51,7 @@ import Funcionarios from "./pages/Funcionarios"
 import FolhaPagamento from "./pages/FolhaPagamento"
 import ProLabore from "./pages/ProLabore"
 import CalculadoraRescisao from "./pages/CalculadoraRescisao"
+import Ferias from "./pages/Ferias"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -66,6 +67,7 @@ export default function App() {
       "Funcionários",
       "Folha de Pagamento",
       "Pró-labore",
+      "Férias",
       "Serviços",
       "Plano de Contas",
       "Lançamentos Contábeis",
@@ -109,6 +111,7 @@ export default function App() {
       "Funcionários",
       "Folha de Pagamento",
       "Pró-labore",
+      "Férias",
       "Lançamentos Contábeis",
       "Fiscal",
       "NF-e",
@@ -210,6 +213,9 @@ export default function App() {
 
       case "Pró-labore":
         return <ProLabore />
+
+      case "Férias":
+        return <Ferias />
 
       case "Calculadora de Rescisão":
         return <CalculadoraRescisao />

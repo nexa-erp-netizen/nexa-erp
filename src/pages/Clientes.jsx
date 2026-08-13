@@ -1195,6 +1195,12 @@ export default function Clientes({ setPage }) {
     if (typeof setPage === "function") setPage("Pró-labore")
   }
 
+  function abrirFeriasCliente() {
+    if (!clienteSelecionado?.id) return
+    localStorage.setItem("nexaFeriasClienteId", String(clienteSelecionado.id))
+    if (typeof setPage === "function") setPage("Férias")
+  }
+
   function abrirFiscalCliente() {
     if (!clienteSelecionado?.nome) return
     localStorage.setItem("nexaFiltroFiscalCliente", clienteSelecionado.nome)
@@ -1631,6 +1637,7 @@ export default function Clientes({ setPage }) {
 
               <button style={button} onClick={abrirFolhaCliente}>Folha</button>
               <button style={button} onClick={abrirProLaboreCliente}>Pró-labore</button>
+              <button style={button} onClick={abrirFeriasCliente}>Férias</button>
 
               <WhatsAppMenu
                 cliente={clienteSelecionado}
@@ -1952,12 +1959,14 @@ export default function Clientes({ setPage }) {
               <button style={button} onClick={abrirFuncionariosCliente}>Abrir Funcionários</button>
               <button style={button} onClick={abrirFolhaCliente}>Abrir Folha</button>
               <button style={button} onClick={abrirProLaboreCliente}>Abrir Pró-labore</button>
+              <button style={button} onClick={abrirFeriasCliente}>Abrir Férias</button>
             </div>
             <div style={miniResumoGrid}>
               <Info label="Empresa" value={clienteSelecionado.nome} />
               <Info label="Área" value="Funcionários" />
               <Info label="Disponível" value="Folha e holerite" />
               <Info label="Pró-labore" value="Disponível" />
+              <Info label="Férias" value="Disponível" />
             </div>
           </div>
 
