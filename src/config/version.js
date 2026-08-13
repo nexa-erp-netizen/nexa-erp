@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.19.0",
-  build: "3190",
-  release: "Folha de pagamento e holerite",
+  version: "3.19.1",
+  build: "3191",
+  release: "Holerite no padrão profissional",
   date: "13/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.19.1", release: "Holerite no padrão profissional", date: "13/08/2026", items: ["Layout tradicional em verde", "Tabela de vencimentos e descontos", "Bases de INSS, FGTS e IRRF", "Comprovante com assinatura e data"] },
     { version: "3.19.0", release: "Folha de pagamento e holerite", date: "13/08/2026", items: ["Cálculo mensal por funcionário", "INSS e IRRF 2026", "FGTS e salário-família", "Proventos, descontos e fechamento", "Holerite em PDF"] },
     {
       version: "3.18.0",
