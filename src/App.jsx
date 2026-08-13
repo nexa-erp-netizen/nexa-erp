@@ -47,6 +47,7 @@ import IntegracaoGoogleDrive from "./pages/IntegracaoGoogleDrive"
 import NFe from "./pages/NFe"
 import NFSe from "./pages/NFSe"
 import EscritoriosNexa from "./pages/EscritoriosNexa"
+import Funcionarios from "./pages/Funcionarios"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -59,6 +60,7 @@ export default function App() {
       "Notificações",
       "Escritório Digital",
       "Clientes",
+      "Funcionários",
       "Serviços",
       "Plano de Contas",
       "Lançamentos Contábeis",
@@ -98,6 +100,7 @@ export default function App() {
       "Notificações",
       "Escritório Digital",
       "Clientes",
+      "Funcionários",
       "Lançamentos Contábeis",
       "Fiscal",
       "NF-e",
@@ -189,6 +192,9 @@ export default function App() {
 
       case "Clientes":
         return <Clientes setPage={setPage} />
+
+      case "Funcionários":
+        return <Funcionarios />
 
       case "Serviços":
         return <Servicos />

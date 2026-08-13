@@ -1177,6 +1177,12 @@ export default function Clientes({ setPage }) {
     if (typeof setPage === "function") setPage("Movimentos Clientes")
   }
 
+  function abrirFuncionariosCliente() {
+    if (!clienteSelecionado?.id) return
+    localStorage.setItem("nexaFuncionariosClienteId", String(clienteSelecionado.id))
+    if (typeof setPage === "function") setPage("Funcionários")
+  }
+
   function abrirFiscalCliente() {
     if (!clienteSelecionado?.nome) return
     localStorage.setItem("nexaFiltroFiscalCliente", clienteSelecionado.nome)
@@ -1607,6 +1613,10 @@ export default function Clientes({ setPage }) {
                 Corrigir
               </button>
 
+              <button style={button} onClick={abrirFuncionariosCliente}>
+                Funcionários
+              </button>
+
               <WhatsAppMenu
                 cliente={clienteSelecionado}
                 contexto={{
@@ -1633,6 +1643,7 @@ export default function Clientes({ setPage }) {
             <button title="Próximas Ações" style={centralMenuBotao} onClick={() => rolarParaSecao("acoes")}>⏰</button>
             <button title="Histórico" style={centralMenuBotao} onClick={() => rolarParaSecao("historico")}>📝</button>
             <button title="Serviços e cobranças" style={centralMenuBotao} onClick={() => rolarParaSecao("servicos")}>🧾</button>
+            <button title="Funcionários" style={centralMenuBotao} onClick={() => rolarParaSecao("funcionarios")}>👥</button>
             <button title="Documentos" style={centralMenuBotao} onClick={() => rolarParaSecao("documentos")}>📎</button>
             <button title="Dados" style={centralMenuBotao} onClick={() => rolarParaSecao("dados")}>📋</button>
             <button title="Financeiro do Cliente" style={centralMenuBotao} onClick={() => rolarParaSecao("financeiro")}>💰</button>
@@ -1915,6 +1926,22 @@ export default function Clientes({ setPage }) {
               cliente={clienteSelecionado}
               onAtualizado={recarregarClienteSelecionado}
             />
+          </div>
+
+          <div id="central-funcionarios" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Pessoas e Folha</span>
+                <p style={secaoDescricao}>Cadastre os funcionários vinculados a esta empresa e prepare os dados admissionais para a futura folha de pagamento.</p>
+              </div>
+              <button style={button} onClick={abrirFuncionariosCliente}>Abrir Funcionários</button>
+            </div>
+            <div style={miniResumoGrid}>
+              <Info label="Empresa" value={clienteSelecionado.nome} />
+              <Info label="Área" value="Funcionários" />
+              <Info label="Próxima etapa" value="Folha e holerite" />
+              <Info label="Pró-labore" value="Sócios (próxima etapa)" />
+            </div>
           </div>
 
           <div id="central-financeiro" style={observacaoBox}>

@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.17.4",
-  build: "3174",
-  release: "Voz sem sobreposição e comandos oficiais aprimorados",
+  version: "3.18.0",
+  build: "3180",
+  release: "Cadastro de funcionários por empresa",
   date: "12/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,24 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    {
+      version: "3.18.0",
+      release: "Cadastro de funcionários por empresa",
+      date: "12/08/2026",
+      items: ["Área Pessoas e Folha dentro da empresa", "Cadastro admissional completo", "Dependentes, benefícios e checklist de documentos", "Dados trabalhistas, eSocial, FGTS e pagamento", "Base preparada para folha, holerite e pró-labore"],
+    },
+    {
+      version: "3.17.6",
+      release: "Pendências somente após o vencimento",
+      date: "12/08/2026",
+      items: ["Obrigações em andamento não aparecem como pendência", "Fiscal e cobranças entram um dia após o vencimento", "Iniciar meu dia mostra somente pendências reais", "Solicitações e documentos que exigem ação permanecem visíveis", "Itens duplicados removidos do painel"],
+    },
+    {
+      version: "3.17.5",
+      release: "Prioridades vencidas classificadas como críticas",
+      date: "12/08/2026",
+      items: ["Toda ação vencida força nível urgente", "Pendências consolidadas aparecem em Prioridades do Dia", "Contadores e lista crítica usam a mesma regra"],
+    },
     {
       version: "3.17.4",
       release: "Voz sem sobreposição e comandos oficiais aprimorados",

@@ -202,6 +202,8 @@ export function montarAcoesDoDia({
   const acoes = []
 
   montarAlertasIdentidadeDigital({ clientes, certificados, procuracoes }).forEach((alerta) => {
+    const dias = diferencaDias(alerta.data)
+    if (dias === null || dias >= 0) return
     acoes.push(criarAcao({
       id: `identidade-${alerta.id}`,
       cliente: alerta.cliente,
@@ -222,7 +224,7 @@ export function montarAcoesDoDia({
     .filter((item) => item?.status !== "concluido" && item?.status !== "concluído")
     .forEach((item) => {
       const dias = diferencaDias(item.data)
-      if (dias === null || dias < -30 || dias > 7) return
+      if (dias === null || dias < -30 || dias >= 0) return
 
       const clienteCadastro = localizarCliente(mapaClientes, item.cliente) || item.clienteDados || null
       if (!clienteOperacionalAtivo(clienteCadastro)) return
@@ -291,6 +293,10 @@ export function montarAcoesDoDia({
       }))
       return
     }
+
+    // Antes do vencimento é obrigação programada, não pendência. A única
+    // exceção é pagamento já informado pelo cliente, que exige conferência.
+    if (!status.includes("pago pelo cliente")) return
 
     if (dias !== null && dias === 0 && aguardandoPagamentoFiscal(item)) {
       acoes.push(criarAcao({
@@ -462,7 +468,7 @@ export function montarAcoesDoDia({
     const dias = diferencaDias(vencimento)
     const encerrado = status.includes("pago") || status.includes("recebido") || status.includes("concl") || status.includes("cancel")
 
-    if (ehServicoCliente && !encerrado) {
+    if (ehServicoCliente && !encerrado && dias !== null && dias < 0) {
       const prioridade = dias !== null && dias < 0
         ? 105 + Math.min(Math.abs(dias) * 2, 30)
         : dias === 0
@@ -491,7 +497,7 @@ export function montarAcoesDoDia({
       return
     }
 
-    if (tipo.includes("honor") && !encerrado) {
+    if (tipo.includes("honor") && !encerrado && dias !== null && dias < 0) {
       acoes.push(criarAcao({
         id: `honorario-${item.id}`,
         cliente,

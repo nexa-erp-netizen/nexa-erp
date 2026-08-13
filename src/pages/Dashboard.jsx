@@ -773,12 +773,73 @@ export default function Dashboard({ setPage }) {
     }))
   }, [pendenciasConsolidadas, pendenciasPainelLegado])
 
+  const pendenciasParaOlhar = useMemo(() => {
+    const modulosComVencimento = ["fiscal", "das-mei", "financeiro", "honorario", "servico-cobranca"]
+    const vistos = new Set()
+
+    return pendenciasPainel.filter((acao) => {
+      const modulo = String(acao.modulo || "").trim().toLowerCase()
+      const dependeDeVencimento = modulosComVencimento.some((item) => modulo.includes(item))
+      const dias = diferencaDias(acao.data)
+
+      // Obrigações fiscais e cobranças só se tornam pendência no dia seguinte
+      // ao vencimento. Solicitações e documentos recebidos já exigem ação.
+      if (dependeDeVencimento && (dias === null || dias >= 0)) return false
+
+      const chave = [
+        String(acao.clienteId || acao.cliente || "").trim().toLowerCase(),
+        String(acao.titulo || "").trim().toLowerCase(),
+        String(acao.data || "").slice(0, 10),
+      ].join("|")
+      if (vistos.has(chave)) return false
+      vistos.add(chave)
+      return true
+    })
+  }, [pendenciasPainel])
+
   const totalEmAtraso = useMemo(() => {
     return pendenciasPainel.filter((acao) => {
       const dias = diferencaDias(acao.data)
       return dias !== null && dias < 0
     }).length
   }, [pendenciasPainel])
+
+  const prioridadesDoDia = useMemo(() => {
+    const lista = [...prioridades]
+    const idsExistentes = new Set(lista.map((item) => String(item.id)))
+    const referenciasExistentes = new Set(
+      lista
+        .filter((item) => item.referenciaId !== null && item.referenciaId !== undefined && item.referenciaId !== "")
+        .map((item) => `${item.destino || ""}:${item.referenciaId}`)
+    )
+
+    pendenciasPainel.forEach((acao) => {
+      const dias = diferencaDias(acao.data)
+      if (dias === null || dias >= 0) return
+
+      const id = String(acao.id || `pendencia-atrasada-${acao.referenciaId || acao.cliente}`)
+      const temReferencia = acao.referenciaId !== null && acao.referenciaId !== undefined && acao.referenciaId !== ""
+      const referencia = temReferencia ? `${acao.destino || ""}:${acao.referenciaId}` : ""
+      if (idsExistentes.has(id) || (referencia && referenciasExistentes.has(referencia))) return
+
+      lista.push({
+        id,
+        nivel: "danger",
+        peso: 0,
+        titulo: acao.cliente || "Cliente",
+        descricao: `${acao.titulo || "Pendência"} ${textoPrazo(dias).toLowerCase()}.`,
+        etiqueta: "Atrasado",
+        destino: acao.destino || "Clientes",
+        cliente: acao.cliente,
+        referenciaId: acao.referenciaId,
+        secao: acao.secao,
+      })
+      idsExistentes.add(id)
+      if (referencia) referenciasExistentes.add(referencia)
+    })
+
+    return lista.sort((a, b) => a.peso - b.peso).slice(0, 8)
+  }, [pendenciasPainel, prioridades])
 
   const resumoAssistenteDia = useMemo(() => {
     const base = montarResumoAssistenteDia(filaAssistenteDia)
@@ -801,7 +862,7 @@ export default function Dashboard({ setPage }) {
       String(`${acao.modulo || ""} ${acao.titulo || ""} ${acao.descricao || ""}`).toLowerCase()
     const diasAcao = (acao) => diferencaDias(acao.data)
     const clientesCriticos = new Set(
-      pendenciasPainel
+      pendenciasParaOlhar
         .filter((acao) => acao.nivelCliente === "urgente" || (diasAcao(acao) !== null && diasAcao(acao) < 0))
         .map((acao) => acao.cliente)
     )
@@ -809,11 +870,11 @@ export default function Dashboard({ setPage }) {
       const dias = diasAcao(acao)
       return textoAcao(acao).includes("das") && dias !== null && dias <= 3
     }).length
-    const pagamentosPendentes = pendenciasPainel.filter((acao) => {
+    const pagamentosPendentes = pendenciasParaOlhar.filter((acao) => {
       const texto = textoAcao(acao)
       return texto.includes("honor") || texto.includes("cobran") || texto.includes("pagamento")
     }).length
-    const documentosPendentes = pendenciasPainel.filter((acao) =>
+    const documentosPendentes = pendenciasParaOlhar.filter((acao) =>
       String(acao.modulo || "").toLowerCase().includes("document")
     ).length
     const parcelamentos = pendenciasPainel.filter((acao) =>
@@ -839,7 +900,7 @@ export default function Dashboard({ setPage }) {
       alertasIdentidade: resumoIdentidade.total,
       primeiro,
     }
-  }, [clientesOperacionais, filaAssistenteDia, pendenciasPainel, resumoIdentidade])
+  }, [clientesOperacionais, filaAssistenteDia, pendenciasPainel, pendenciasParaOlhar, resumoIdentidade])
 
   const eventosCalendario = useMemo(() => {
     const eventos = {}
@@ -1670,7 +1731,7 @@ export default function Dashboard({ setPage }) {
 
         <div className="nexa-pending-list">
           <div className="nexa-pending-list-title">Todas as pendências para olhar</div>
-          {pendenciasPainel.length ? pendenciasPainel.map((acao) => (
+          {pendenciasParaOlhar.length ? pendenciasParaOlhar.map((acao) => (
             <button
               type="button"
               className="nexa-pending-item"
@@ -1823,10 +1884,10 @@ export default function Dashboard({ setPage }) {
           <div className="box-title">🚨 Prioridades do Dia</div>
 
           <div className="priority-list">
-            {prioridades.length === 0 ? (
+            {prioridadesDoDia.length === 0 ? (
               <div className="empty">Nenhuma prioridade crítica no momento.</div>
             ) : (
-              prioridades.map((item) => (
+              prioridadesDoDia.map((item) => (
                 <button
                   type="button"
                   className="priority-item clickable-card"
