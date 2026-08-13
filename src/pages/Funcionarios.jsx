@@ -105,6 +105,7 @@ export default function Funcionarios({ setPage }) {
     catch (error) { alert(error?.response?.data?.message || "Erro ao remover funcionário") }
   }
   function abrirRescisao(item){localStorage.setItem("nexaRescisaoClienteId",String(item.clienteId));localStorage.setItem("nexaRescisaoFuncionarioId",String(item.id));if(typeof setPage==="function")setPage("Calculadora de Rescisão")}
+  function voltarEmpresa(){if(!clienteId)return alert("Selecione uma empresa");localStorage.setItem("nexaAbrirClienteId",String(clienteId));if(typeof setPage==="function")setPage("Clientes")}
 
   function adicionarDependente() {
     alterar("dependentes", [...form.dependentes, { nome: "", cpf: "", dataNascimento: "", parentesco: "Filho(a)", irrf: true, salarioFamilia: false }])
@@ -138,7 +139,7 @@ export default function Funcionarios({ setPage }) {
   return <div style={s.pagina}>
     <div style={s.hero}>
       <div><span style={s.badge}>Pessoas e Folha</span><h2 style={s.titulo}>Funcionários da empresa</h2><p style={s.subtitulo}>Cadastro admissional vinculado à empresa. Base preparada para folha, holerite, férias e rescisão.</p></div>
-      <button style={s.botaoPrimario} onClick={novo} disabled={!clienteId}>+ Novo funcionário</button>
+      <div style={s.linhaInput}>{clienteId&&<button style={{width:44,height:44,border:"1px solid #49f2c2",borderRadius:11,background:"#092750",fontSize:22,cursor:"pointer"}} title="Voltar para a empresa" aria-label="Voltar para a empresa" onClick={voltarEmpresa}>🏠</button>}<button style={s.botaoPrimario} onClick={novo} disabled={!clienteId}>+ Novo funcionário</button></div>
     </div>
 
     <div style={s.filtroEmpresa}>

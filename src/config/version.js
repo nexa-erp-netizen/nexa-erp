@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.23.1",
-  build: "3231",
-  release: "Retorno direto para a empresa",
+  version: "3.23.5",
+  build: "3235",
+  release: "Ícone da empresa em todos os módulos",
   date: "13/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,10 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.23.5", release: "Ícone da empresa em todos os módulos", date: "13/08/2026", items: ["Casinha em Funcionários", "Casinha em Folha", "Casinha em Pró-labore", "Casinha em Férias", "Casinha em Rescisão", "Retorno direto à empresa selecionada"] },
+    { version: "3.23.4", release: "Retorno completo para a empresa", date: "13/08/2026", items: ["Retorno em Funcionários", "Retorno em Pró-labore", "Retorno em Férias", "Retorno em Folha e Rescisão", "Empresa selecionada preservada"] },
+    { version: "3.23.3", release: "Retorno nos módulos de pessoas", date: "13/08/2026", items: ["Botão Voltar para a empresa em Funcionários", "Botão Voltar para a empresa em Pró-labore", "Empresa selecionada preservada no retorno"] },
+    { version: "3.23.2", release: "Retorno pela tela de funcionários", date: "13/08/2026", items: ["Botão Voltar para a empresa em Funcionários", "Empresa selecionada preservada no retorno"] },
     { version: "3.23.1", release: "Retorno direto para a empresa", date: "13/08/2026", items: ["Botão Voltar para a empresa na rescisão", "Botão Voltar para a empresa na folha", "Retorno preservando a empresa selecionada"] },
     { version: "3.23.0", release: "Rescisões e folha consolidada", date: "13/08/2026", items: ["Rescisão vinculada ao funcionário e histórico", "PDF vertical em duas vias", "Status calculada, paga e finalizada", "Inativação segura do funcionário ao finalizar", "Processamento, fechamento e resumo PDF da folha por empresa"] },
     { version: "3.22.0", release: "Controle e cálculo de férias", date: "13/08/2026", items: ["Períodos aquisitivo e concessivo", "Cálculo de férias, terço e abono", "Adiantamento da primeira parcela do 13º", "Alertas de férias próximas e vencidas", "Aviso e recibo em PDF"] },

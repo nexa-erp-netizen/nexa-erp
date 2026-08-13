@@ -212,10 +212,10 @@ export default function App() {
         return <FolhaPagamento setPage={setPage} />
 
       case "Pró-labore":
-        return <ProLabore />
+        return <ProLabore setPage={setPage} />
 
       case "Férias":
-        return <Ferias />
+        return <Ferias setPage={setPage} />
 
       case "Calculadora de Rescisão":
         return <CalculadoraRescisao setPage={setPage} />
