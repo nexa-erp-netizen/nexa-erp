@@ -206,7 +206,7 @@ export default function App() {
         return <Clientes setPage={setPage} />
 
       case "Funcionários":
-        return <Funcionarios />
+        return <Funcionarios setPage={setPage} />
 
       case "Folha de Pagamento":
         return <FolhaPagamento />

@@ -20,7 +20,7 @@ function mascaraCep(valor) { return somenteDigitos(valor, 8).replace(/(\d{2})(\d
 function moeda(valor) { return Number(valor || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) }
 function dataBr(valor) { if (!valor) return "-"; const [a,m,d] = String(valor).slice(0,10).split("-"); return a && m && d ? `${d}/${m}/${a}` : valor }
 
-export default function Funcionarios() {
+export default function Funcionarios({ setPage }) {
   const [clientes, setClientes] = useState([])
   const [funcionarios, setFuncionarios] = useState([])
   const [clienteId, setClienteId] = useState(localStorage.getItem("nexaFuncionariosClienteId") || "")
@@ -104,6 +104,7 @@ export default function Funcionarios() {
     try { await api.delete(`/funcionarios/${item.id}`); await carregarFuncionarios() }
     catch (error) { alert(error?.response?.data?.message || "Erro ao remover funcionário") }
   }
+  function abrirRescisao(item){localStorage.setItem("nexaRescisaoClienteId",String(item.clienteId));localStorage.setItem("nexaRescisaoFuncionarioId",String(item.id));if(typeof setPage==="function")setPage("Calculadora de Rescisão")}
 
   function adicionarDependente() {
     alterar("dependentes", [...form.dependentes, { nome: "", cpf: "", dataNascimento: "", parentesco: "Filho(a)", irrf: true, salarioFamilia: false }])
@@ -245,7 +246,7 @@ export default function Funcionarios() {
 
     <div style={s.listaCard}>
       <div style={s.listaTopo}><div><h3 style={s.cardTitulo}>Quadro de funcionários</h3><span style={s.ajuda}>{empresa ? empresa.nome : "Selecione uma empresa"}</span></div><input style={s.pesquisa} placeholder="Pesquisar nome, CPF, cargo ou matrícula" value={busca} onChange={(e)=>setBusca(e.target.value)} /></div>
-      {!clienteId ? <div style={s.vazio}>Selecione uma empresa para consultar os funcionários.</div> : filtrados.length === 0 ? <div style={s.vazio}>Nenhum funcionário cadastrado nessa empresa.</div> : <div style={s.tabelaWrap}><table style={s.tabela}><thead><tr><th>Funcionário</th><th>Cargo</th><th>Admissão</th><th>Salário-base</th><th>Situação</th><th>Ações</th></tr></thead><tbody>{filtrados.map((item)=><tr key={item.id}><td><strong>{item.nome}</strong><small style={s.small}>CPF {mascaraCpf(item.cpf)} • {item.matricula || "Sem matrícula"}</small></td><td>{item.cargo}<small style={s.small}>{item.departamento || "Sem departamento"}</small></td><td>{dataBr(item.dataAdmissao)}</td><td>{moeda(item.salarioBase)}</td><td><span style={{...s.status,color:item.status==="Ativo"?"#35f58a":"#ffd166"}}>{item.status}</span></td><td><div style={s.linhaInput}><button style={s.botaoMini} onClick={()=>editar(item)}>Abrir</button><button style={s.botaoPerigo} onClick={()=>excluir(item)}>Remover</button></div></td></tr>)}</tbody></table></div>}
+      {!clienteId ? <div style={s.vazio}>Selecione uma empresa para consultar os funcionários.</div> : filtrados.length === 0 ? <div style={s.vazio}>Nenhum funcionário cadastrado nessa empresa.</div> : <div style={s.tabelaWrap}><table style={s.tabela}><thead><tr><th>Funcionário</th><th>Cargo</th><th>Admissão</th><th>Salário-base</th><th>Situação</th><th>Ações</th></tr></thead><tbody>{filtrados.map((item)=><tr key={item.id}><td><strong>{item.nome}</strong><small style={s.small}>CPF {mascaraCpf(item.cpf)} • {item.matricula || "Sem matrícula"}</small></td><td>{item.cargo}<small style={s.small}>{item.departamento || "Sem departamento"}</small></td><td>{dataBr(item.dataAdmissao)}</td><td>{moeda(item.salarioBase)}</td><td><span style={{...s.status,color:item.status==="Ativo"?"#35f58a":"#ffd166"}}>{item.status}</span></td><td><div style={s.linhaInput}><button style={s.botaoMini} onClick={()=>editar(item)}>Abrir</button>{item.status==="Ativo"&&<button style={s.botaoMini} onClick={()=>abrirRescisao(item)}>Rescisão</button>}<button style={s.botaoPerigo} onClick={()=>excluir(item)}>Remover</button></div></td></tr>)}</tbody></table></div>}
     </div>
   </div>
 }
