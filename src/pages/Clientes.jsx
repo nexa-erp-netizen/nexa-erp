@@ -1183,6 +1183,12 @@ export default function Clientes({ setPage }) {
     if (typeof setPage === "function") setPage("Funcionários")
   }
 
+  function abrirFolhaCliente() {
+    if (!clienteSelecionado?.id) return
+    localStorage.setItem("nexaFolhaClienteId", String(clienteSelecionado.id))
+    if (typeof setPage === "function") setPage("Folha de Pagamento")
+  }
+
   function abrirFiscalCliente() {
     if (!clienteSelecionado?.nome) return
     localStorage.setItem("nexaFiltroFiscalCliente", clienteSelecionado.nome)
@@ -1617,6 +1623,8 @@ export default function Clientes({ setPage }) {
                 Funcionários
               </button>
 
+              <button style={button} onClick={abrirFolhaCliente}>Folha</button>
+
               <WhatsAppMenu
                 cliente={clienteSelecionado}
                 contexto={{
@@ -1932,14 +1940,15 @@ export default function Clientes({ setPage }) {
             <div style={secaoTopo}>
               <div>
                 <span style={infoLabel}>Pessoas e Folha</span>
-                <p style={secaoDescricao}>Cadastre os funcionários vinculados a esta empresa e prepare os dados admissionais para a futura folha de pagamento.</p>
+                <p style={secaoDescricao}>Cadastre os funcionários vinculados a esta empresa, calcule a folha mensal e emita os holerites.</p>
               </div>
               <button style={button} onClick={abrirFuncionariosCliente}>Abrir Funcionários</button>
+              <button style={button} onClick={abrirFolhaCliente}>Abrir Folha</button>
             </div>
             <div style={miniResumoGrid}>
               <Info label="Empresa" value={clienteSelecionado.nome} />
               <Info label="Área" value="Funcionários" />
-              <Info label="Próxima etapa" value="Folha e holerite" />
+              <Info label="Disponível" value="Folha e holerite" />
               <Info label="Pró-labore" value="Sócios (próxima etapa)" />
             </div>
           </div>

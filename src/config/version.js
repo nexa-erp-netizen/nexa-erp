@@ -1,14 +1,15 @@
 const NEXA_VERSION = {
-  version: "3.18.0",
-  build: "3180",
-  release: "Cadastro de funcionários por empresa",
-  date: "12/08/2026",
+  version: "3.19.0",
+  build: "3190",
+  release: "Folha de pagamento e holerite",
+  date: "13/08/2026",
   status: "Produção",
   frontend: "Vercel",
   backend: "Render",
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.19.0", release: "Folha de pagamento e holerite", date: "13/08/2026", items: ["Cálculo mensal por funcionário", "INSS e IRRF 2026", "FGTS e salário-família", "Proventos, descontos e fechamento", "Holerite em PDF"] },
     {
       version: "3.18.0",
       release: "Cadastro de funcionários por empresa",
