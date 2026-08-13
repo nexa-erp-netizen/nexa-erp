@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.23.0",
-  build: "3230",
-  release: "Rescisões e folha consolidada",
+  version: "3.23.1",
+  build: "3231",
+  release: "Retorno direto para a empresa",
   date: "13/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.23.1", release: "Retorno direto para a empresa", date: "13/08/2026", items: ["Botão Voltar para a empresa na rescisão", "Botão Voltar para a empresa na folha", "Retorno preservando a empresa selecionada"] },
     { version: "3.23.0", release: "Rescisões e folha consolidada", date: "13/08/2026", items: ["Rescisão vinculada ao funcionário e histórico", "PDF vertical em duas vias", "Status calculada, paga e finalizada", "Inativação segura do funcionário ao finalizar", "Processamento, fechamento e resumo PDF da folha por empresa"] },
     { version: "3.22.0", release: "Controle e cálculo de férias", date: "13/08/2026", items: ["Períodos aquisitivo e concessivo", "Cálculo de férias, terço e abono", "Adiantamento da primeira parcela do 13º", "Alertas de férias próximas e vencidas", "Aviso e recibo em PDF"] },
     { version: "3.21.1", release: "DRE profissional em PDF", date: "13/08/2026", items: ["PDF A4 limpo para envio ao cliente", "Empresa e competência selecionadas", "Receitas e despesas por plano de contas", "Resultado e margem gerencial", "Data de emissão e total de lançamentos"] },
