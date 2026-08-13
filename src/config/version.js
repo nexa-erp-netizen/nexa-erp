@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.21.0",
-  build: "3210",
-  release: "Calculadora de rescisão trabalhista",
+  version: "3.21.1",
+  build: "3211",
+  release: "DRE profissional em PDF",
   date: "13/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.21.1", release: "DRE profissional em PDF", date: "13/08/2026", items: ["PDF A4 limpo para envio ao cliente", "Empresa e competência selecionadas", "Receitas e despesas por plano de contas", "Resultado e margem gerencial", "Data de emissão e total de lançamentos"] },
     { version: "3.21.0", release: "Calculadora de rescisão trabalhista", date: "13/08/2026", items: ["Cálculo avulso ou por funcionário cadastrado", "Modalidades de desligamento e aviso prévio", "Férias, 13º, INSS, IRRF e FGTS", "Multa rescisória e prazo de pagamento", "Demonstrativo detalhado para PDF"] },
     { version: "3.20.0", release: "Pró-labore e recibo em duas vias", date: "13/08/2026", items: ["Cadastro de sócios por empresa", "Cálculo mensal de INSS e IRRF", "Controle de outros vínculos previdenciários", "Fechamento mensal", "Recibo A4 vertical em duas vias"] },
     { version: "3.19.3", release: "Holerite vertical em duas vias", date: "13/08/2026", items: ["PDF A4 na orientação vertical", "Duas vias no padrão clássico", "Assinatura e data em orientação vertical", "Tabela redimensionada e alinhada"] },
