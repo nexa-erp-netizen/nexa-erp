@@ -1187,6 +1187,12 @@ export default function Clientes({ setPage }) {
     if (typeof setPage === "function") setPage("Movimentos Clientes")
   }
 
+  function abrirConciliacaoCliente() {
+    if (!clienteSelecionado?.id) return
+    localStorage.setItem("nexaConciliacaoClienteId", String(clienteSelecionado.id))
+    if (typeof setPage === "function") setPage("Conciliação Bancária")
+  }
+
   function abrirFuncionariosCliente() {
     if (!clienteSelecionado?.id) return
     localStorage.setItem("nexaFuncionariosClienteId", String(clienteSelecionado.id))
@@ -1653,6 +1659,7 @@ export default function Clientes({ setPage }) {
               <button style={button} onClick={abrirFolhaCliente}>Folha</button>
               <button style={button} onClick={abrirProLaboreCliente}>Pró-labore</button>
               <button style={button} onClick={abrirFeriasCliente}>Férias</button>
+              <button style={button} onClick={abrirConciliacaoCliente}>Conciliação</button>
 
               <WhatsAppMenu
                 cliente={clienteSelecionado}
@@ -2013,6 +2020,22 @@ export default function Clientes({ setPage }) {
             ) : (
               <p style={observacaoTexto}>Nenhum lançamento financeiro encontrado para este cliente.</p>
             )}
+          </div>
+
+          <div id="central-conciliacao" style={observacaoBox}>
+            <div style={secaoTopo}>
+              <div>
+                <span style={infoLabel}>Conciliação Bancária</span>
+                <p style={secaoDescricao}>Cadastre as contas da empresa para importar extratos, classificar entradas e saídas e gerar os lançamentos contábeis.</p>
+              </div>
+              <button style={button} onClick={abrirConciliacaoCliente}>Abrir Conciliação</button>
+            </div>
+            <div style={miniResumoGrid}>
+              <Info label="Empresa" value={clienteSelecionado.nome} />
+              <Info label="Etapa atual" value="Cadastro de contas" />
+              <Info label="Importação" value="OFX e CSV na próxima etapa" />
+              <Info label="Destino" value="Lançamentos e DRE" />
+            </div>
           </div>
 
           <div id="central-saude-tributaria" style={observacaoBox}>

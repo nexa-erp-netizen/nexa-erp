@@ -65,6 +65,7 @@ export default function Sidebar({ page, setPage, usuario }) {
       itens: [
         "Plano de Contas",
         "Lançamentos Contábeis",
+        "Conciliação Bancária",
         "Movimentos Clientes",
         "DRE Gerencial",
       ],

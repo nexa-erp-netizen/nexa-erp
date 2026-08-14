@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.23.6",
-  build: "3236",
-  release: "Navegação do cliente e prioridades trabalhistas",
+  version: "3.24.0",
+  build: "3240",
+  release: "Cadastro de contas para conciliação bancária",
   date: "14/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.24.0", release: "Cadastro de contas para conciliação bancária", date: "14/08/2026", items: ["Conciliação dentro do Contábil", "Várias contas por empresa", "Conta principal, saldo inicial e data-base", "Acesso direto pela ficha do cliente", "Casinha retorna para a empresa selecionada"] },
     { version: "3.23.6", release: "Navegação do cliente e prioridades trabalhistas", date: "14/08/2026", items: ["Casinha em Corrigir Cliente retorna para a ficha da empresa", "Folha vencida em Prioridades do Dia", "Rescisões vencidas ou pagas aguardando finalização", "Itens dentro do prazo continuam fora das pendências"] },
     { version: "3.23.5", release: "Ícone da empresa em todos os módulos", date: "13/08/2026", items: ["Casinha em Funcionários", "Casinha em Folha", "Casinha em Pró-labore", "Casinha em Férias", "Casinha em Rescisão", "Retorno direto à empresa selecionada"] },
     { version: "3.23.4", release: "Retorno completo para a empresa", date: "13/08/2026", items: ["Retorno em Funcionários", "Retorno em Pró-labore", "Retorno em Férias", "Retorno em Folha e Rescisão", "Empresa selecionada preservada"] },

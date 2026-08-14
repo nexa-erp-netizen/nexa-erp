@@ -1,0 +1,104 @@
+import { useEffect, useMemo, useState } from "react"
+import api from "../services/api"
+
+const vazio = { bancoCodigo: "", bancoNome: "", agencia: "", conta: "", digito: "", tipoConta: "Conta corrente", moeda: "BRL", saldoInicial: "", dataSaldoInicial: "", principal: false, ativo: true, observacoes: "" }
+
+export default function ConciliacaoBancaria({ setPage }) {
+  const [clientes, setClientes] = useState([])
+  const [clienteId, setClienteId] = useState(localStorage.getItem("nexaConciliacaoClienteId") || "")
+  const [contas, setContas] = useState([])
+  const [form, setForm] = useState(vazio)
+  const [editandoId, setEditandoId] = useState(null)
+  const [salvando, setSalvando] = useState(false)
+
+  useEffect(() => { api.get("/clientes").then(r => setClientes(r.data || [])).catch(() => setClientes([])) }, [])
+  useEffect(() => {
+    if (!clienteId) { setContas([]); return }
+    localStorage.setItem("nexaConciliacaoClienteId", String(clienteId))
+    carregar()
+  }, [clienteId])
+
+  async function carregar() {
+    try { const r = await api.get("/contas-bancarias-clientes", { params: { clienteId } }); setContas(r.data || []) }
+    catch (e) { alert(e.response?.data?.message || "Erro ao carregar contas bancárias") }
+  }
+
+  const cliente = useMemo(() => clientes.find(c => String(c.id) === String(clienteId)), [clientes, clienteId])
+  const alterar = (campo, valor) => setForm(atual => ({ ...atual, [campo]: valor }))
+  function limpar() { setForm(vazio); setEditandoId(null) }
+
+  function editar(item) {
+    setEditandoId(item.id)
+    setForm({ ...vazio, ...item, saldoInicial: item.saldoInicial ?? "", dataSaldoInicial: item.dataSaldoInicial || "" })
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  async function salvar(e) {
+    e.preventDefault()
+    if (!clienteId) return alert("Selecione a empresa")
+    setSalvando(true)
+    try {
+      const corpo = { ...form, clienteId, saldoInicial: Number(form.saldoInicial || 0) }
+      if (editandoId) await api.put(`/contas-bancarias-clientes/${editandoId}`, corpo)
+      else await api.post("/contas-bancarias-clientes", corpo)
+      limpar(); await carregar()
+    } catch (e) { alert(e.response?.data?.message || "Erro ao salvar conta bancária") }
+    finally { setSalvando(false) }
+  }
+
+  async function alternar(item) {
+    try { await api.patch(`/contas-bancarias-clientes/${item.id}/status`, { ativo: !item.ativo }); await carregar() }
+    catch (e) { alert(e.response?.data?.message || "Erro ao alterar situação") }
+  }
+
+  function voltarEmpresa() {
+    if (!clienteId) return
+    localStorage.setItem("nexaAbrirClienteId", String(clienteId))
+    setPage?.("Clientes")
+  }
+
+  return <div style={s.page}>
+    <div style={s.hero}>
+      <div><span style={s.badge}>Contábil</span><h2 style={s.h2}>Conciliação Bancária</h2><p style={s.p}>Contas bancárias vinculadas à empresa para conciliação, lançamentos e relatórios.</p></div>
+      {clienteId && <button style={s.home} title="Voltar para a empresa" aria-label="Voltar para a empresa" onClick={voltarEmpresa}>🏠</button>}
+    </div>
+
+    <div style={s.card}>
+      <label style={s.label}>Empresa
+        <select style={s.input} value={clienteId} onChange={e => { setClienteId(e.target.value); limpar() }}>
+          <option value="">Selecione a empresa</option>{clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+        </select>
+      </label>
+    </div>
+
+    {clienteId && <>
+      <form style={s.card} onSubmit={salvar}>
+        <div style={s.titleRow}><div><h3 style={s.h3}>{editandoId ? "Corrigir conta bancária" : "Cadastrar conta bancária"}</h3><p style={s.p}>Empresa: <strong>{cliente?.nome || "-"}</strong></p></div>{editandoId && <button type="button" style={s.secondary} onClick={limpar}>Cancelar edição</button>}</div>
+        <div style={s.grid}>
+          <Campo t="Código do banco"><input style={s.input} value={form.bancoCodigo} onChange={e => alterar("bancoCodigo", e.target.value)} placeholder="Ex.: 001" /></Campo>
+          <Campo t="Banco *"><input style={s.input} value={form.bancoNome} onChange={e => alterar("bancoNome", e.target.value)} placeholder="Ex.: Banco do Brasil" required /></Campo>
+          <Campo t="Agência *"><input style={s.input} value={form.agencia} onChange={e => alterar("agencia", e.target.value)} required /></Campo>
+          <Campo t="Conta *"><input style={s.input} value={form.conta} onChange={e => alterar("conta", e.target.value)} required /></Campo>
+          <Campo t="Dígito"><input style={s.input} value={form.digito || ""} onChange={e => alterar("digito", e.target.value)} /></Campo>
+          <Campo t="Tipo de conta"><select style={s.input} value={form.tipoConta} onChange={e => alterar("tipoConta", e.target.value)}><option>Conta corrente</option><option>Conta poupança</option><option>Conta pagamento</option><option>Investimentos</option><option>Caixa interno</option></select></Campo>
+          <Campo t="Saldo inicial"><input type="number" step="0.01" style={s.input} value={form.saldoInicial} onChange={e => alterar("saldoInicial", e.target.value)} /></Campo>
+          <Campo t="Data-base do saldo"><input type="date" style={s.input} value={form.dataSaldoInicial} onChange={e => alterar("dataSaldoInicial", e.target.value)} /></Campo>
+        </div>
+        <label style={s.check}><input type="checkbox" checked={form.principal} onChange={e => alterar("principal", e.target.checked)} /> Definir como conta principal da empresa</label>
+        <Campo t="Observações"><textarea style={{ ...s.input, minHeight: 80 }} value={form.observacoes || ""} onChange={e => alterar("observacoes", e.target.value)} /></Campo>
+        <button style={s.primary} disabled={salvando}>{salvando ? "Salvando..." : editandoId ? "Salvar correção" : "Cadastrar conta"}</button>
+      </form>
+
+      <div style={s.card}>
+        <div style={s.titleRow}><div><h3 style={s.h3}>Contas da empresa</h3><p style={s.p}>{contas.length} conta(s) cadastrada(s).</p></div><span style={s.next}>Próxima etapa: importar OFX e CSV</span></div>
+        {contas.length === 0 ? <div style={s.empty}>Nenhuma conta bancária cadastrada.</div> : <div style={{ overflowX: "auto" }}><table style={s.table}><thead><tr><th>Banco</th><th>Agência</th><th>Conta</th><th>Tipo</th><th>Saldo inicial</th><th>Situação</th><th>Ações</th></tr></thead><tbody>{contas.map(item => <tr key={item.id}><td><strong>{item.bancoCodigo ? `${item.bancoCodigo} • ` : ""}{item.bancoNome}</strong>{item.principal && <span style={s.principal}>Principal</span>}</td><td>{item.agencia}</td><td>{item.conta}{item.digito ? `-${item.digito}` : ""}</td><td>{item.tipoConta}</td><td>{moeda(item.saldoInicial)}</td><td>{item.ativo ? "Ativa" : "Inativa"}</td><td><div style={s.actions}><button style={s.small} onClick={() => editar(item)}>Corrigir</button><button style={item.ativo ? s.danger : s.secondary} onClick={() => alternar(item)}>{item.ativo ? "Inativar" : "Ativar"}</button></div></td></tr>)}</tbody></table></div>}
+      </div>
+    </>}
+  </div>
+}
+
+function Campo({ t, children }) { return <label style={s.label}>{t}{children}</label> }
+function moeda(v) { return Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) }
+const s = {
+  page:{padding:24,color:"#fff",background:"#082e61",minHeight:"100vh"},hero:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,background:"linear-gradient(135deg,#0b4a84,#087c7c)",padding:24,borderRadius:20,marginBottom:18,border:"1px solid #18c9b2"},badge:{color:"#58ffd0",fontWeight:800},h2:{margin:"6px 0",fontSize:30},h3:{margin:"0 0 6px"},p:{margin:0,color:"#bcd8f5"},home:{width:46,height:46,borderRadius:12,border:"1px solid #49f2c2",background:"#092750",fontSize:23,cursor:"pointer"},card:{background:"#0b2852",border:"1px solid #22558d",borderRadius:18,padding:20,marginBottom:18},grid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14},label:{display:"flex",flexDirection:"column",gap:7,color:"#bcd8f5",fontSize:13,fontWeight:700,marginBottom:12},input:{boxSizing:"border-box",width:"100%",padding:"12px 13px",borderRadius:10,border:"1px solid #2b6098",background:"#071f43",color:"#fff",fontSize:14},check:{display:"flex",gap:9,alignItems:"center",margin:"4px 0 16px",color:"#dff"},primary:{border:0,borderRadius:10,padding:"12px 18px",background:"linear-gradient(90deg,#08b8ef,#27ed8b)",fontWeight:800,cursor:"pointer"},secondary:{border:"1px solid #2f74ae",borderRadius:9,padding:"9px 13px",background:"#123b6b",color:"#fff",cursor:"pointer"},danger:{border:"1px solid #ff6a78",borderRadius:9,padding:"9px 13px",background:"#6b2433",color:"#fff",cursor:"pointer"},small:{border:0,borderRadius:9,padding:"9px 13px",background:"#09bcea",fontWeight:800,cursor:"pointer"},titleRow:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"},next:{background:"#164f69",color:"#65ffd0",padding:"8px 12px",borderRadius:999,fontSize:12,fontWeight:800},table:{width:"100%",borderCollapse:"collapse"},actions:{display:"flex",gap:8},principal:{display:"inline-block",marginLeft:8,padding:"3px 7px",background:"#167a64",borderRadius:999,fontSize:10},empty:{padding:20,textAlign:"center",color:"#9ab8d7",background:"#071f43",borderRadius:12}
+}

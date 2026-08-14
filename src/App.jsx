@@ -52,6 +52,7 @@ import FolhaPagamento from "./pages/FolhaPagamento"
 import ProLabore from "./pages/ProLabore"
 import CalculadoraRescisao from "./pages/CalculadoraRescisao"
 import Ferias from "./pages/Ferias"
+import ConciliacaoBancaria from "./pages/ConciliacaoBancaria"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -71,6 +72,7 @@ export default function App() {
       "Serviços",
       "Plano de Contas",
       "Lançamentos Contábeis",
+      "Conciliação Bancária",
       "Fiscal",
       "NF-e",
       "NFS-e",
@@ -113,6 +115,7 @@ export default function App() {
       "Pró-labore",
       "Férias",
       "Lançamentos Contábeis",
+      "Conciliação Bancária",
       "Fiscal",
       "NF-e",
       "NFS-e",
@@ -256,6 +259,9 @@ export default function App() {
 
       case "Lançamentos Contábeis":
         return <LancamentosContabeis />
+
+      case "Conciliação Bancária":
+        return <ConciliacaoBancaria setPage={setPage} />
 
       case "Acesso Rápido Fiscal":
         return <AcessoRapidoFiscal />
