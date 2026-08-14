@@ -46,6 +46,8 @@ export default function Dashboard({ setPage }) {
   const [pendenciasConsolidadas, setPendenciasConsolidadas] = useState([])
   const [certificados, setCertificados] = useState([])
   const [procuracoes, setProcuracoes] = useState([])
+  const [folhasPagamento, setFolhasPagamento] = useState([])
+  const [rescisoes, setRescisoes] = useState([])
   const [notificacoes, setNotificacoes] = useState(0)
   const [sugestoesEnviadas, setSugestoesEnviadas] = useState(new Set())
   const [sugestaoAbertaId, setSugestaoAbertaId] = useState("")
@@ -128,7 +130,7 @@ export default function Dashboard({ setPage }) {
       const usuarioSalvo = JSON.parse(localStorage.getItem("usuario"))
       const token = localStorage.getItem("token") || usuarioSalvo?.token
 
-      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, servicosResp, certificadosResp, procuracoesResp, painelResp, enviosWhatsAppResp] =
+      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, servicosResp, certificadosResp, procuracoesResp, painelResp, enviosWhatsAppResp, folhasResp, rescisoesResp] =
         await Promise.allSettled([
           api.get("/clientes"),
           api.get("/fiscal"),
@@ -140,6 +142,8 @@ export default function Dashboard({ setPage }) {
           api.get("/procuracoes-ecac"),
           api.get("/conversa/painel-diario"),
           api.get("/whatsapp-assist/envios"),
+          api.get("/folhas-pagamento"),
+          api.get("/rescisoes"),
         ])
 
       const resultadoArray = (resultado) =>
@@ -155,6 +159,8 @@ export default function Dashboard({ setPage }) {
       setServicosCobrancas(resultadoArray(servicosResp))
       setCertificados(resultadoArray(certificadosResp))
       setProcuracoes(resultadoArray(procuracoesResp))
+      setFolhasPagamento(resultadoArray(folhasResp))
+      setRescisoes(resultadoArray(rescisoesResp))
       setPendenciasConsolidadas(
         painelResp.status === "fulfilled" && Array.isArray(painelResp.value.data?.itens)
           ? painelResp.value.data.itens
@@ -202,6 +208,18 @@ export default function Dashboard({ setPage }) {
     localStorage.setItem("nexaFiltroPendenciaCliente", item.cliente || "")
     localStorage.setItem("nexaFiltroPendenciaId", String(item.referenciaId || ""))
     setPage("Pendências Clientes")
+    return
+  }
+
+  if (destino === "Folha de Pagamento" && item.clienteId) {
+    localStorage.setItem("nexaFolhaClienteId", String(item.clienteId))
+    setPage(destino)
+    return
+  }
+
+  if (destino === "Calculadora de Rescisão" && item.clienteId) {
+    localStorage.setItem("nexaRescisaoClienteId", String(item.clienteId))
+    setPage(destino)
     return
   }
 
@@ -733,8 +751,10 @@ export default function Dashboard({ setPage }) {
       financeiro: [...financeiroSemEspelhosRepetidos, ...cobrancasDiretas],
       certificados,
       procuracoes,
+      folhasPagamento,
+      rescisoes,
     })
-  }, [clientes, fiscal, pendencias, documentos, financeiro, servicosCobrancas, certificados, procuracoes])
+  }, [clientes, fiscal, pendencias, documentos, financeiro, servicosCobrancas, certificados, procuracoes, folhasPagamento, rescisoes])
 
   const pendenciasPainelLegado = useMemo(() => {
     return filaAssistenteDia.flatMap((cliente) =>
@@ -815,7 +835,8 @@ export default function Dashboard({ setPage }) {
 
     pendenciasPainel.forEach((acao) => {
       const dias = diferencaDias(acao.data)
-      if (dias === null || dias >= 0) return
+      const finalizacaoRescisao = acao.tipo === "rescisao-finalizar"
+      if (!finalizacaoRescisao && (dias === null || dias >= 0)) return
 
       const id = String(acao.id || `pendencia-atrasada-${acao.referenciaId || acao.cliente}`)
       const temReferencia = acao.referenciaId !== null && acao.referenciaId !== undefined && acao.referenciaId !== ""
@@ -827,10 +848,13 @@ export default function Dashboard({ setPage }) {
         nivel: "danger",
         peso: 0,
         titulo: acao.cliente || "Cliente",
-        descricao: `${acao.titulo || "Pendência"} ${textoPrazo(dias).toLowerCase()}.`,
-        etiqueta: "Atrasado",
+        descricao: finalizacaoRescisao
+          ? acao.descricao
+          : `${acao.titulo || "Pendência"} ${textoPrazo(dias).toLowerCase()}.`,
+        etiqueta: finalizacaoRescisao ? "Finalizar" : "Atrasado",
         destino: acao.destino || "Clientes",
         cliente: acao.cliente,
+        clienteId: acao.clienteId,
         referenciaId: acao.referenciaId,
         secao: acao.secao,
       })

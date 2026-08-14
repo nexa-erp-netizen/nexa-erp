@@ -191,6 +191,8 @@ export function montarAcoesDoDia({
   planejamento = [],
   certificados = [],
   procuracoes = [],
+  folhasPagamento = [],
+  rescisoes = [],
 } = {}) {
   const mapaClientes = montarMapaClientes(clientes)
   const mapaTodosClientes = new Map()
@@ -513,6 +515,75 @@ export function montarAcoesDoDia({
         data: vencimento,
       }))
     }
+  })
+
+  const folhasAtrasadas = new Map()
+  folhasPagamento.forEach((item) => {
+    if (normalizarTexto(item.status) !== "rascunho" || !item.competencia) return
+    const [ano, mes] = String(item.competencia).split("-").map(Number)
+    if (!ano || !mes) return
+
+    const prazo = new Date(ano, mes, 5)
+    while (prazo.getDay() === 0 || prazo.getDay() === 6) prazo.setDate(prazo.getDate() + 1)
+    const dataPrazo = prazo.toISOString().slice(0, 10)
+    const dias = diferencaDias(dataPrazo)
+    if (dias === null || dias >= 0) return
+
+    const chave = `${item.clienteId || item.cliente}-${item.competencia}`
+    if (!folhasAtrasadas.has(chave)) folhasAtrasadas.set(chave, { item, dataPrazo, dias })
+  })
+
+  folhasAtrasadas.forEach(({ item, dataPrazo, dias }) => {
+    const clienteCadastro = clientes.find((cliente) => String(obterClienteId(cliente)) === String(item.clienteId))
+      || localizarCliente(mapaClientes, item.cliente)
+    if (!clienteOperacionalAtivo(clienteCadastro)) return
+    const cliente = item.cliente || obterNomeCliente(clienteCadastro)
+
+    acoes.push(criarAcao({
+      id: `folha-atrasada-${item.clienteId || cliente}-${item.competencia}`,
+      cliente,
+      clienteId: obterClienteId(clienteCadastro) || item.clienteId,
+      clienteDados: clienteCadastro,
+      modulo: "Folha de Pagamento",
+      titulo: `Fechar folha de ${item.competencia}`,
+      descricao: `Folha da competência ${item.competencia} permanece em rascunho e ${textoPrazo(dias).toLowerCase()}.`,
+      prioridade: 115 + Math.min(Math.abs(dias) * 2, 35),
+      destino: "Folha de Pagamento",
+      referenciaId: item.id,
+      data: dataPrazo,
+    }))
+  })
+
+  rescisoes.forEach((item) => {
+    const status = normalizarTexto(item.status)
+    if (status === "finalizada" || status === "simulação" || status === "simulacao") return
+    const clienteCadastro = clientes.find((cliente) => String(obterClienteId(cliente)) === String(item.clienteId))
+      || localizarCliente(mapaClientes, item.cliente)
+    if (!clienteOperacionalAtivo(clienteCadastro)) return
+    const cliente = item.cliente || obterNomeCliente(clienteCadastro)
+    const prazo = item.prazoPagamento
+    const dias = diferencaDias(prazo)
+    const pagaPendenteFinalizacao = status === "paga"
+    if (!pagaPendenteFinalizacao && (status !== "calculada" || dias === null || dias >= 0)) return
+
+    acoes.push(criarAcao({
+      id: `rescisao-${item.id}`,
+      cliente,
+      clienteId: obterClienteId(clienteCadastro) || item.clienteId,
+      clienteDados: clienteCadastro,
+      modulo: "Rescisões",
+      titulo: pagaPendenteFinalizacao
+        ? `Finalizar rescisão de ${item.funcionario || "funcionário"}`
+        : `Regularizar rescisão de ${item.funcionario || "funcionário"}`,
+      descricao: pagaPendenteFinalizacao
+        ? "Pagamento registrado; falta finalizar a rescisão e atualizar o cadastro do funcionário."
+        : `Prazo de pagamento da rescisão ${textoPrazo(dias).toLowerCase()}.`,
+      prioridade: pagaPendenteFinalizacao ? 105 : 130 + Math.min(Math.abs(dias) * 3, 45),
+      destino: "Calculadora de Rescisão",
+      referenciaId: item.id,
+      tipo: pagaPendenteFinalizacao ? "rescisao-finalizar" : "rescisao-atrasada",
+      data: prazo || item.dataDesligamento,
+    }))
   })
 
   const vistos = new Set()

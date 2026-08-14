@@ -26,6 +26,8 @@ export default function AssistenteDoDia({ setPage }) {
   const [planejamento, setPlanejamento] = useState([])
   const [certificados, setCertificados] = useState([])
   const [procuracoes, setProcuracoes] = useState([])
+  const [folhasPagamento, setFolhasPagamento] = useState([])
+  const [rescisoes, setRescisoes] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [atendimentoAtivo, setAtendimentoAtivo] = useState(false)
   const [clienteAtualIndex, setClienteAtualIndex] = useState(0)
@@ -42,7 +44,7 @@ export default function AssistenteDoDia({ setPage }) {
     setCarregando(true)
 
     try {
-      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, certificadosResp, procuracoesResp] =
+      const [clientesResp, fiscalResp, pendenciasResp, documentosResp, financeiroResp, certificadosResp, procuracoesResp, folhasResp, rescisoesResp] =
         await Promise.allSettled([
           api.get("/clientes"),
           api.get("/fiscal"),
@@ -51,6 +53,8 @@ export default function AssistenteDoDia({ setPage }) {
           api.get("/financeiro"),
           api.get("/certificados-digitais"),
           api.get("/procuracoes-ecac"),
+          api.get("/folhas-pagamento"),
+          api.get("/rescisoes"),
         ])
 
       setClientes(resultadoArray(clientesResp))
@@ -60,6 +64,8 @@ export default function AssistenteDoDia({ setPage }) {
       setFinanceiro(resultadoArray(financeiroResp))
       setCertificados(resultadoArray(certificadosResp))
       setProcuracoes(resultadoArray(procuracoesResp))
+      setFolhasPagamento(resultadoArray(folhasResp))
+      setRescisoes(resultadoArray(rescisoesResp))
       setPlanejamento([])
     } catch (error) {
       console.error("Erro ao carregar Assistente do Dia", error)
@@ -94,8 +100,10 @@ export default function AssistenteDoDia({ setPage }) {
       planejamento,
       certificados,
       procuracoes,
+      folhasPagamento,
+      rescisoes,
     })
-  }, [clientes, fiscal, pendencias, documentos, financeiro, planejamento, certificados, procuracoes])
+  }, [clientes, fiscal, pendencias, documentos, financeiro, planejamento, certificados, procuracoes, folhasPagamento, rescisoes])
 
   const resumoBase = useMemo(() => montarResumoAssistenteDia(fila), [fila])
 
@@ -255,6 +263,14 @@ export default function AssistenteDoDia({ setPage }) {
       if (acao.secao) localStorage.setItem("nexaAbrirSecaoCliente", String(acao.secao))
     }
 
+    if (acao.destino === "Folha de Pagamento" && acao.clienteId) {
+      localStorage.setItem("nexaFolhaClienteId", String(acao.clienteId))
+    }
+
+    if (acao.destino === "Calculadora de Rescisão" && acao.clienteId) {
+      localStorage.setItem("nexaRescisaoClienteId", String(acao.clienteId))
+    }
+
     setPage(acao.destino || "Dashboard")
   }
 
@@ -342,6 +358,8 @@ export default function AssistenteDoDia({ setPage }) {
     if (acao.destino === "Documentos Digitais") return "Abrir Documentos"
     if (acao.destino === "Pendências Clientes") return "Abrir Pendências"
     if (acao.destino === "Clientes" && acao.secao === "servicos") return "Abrir cobrança"
+    if (acao.destino === "Folha de Pagamento") return "Abrir Folha"
+    if (acao.destino === "Calculadora de Rescisão") return "Abrir Rescisão"
     return "Abrir"
   }
 

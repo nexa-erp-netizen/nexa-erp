@@ -543,6 +543,16 @@ export default function Clientes({ setPage }) {
     setTela("lista")
   }
 
+  function voltarFormulario() {
+    if (editandoId !== null && clienteSelecionado) {
+      setTela("detalhes")
+      window.scrollTo({ top: 0, behavior: "smooth" })
+      return
+    }
+
+    voltarLista()
+  }
+
   async function salvarAnotacaoCliente() {
     if (!clienteSelecionado || !novaAnotacao.trim()) {
       alert("Digite uma anotação antes de salvar")
@@ -1295,8 +1305,13 @@ export default function Clientes({ setPage }) {
               {editandoId !== null ? "Corrigir Cliente" : "Novo Cliente"}
             </h2>
 
-            <button style={backButton} onClick={voltarLista}>
-              Voltar
+            <button
+              style={{ ...backButton, width: 46, height: 46, padding: 0, fontSize: 23, cursor: "pointer" }}
+              title={editandoId !== null ? "Voltar para o cliente" : "Voltar para clientes"}
+              aria-label={editandoId !== null ? "Voltar para o cliente" : "Voltar para clientes"}
+              onClick={voltarFormulario}
+            >
+              🏠
             </button>
           </div>
 
