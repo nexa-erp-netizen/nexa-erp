@@ -16,8 +16,17 @@ export default function ConciliacaoBancaria({ setPage }) {
   const [importacoes, setImportacoes] = useState([])
   const [importando, setImportando] = useState(false)
   const [resumoImportacao, setResumoImportacao] = useState(null)
+  const [planoContas, setPlanoContas] = useState([])
+  const [classificacoes, setClassificacoes] = useState({})
+  const [selecionados, setSelecionados] = useState([])
+  const [planoLoteId, setPlanoLoteId] = useState("")
+  const [filtroStatus, setFiltroStatus] = useState("Todos")
+  const [processando, setProcessando] = useState(false)
 
-  useEffect(() => { api.get("/clientes").then(r => setClientes(r.data || [])).catch(() => setClientes([])) }, [])
+  useEffect(() => {
+    api.get("/clientes").then(r => setClientes(r.data || [])).catch(() => setClientes([]))
+    api.get("/plano-contas").then(r => setPlanoContas(r.data || [])).catch(() => setPlanoContas([]))
+  }, [])
   useEffect(() => {
     if (!clienteId) { setContas([]); return }
     localStorage.setItem("nexaConciliacaoClienteId", String(clienteId))
@@ -70,7 +79,10 @@ export default function ConciliacaoBancaria({ setPage }) {
         api.get("/extratos-bancarios/movimentos", { params: { contaBancariaId: contaExtratoId, _t: semCache } }),
         api.get("/extratos-bancarios/importacoes", { params: { contaBancariaId: contaExtratoId, _t: semCache } }),
       ])
-      setMovimentos(m.data || []); setImportacoes(i.data || [])
+      const lista = m.data || []
+      setMovimentos(lista); setImportacoes(i.data || [])
+      setClassificacoes(Object.fromEntries(lista.map(item => [item.id, item.planoContaId || ""])))
+      setSelecionados(atual => atual.filter(id => lista.some(item => item.id === id)))
     } catch (e) { alert(e.response?.data?.message || "Erro ao carregar extratos") }
   }
 
@@ -96,8 +108,59 @@ export default function ConciliacaoBancaria({ setPage }) {
     const valor = Number(m.valor || 0)
     if (m.natureza === "Entrada") r.entradas += valor; else r.saidas += valor
     if (m.statusConciliacao === "Pendente") r.pendentes += 1
+    if (m.statusConciliacao === "Classificado") r.classificados += 1
+    if (m.statusConciliacao === "Conciliado") r.conciliados += 1
     return r
-  }, { entradas: 0, saidas: 0, pendentes: 0 }), [movimentos])
+  }, { entradas: 0, saidas: 0, pendentes: 0, classificados: 0, conciliados: 0 }), [movimentos])
+
+  const movimentosVisiveis = useMemo(() => filtroStatus === "Todos" ? movimentos : movimentos.filter(m => m.statusConciliacao === filtroStatus), [movimentos, filtroStatus])
+  const planosPara = natureza => planoContas.filter(p => naturezaCompativel(p, natureza))
+  function naturezaCompativel(plano, natureza) {
+    const texto = `${plano?.natureza || ""} ${plano?.tipo || ""} ${plano?.conta || ""}`.toLowerCase()
+    return natureza === "Entrada"
+      ? texto.includes("credor") || texto.includes("receita") || texto.includes("fatur")
+      : texto.includes("devedor") || texto.includes("despesa") || texto.includes("custo") || texto.includes("taxa") || texto.includes("imposto")
+  }
+
+  function alternarSelecao(id) { setSelecionados(atual => atual.includes(id) ? atual.filter(x => x !== id) : [...atual, id]) }
+  function selecionarVisiveis() { setSelecionados(movimentosVisiveis.filter(m => !m.lancamentoContabilId).map(m => m.id)) }
+
+  async function classificarUm(movimento, status) {
+    const planoContaId = classificacoes[movimento.id]
+    if (["Classificado", "Conciliado"].includes(status) && !planoContaId) return alert("Selecione a conta contábil deste movimento")
+    setProcessando(true)
+    try { await api.patch(`/extratos-bancarios/movimentos/${movimento.id}`, { planoContaId, statusConciliacao: status }); await carregarExtratos() }
+    catch (e) { alert(e.response?.data?.message || "Erro ao classificar movimento") }
+    finally { setProcessando(false) }
+  }
+
+  async function classificarLote(status) {
+    if (!selecionados.length) return alert("Selecione os movimentos")
+    if (["Classificado", "Conciliado"].includes(status) && !planoLoteId) return alert("Selecione uma conta contábil para o lote")
+    setProcessando(true)
+    try {
+      const r = await api.post("/extratos-bancarios/movimentos/classificar-lote", { ids: selecionados, planoContaId: planoLoteId || null, statusConciliacao: status })
+      setSelecionados([]); await carregarExtratos(); alert(`${r.data.atualizados} movimento(s) atualizado(s).`)
+    } catch (e) { alert(e.response?.data?.message || "Erro na classificação em lote") }
+    finally { setProcessando(false) }
+  }
+
+  async function sugerirClassificacoes() {
+    setProcessando(true)
+    try { const r = await api.post("/extratos-bancarios/movimentos/sugerir", { contaBancariaId: contaExtratoId }); await carregarExtratos(); alert(`${r.data.sugeridos} classificação(ões) sugerida(s) pelo histórico.`) }
+    catch (e) { alert(e.response?.data?.message || "Erro ao sugerir classificações") }
+    finally { setProcessando(false) }
+  }
+
+  async function gerarLancamentos() {
+    const ids = selecionados.filter(id => movimentos.some(m => m.id === id && m.statusConciliacao === "Conciliado"))
+    if (!ids.length) return alert("Selecione movimentos com status Conciliado")
+    if (!confirm(`Gerar ${ids.length} lançamento(s) contábil(eis)?`)) return
+    setProcessando(true)
+    try { const r = await api.post("/extratos-bancarios/gerar-lancamentos", { ids }); setSelecionados([]); await carregarExtratos(); alert(`${r.data.gerados} lançamento(s) gerado(s) com sucesso.`) }
+    catch (e) { alert(e.response?.data?.message || "Erro ao gerar lançamentos") }
+    finally { setProcessando(false) }
+  }
 
   function voltarEmpresa() {
     if (!clienteId) return
@@ -156,8 +219,19 @@ export default function ConciliacaoBancaria({ setPage }) {
 
       {contaExtratoId && <div style={s.card}>
         <div style={s.titleRow}><div><h3 style={s.h3}>Movimentos importados</h3><p style={s.p}>Leitura bancária aguardando classificação e conciliação.</p></div><span style={s.next}>{importacoes.length} importação(ões)</span></div>
-        <div style={s.summary}><Resumo t="Entradas" v={moeda(resumoMovimentos.entradas)} cor="#42f5a7"/><Resumo t="Saídas" v={moeda(resumoMovimentos.saidas)} cor="#ff7d88"/><Resumo t="Movimento líquido" v={moeda(resumoMovimentos.entradas-resumoMovimentos.saidas)} cor="#53c9ff"/><Resumo t="Pendentes" v={resumoMovimentos.pendentes} cor="#ffd45b"/></div>
-        {movimentos.length === 0 ? <div style={s.empty}>Nenhum extrato importado para esta conta.</div> : <div style={{ overflowX: "auto" }}><table style={s.table}><thead><tr><th>Data</th><th>Descrição</th><th>Documento</th><th>Natureza</th><th>Valor</th><th>Status</th></tr></thead><tbody>{movimentos.map(m => <tr key={m.id}><td>{dataBr(m.data)}</td><td><strong>{m.descricao}</strong></td><td>{m.documento || "-"}</td><td><span style={m.natureza === "Entrada" ? s.entrada : s.saida}>{m.natureza}</span></td><td style={{ color: m.natureza === "Entrada" ? "#42f5a7" : "#ff9ba4", fontWeight: 800 }}>{m.natureza === "Saída" ? "- " : "+ "}{moeda(m.valor)}</td><td>{m.statusConciliacao}</td></tr>)}</tbody></table></div>}
+        <div style={s.summary}><Resumo t="Entradas" v={moeda(resumoMovimentos.entradas)} cor="#42f5a7"/><Resumo t="Saídas" v={moeda(resumoMovimentos.saidas)} cor="#ff7d88"/><Resumo t="Movimento líquido" v={moeda(resumoMovimentos.entradas-resumoMovimentos.saidas)} cor="#53c9ff"/><Resumo t="Pendentes" v={resumoMovimentos.pendentes} cor="#ffd45b"/><Resumo t="Classificados" v={resumoMovimentos.classificados} cor="#9ac7ff"/><Resumo t="Conciliados" v={resumoMovimentos.conciliados} cor="#73ffd4"/></div>
+        {movimentos.length > 0 && <div style={s.batch}>
+          <select style={s.input} value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}><option>Todos</option><option>Pendente</option><option>Classificado</option><option>Conciliado</option><option>Ignorado</option><option>Lançado</option></select>
+          <button style={s.secondary} onClick={selecionarVisiveis}>Selecionar visíveis</button><button style={s.secondary} onClick={() => setSelecionados([])}>Limpar seleção</button>
+          <select style={s.input} value={planoLoteId} onChange={e => setPlanoLoteId(e.target.value)}><option value="">Conta contábil para o lote</option>{planoContas.map(p => <option key={p.id} value={p.id}>{p.codigo} • {p.conta}</option>)}</select>
+          <button style={s.small} disabled={processando} onClick={() => classificarLote("Classificado")}>Classificar lote</button>
+          <button style={s.primary} disabled={processando} onClick={() => classificarLote("Conciliado")}>Conciliar lote</button>
+          <button style={s.secondary} disabled={processando} onClick={() => classificarLote("Ignorado")}>Ignorar lote</button>
+          <button style={s.small} disabled={processando} onClick={sugerirClassificacoes}>Sugerir pelo histórico</button>
+          <button style={s.launch} disabled={processando} onClick={gerarLancamentos}>Gerar lançamentos</button>
+          <strong>{selecionados.length} selecionado(s)</strong>
+        </div>}
+        {movimentos.length === 0 ? <div style={s.empty}>Nenhum extrato importado para esta conta.</div> : <div style={{ overflowX: "auto" }}><table style={s.table}><thead><tr><th>✓</th><th>Data</th><th>Descrição</th><th>Natureza</th><th>Valor</th><th>Plano de Contas</th><th>Status</th><th>Ações</th></tr></thead><tbody>{movimentosVisiveis.map(m => <tr key={m.id}><td><input type="checkbox" checked={selecionados.includes(m.id)} disabled={Boolean(m.lancamentoContabilId)} onChange={() => alternarSelecao(m.id)} /></td><td>{dataBr(m.data)}</td><td><strong>{m.descricao}</strong><small style={s.block}>{m.documento || ""}</small></td><td><span style={m.natureza === "Entrada" ? s.entrada : s.saida}>{m.natureza}</span></td><td style={{ color: m.natureza === "Entrada" ? "#42f5a7" : "#ff9ba4", fontWeight: 800 }}>{m.natureza === "Saída" ? "- " : "+ "}{moeda(m.valor)}</td><td><select style={s.tableSelect} value={classificacoes[m.id] || ""} disabled={Boolean(m.lancamentoContabilId)} onChange={e => setClassificacoes(a => ({ ...a, [m.id]: e.target.value }))}><option value="">Selecione</option>{planosPara(m.natureza).map(p => <option key={p.id} value={p.id}>{p.codigo} • {p.conta}</option>)}</select>{m.categoriaSugerida && <small style={s.block}>Sugestão: {m.categoriaSugerida}</small>}</td><td>{m.statusConciliacao}</td><td><div style={s.actions}>{!m.lancamentoContabilId && <><button style={s.small} disabled={processando} onClick={() => classificarUm(m,"Classificado")}>Classificar</button><button style={s.primary} disabled={processando} onClick={() => classificarUm(m,"Conciliado")}>Conciliar</button><button style={s.secondary} disabled={processando} onClick={() => classificarUm(m,"Ignorado")}>Ignorar</button></>}{m.lancamentoContabilId && <span style={s.lancado}>Lançamento #{m.lancamentoContabilId}</span>}</div></td></tr>)}</tbody></table></div>}
         {importacoes.length > 0 && <div style={{ marginTop: 18 }}><h4>Histórico de importações</h4>{importacoes.slice(0, 5).map(i => <div key={i.id} style={s.importItem}><span><strong>{i.nomeArquivo}</strong> • {i.formato}</span><span>{i.totalImportados} novos • {i.totalDuplicados} duplicados • {dataBr(String(i.createdAt).slice(0,10))}</span></div>)}</div>}
       </div>}
     </>}
@@ -172,5 +246,5 @@ function formatarMoedaDigitada(v) { const d=String(v||"").replace(/\D/g,""); ret
 function numeroMoeda(v) { const t=String(v||"").replace(/R\$/g,"").replace(/\s/g,"").replace(/\./g,"").replace(",","."); return Number(t||0) }
 function dataBr(v) { if(!v)return "-"; return new Date(`${String(v).slice(0,10)}T12:00:00`).toLocaleDateString("pt-BR") }
 const s = {
-  page:{padding:24,color:"#fff",background:"#082e61",minHeight:"100vh"},hero:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,background:"linear-gradient(135deg,#0b4a84,#087c7c)",padding:24,borderRadius:20,marginBottom:18,border:"1px solid #18c9b2"},badge:{color:"#58ffd0",fontWeight:800},h2:{margin:"6px 0",fontSize:30},h3:{margin:"0 0 6px"},p:{margin:0,color:"#bcd8f5"},home:{width:46,height:46,borderRadius:12,border:"1px solid #49f2c2",background:"#092750",fontSize:23,cursor:"pointer"},card:{background:"#0b2852",border:"1px solid #22558d",borderRadius:18,padding:20,marginBottom:18},grid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14},label:{display:"flex",flexDirection:"column",gap:7,color:"#bcd8f5",fontSize:13,fontWeight:700,marginBottom:12},input:{boxSizing:"border-box",width:"100%",padding:"12px 13px",borderRadius:10,border:"1px solid #2b6098",background:"#071f43",color:"#fff",fontSize:14},check:{display:"flex",gap:9,alignItems:"center",margin:"4px 0 16px",color:"#dff"},primary:{border:0,borderRadius:10,padding:"12px 18px",background:"linear-gradient(90deg,#08b8ef,#27ed8b)",fontWeight:800,cursor:"pointer"},secondary:{border:"1px solid #2f74ae",borderRadius:9,padding:"9px 13px",background:"#123b6b",color:"#fff",cursor:"pointer"},danger:{border:"1px solid #ff6a78",borderRadius:9,padding:"9px 13px",background:"#6b2433",color:"#fff",cursor:"pointer"},small:{border:0,borderRadius:9,padding:"9px 13px",background:"#09bcea",fontWeight:800,cursor:"pointer"},titleRow:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"},next:{background:"#164f69",color:"#65ffd0",padding:"8px 12px",borderRadius:999,fontSize:12,fontWeight:800},table:{width:"100%",borderCollapse:"collapse"},actions:{display:"flex",gap:8},principal:{display:"inline-block",marginLeft:8,padding:"3px 7px",background:"#167a64",borderRadius:999,fontSize:10},empty:{padding:20,textAlign:"center",color:"#9ab8d7",background:"#071f43",borderRadius:12},success:{display:"flex",flexDirection:"column",gap:5,marginTop:15,padding:14,borderRadius:12,background:"#0c5c50",color:"#caffee"},summary:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:18},summaryItem:{display:"flex",flexDirection:"column",gap:6,padding:14,background:"#071f43",borderRadius:12},entrada:{padding:"4px 8px",borderRadius:999,background:"#145c4a",color:"#6cffc5"},saida:{padding:"4px 8px",borderRadius:999,background:"#652c3b",color:"#ffabb2"},importItem:{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"10px 12px",marginTop:7,background:"#071f43",borderRadius:10,color:"#bcd8f5"}
+  page:{padding:24,color:"#fff",background:"#082e61",minHeight:"100vh"},hero:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,background:"linear-gradient(135deg,#0b4a84,#087c7c)",padding:24,borderRadius:20,marginBottom:18,border:"1px solid #18c9b2"},badge:{color:"#58ffd0",fontWeight:800},h2:{margin:"6px 0",fontSize:30},h3:{margin:"0 0 6px"},p:{margin:0,color:"#bcd8f5"},home:{width:46,height:46,borderRadius:12,border:"1px solid #49f2c2",background:"#092750",fontSize:23,cursor:"pointer"},card:{background:"#0b2852",border:"1px solid #22558d",borderRadius:18,padding:20,marginBottom:18},grid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14},label:{display:"flex",flexDirection:"column",gap:7,color:"#bcd8f5",fontSize:13,fontWeight:700,marginBottom:12},input:{boxSizing:"border-box",width:"100%",padding:"12px 13px",borderRadius:10,border:"1px solid #2b6098",background:"#071f43",color:"#fff",fontSize:14},check:{display:"flex",gap:9,alignItems:"center",margin:"4px 0 16px",color:"#dff"},primary:{border:0,borderRadius:10,padding:"12px 18px",background:"linear-gradient(90deg,#08b8ef,#27ed8b)",fontWeight:800,cursor:"pointer"},secondary:{border:"1px solid #2f74ae",borderRadius:9,padding:"9px 13px",background:"#123b6b",color:"#fff",cursor:"pointer"},danger:{border:"1px solid #ff6a78",borderRadius:9,padding:"9px 13px",background:"#6b2433",color:"#fff",cursor:"pointer"},small:{border:0,borderRadius:9,padding:"9px 13px",background:"#09bcea",fontWeight:800,cursor:"pointer"},titleRow:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"},next:{background:"#164f69",color:"#65ffd0",padding:"8px 12px",borderRadius:999,fontSize:12,fontWeight:800},table:{width:"100%",borderCollapse:"collapse"},actions:{display:"flex",gap:8,flexWrap:"wrap"},principal:{display:"inline-block",marginLeft:8,padding:"3px 7px",background:"#167a64",borderRadius:999,fontSize:10},empty:{padding:20,textAlign:"center",color:"#9ab8d7",background:"#071f43",borderRadius:12},success:{display:"flex",flexDirection:"column",gap:5,marginTop:15,padding:14,borderRadius:12,background:"#0c5c50",color:"#caffee"},summary:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:18},summaryItem:{display:"flex",flexDirection:"column",gap:6,padding:14,background:"#071f43",borderRadius:12},entrada:{padding:"4px 8px",borderRadius:999,background:"#145c4a",color:"#6cffc5"},saida:{padding:"4px 8px",borderRadius:999,background:"#652c3b",color:"#ffabb2"},importItem:{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"10px 12px",marginTop:7,background:"#071f43",borderRadius:10,color:"#bcd8f5"},batch:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:14,marginBottom:14,background:"#071f43",borderRadius:12},tableSelect:{minWidth:210,padding:8,borderRadius:8,border:"1px solid #2b6098",background:"#071f43",color:"#fff"},launch:{border:0,borderRadius:9,padding:"10px 14px",background:"#8f69ff",color:"#fff",fontWeight:800,cursor:"pointer"},block:{display:"block",marginTop:5,color:"#91b4d8"},lancado:{padding:"6px 9px",borderRadius:8,background:"#3c3476",color:"#d9d2ff",whiteSpace:"nowrap"}
 }
