@@ -107,6 +107,7 @@ export default function Sidebar({ page, setPage, usuario }) {
     "Portal Cliente",
     "Pendências e Guias",
     "Movimentos",
+    "Atualização Cadastral",
     "Documentos Digitais",
   ]
 

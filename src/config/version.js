@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.26.0",
-  build: "3260",
-  release: "Classificação e conciliação bancária",
+  version: "3.27.0",
+  build: "3270",
+  release: "Atualização cadastral e gráfico de movimentos",
   date: "15/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.27.0", release: "Atualização cadastral e gráfico de movimentos", date: "15/08/2026", items: ["Atualização de contato e endereço pelo Portal Cliente", "Proteção de dados fiscais e internos", "Gráfico de receitas e despesas dos últimos seis meses", "Visualização responsiva no computador e celular"] },
     { version: "3.26.0", release: "Classificação e conciliação bancária", date: "15/08/2026", items: ["Classificação individual e em lote", "Sugestões com base no histórico", "Status pendente, classificado, conciliado, ignorado e lançado", "Geração de lançamentos contábeis", "Bloqueio contra lançamento duplicado"] },
     { version: "3.25.1", release: "Atualização imediata dos movimentos bancários", date: "14/08/2026", items: ["Movimentos aparecem imediatamente após importar", "Histórico de importações atualizado sem cache", "Extratos já salvos são recuperados ao abrir a conta"] },
     { version: "3.25.0", release: "Importação de extratos OFX e CSV", date: "14/08/2026", items: ["Upload e leitura de OFX e CSV", "Bloqueio de arquivos e movimentos duplicados", "Resumo de entradas, saídas e saldo líquido", "Movimentos vinculados à conta e à empresa", "Saldo inicial no padrão brasileiro"] },

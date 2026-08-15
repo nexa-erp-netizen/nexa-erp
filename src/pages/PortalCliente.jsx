@@ -6,6 +6,7 @@ import {
   FaWallet,
   FaClipboardList,
   FaExternalLinkAlt,
+  FaUserEdit,
 } from "react-icons/fa"
 
 const EMISSOR_NACIONAL_NFSE_URL = "https://www.nfse.gov.br/EmissorNacional"
@@ -97,6 +98,10 @@ export default function PortalCliente({ setPage }) {
     if (typeof setPage === "function") {
       setPage("Pendências e Guias")
     }
+  }
+
+  function abrirAtualizacaoCadastral() {
+    if (typeof setPage === "function") setPage("Atualização Cadastral")
   }
 
   function abrirEmissorNacionalNfse() {
@@ -304,6 +309,22 @@ export default function PortalCliente({ setPage }) {
           border-color: #32f06d;
         }
 
+        .pc-cadastro-btn {
+          border: 1px solid rgba(50,240,109,.5);
+          border-radius: 14px;
+          padding: 15px 24px;
+          background: #061f47;
+          color: white;
+          font-weight: 900;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 15px;
+        }
+
+        .pc-cadastro-btn:hover { border-color: #17b8ff; }
+
         @media (max-width: 768px) {
           .pc-page {
             padding: 18px 14px;
@@ -351,11 +372,13 @@ export default function PortalCliente({ setPage }) {
           }
 
           .pc-actions,
-          .pc-nfse-btn {
+          .pc-nfse-btn,
+          .pc-cadastro-btn {
             width: 100%;
           }
 
-          .pc-nfse-btn {
+          .pc-nfse-btn,
+          .pc-cadastro-btn {
             justify-content: center;
           }
         }
@@ -394,6 +417,11 @@ export default function PortalCliente({ setPage }) {
           <button type="button" className="pc-pendencias-btn" onClick={abrirPendencias}>
             <FaClipboardList />
             Ver Pendências e Guias
+          </button>
+
+          <button type="button" className="pc-cadastro-btn" onClick={abrirAtualizacaoCadastral}>
+            <FaUserEdit />
+            Atualizar meu cadastro
           </button>
 
           <button

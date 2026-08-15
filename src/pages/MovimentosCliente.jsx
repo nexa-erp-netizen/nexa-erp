@@ -393,6 +393,35 @@ export default function MovimentosCliente() {
     }
   }, [movimentosFiltrados])
 
+  const graficoMensal = useMemo(() => {
+    const meses = []
+    const hoje = new Date()
+
+    for (let indice = 5; indice >= 0; indice -= 1) {
+      const data = new Date(hoje.getFullYear(), hoje.getMonth() - indice, 1)
+      const chave = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`
+      meses.push({
+        chave,
+        rotulo: data.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
+        receitas: 0,
+        despesas: 0,
+      })
+    }
+
+    const porChave = new Map(meses.map((mes) => [mes.chave, mes]))
+
+    movimentos.forEach((item) => {
+      const mes = porChave.get(String(item.data || "").slice(0, 7))
+      if (!mes) return
+      const valor = valorSeguro(item.valor)
+      if (item.tipo === "Receita") mes.receitas += valor
+      if (item.tipo === "Despesa") mes.despesas += valor
+    })
+
+    const maiorValor = Math.max(1, ...meses.flatMap((mes) => [mes.receitas, mes.despesas]))
+    return { meses, maiorValor }
+  }, [movimentos])
+
   return (
     <div className="mv-page">
       <style>{`
@@ -456,6 +485,22 @@ export default function MovimentosCliente() {
           padding: 24px;
           margin-bottom: 25px;
         }
+
+        .mv-chart-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+        .mv-chart-subtitle { color: #aec4df; font-size: 14px; margin-top: 5px; }
+        .mv-chart-legend { display: flex; gap: 16px; flex-wrap: wrap; color: #c9d7e8; font-size: 13px; }
+        .mv-chart-legend span { display: inline-flex; align-items: center; gap: 7px; }
+        .mv-chart-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+        .mv-chart-dot-in { background: #32f06d; }
+        .mv-chart-dot-out { background: #ff5c70; }
+        .mv-chart { height: 245px; display: grid; grid-template-columns: repeat(6, minmax(55px, 1fr)); gap: 14px; align-items: end; padding: 20px 12px 0; border-radius: 16px; background: repeating-linear-gradient(to top, rgba(255,255,255,.06) 0, rgba(255,255,255,.06) 1px, transparent 1px, transparent 25%); }
+        .mv-chart-month { height: 100%; display: grid; grid-template-rows: 1fr 24px; gap: 8px; min-width: 0; }
+        .mv-chart-bars { display: flex; align-items: end; justify-content: center; gap: 7px; min-height: 0; }
+        .mv-chart-bar { width: min(30px, 38%); min-height: 3px; border-radius: 8px 8px 2px 2px; transition: filter .2s, transform .2s; position: relative; cursor: help; }
+        .mv-chart-bar:hover { filter: brightness(1.18); transform: translateY(-2px); }
+        .mv-chart-in { background: linear-gradient(180deg,#65ff91,#19bb55); }
+        .mv-chart-out { background: linear-gradient(180deg,#ff8796,#db3750); }
+        .mv-chart-label { text-align: center; color: #c9d7e8; text-transform: capitalize; font-size: 12px; font-weight: 800; }
 
         .mv-card-header {
           display: flex;
@@ -719,6 +764,10 @@ export default function MovimentosCliente() {
             overflow: hidden !important;
           }
 
+          .mv-chart-header { flex-direction: column; }
+          .mv-chart { gap: 6px; padding-left: 4px; padding-right: 4px; height: 210px; }
+          .mv-chart-bars { gap: 3px; }
+
           .mv-card-header {
             flex-direction: column !important;
             align-items: stretch !important;
@@ -804,6 +853,31 @@ export default function MovimentosCliente() {
           <strong className={saldoAnterior >= 0 ? "green" : "red"}>
             {formatarMoeda(saldoAnterior)}
           </strong>
+        </div>
+      </div>
+
+      <div className="mv-card">
+        <div className="mv-chart-header">
+          <div>
+            <div className="mv-card-title">Movimentação dos últimos 6 meses</div>
+            <div className="mv-chart-subtitle">Comparativo mensal entre receitas e despesas.</div>
+          </div>
+          <div className="mv-chart-legend">
+            <span><i className="mv-chart-dot mv-chart-dot-in" /> Receitas</span>
+            <span><i className="mv-chart-dot mv-chart-dot-out" /> Despesas</span>
+          </div>
+        </div>
+
+        <div className="mv-chart" role="img" aria-label="Gráfico de receitas e despesas dos últimos seis meses">
+          {graficoMensal.meses.map((mes) => (
+            <div className="mv-chart-month" key={mes.chave}>
+              <div className="mv-chart-bars">
+                <div className="mv-chart-bar mv-chart-in" style={{ height: `${Math.max(2, (mes.receitas / graficoMensal.maiorValor) * 100)}%` }} title={`${mes.rotulo}: receitas ${formatarMoeda(mes.receitas)}`} />
+                <div className="mv-chart-bar mv-chart-out" style={{ height: `${Math.max(2, (mes.despesas / graficoMensal.maiorValor) * 100)}%` }} title={`${mes.rotulo}: despesas ${formatarMoeda(mes.despesas)}`} />
+              </div>
+              <div className="mv-chart-label">{mes.rotulo}</div>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -53,6 +53,7 @@ import ProLabore from "./pages/ProLabore"
 import CalculadoraRescisao from "./pages/CalculadoraRescisao"
 import Ferias from "./pages/Ferias"
 import ConciliacaoBancaria from "./pages/ConciliacaoBancaria"
+import AtualizacaoCadastroCliente from "./pages/AtualizacaoCadastroCliente"
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -147,6 +148,7 @@ export default function App() {
       "Portal Cliente",
       "Pendências e Guias",
       "Movimentos",
+      "Atualização Cadastral",
       "Documentos Digitais",
     ],
   }
@@ -243,6 +245,9 @@ export default function App() {
 
       case "Movimentos":
         return <MovimentosCliente />
+
+      case "Atualização Cadastral":
+        return <AtualizacaoCadastroCliente setPage={setPage} />
 
       case "Portal Cliente":
         return <PortalCliente setPage={setPage} />
