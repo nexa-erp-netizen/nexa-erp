@@ -22,6 +22,8 @@ export default function ConciliacaoBancaria({ setPage }) {
   const [planoLoteId, setPlanoLoteId] = useState("")
   const [filtroStatus, setFiltroStatus] = useState("Todos")
   const [processando, setProcessando] = useState(false)
+  const [competencia, setCompetencia] = useState(new Date().toISOString().slice(0, 7))
+  const [fechamentos, setFechamentos] = useState([])
 
   useEffect(() => {
     api.get("/clientes").then(r => setClientes(r.data || [])).catch(() => setClientes([]))
@@ -32,7 +34,7 @@ export default function ConciliacaoBancaria({ setPage }) {
     localStorage.setItem("nexaConciliacaoClienteId", String(clienteId))
     carregar()
   }, [clienteId])
-  useEffect(() => { if (contaExtratoId) carregarExtratos(); else { setMovimentos([]); setImportacoes([]) } }, [contaExtratoId])
+  useEffect(() => { if (contaExtratoId) carregarExtratos(); else { setMovimentos([]); setImportacoes([]); setFechamentos([]) } }, [contaExtratoId, competencia])
 
   async function carregar() {
     try {
@@ -75,12 +77,15 @@ export default function ConciliacaoBancaria({ setPage }) {
   async function carregarExtratos() {
     try {
       const semCache = Date.now()
-      const [m, i] = await Promise.all([
-        api.get("/extratos-bancarios/movimentos", { params: { contaBancariaId: contaExtratoId, _t: semCache } }),
+      const [ano, mes] = competencia.split("-").map(Number)
+      const fim = `${competencia}-${String(new Date(ano, mes, 0).getDate()).padStart(2, "0")}`
+      const [m, i, f] = await Promise.all([
+        api.get("/extratos-bancarios/movimentos", { params: { contaBancariaId: contaExtratoId, inicio: `${competencia}-01`, fim, _t: semCache } }),
         api.get("/extratos-bancarios/importacoes", { params: { contaBancariaId: contaExtratoId, _t: semCache } }),
+        api.get("/extratos-bancarios/fechamentos", { params: { contaBancariaId: contaExtratoId, _t: semCache } }),
       ])
       const lista = m.data || []
-      setMovimentos(lista); setImportacoes(i.data || [])
+      setMovimentos(lista); setImportacoes(i.data || []); setFechamentos(f.data || [])
       setClassificacoes(Object.fromEntries(lista.map(item => [item.id, item.planoContaId || ""])))
       setSelecionados(atual => atual.filter(id => lista.some(item => item.id === id)))
     } catch (e) { alert(e.response?.data?.message || "Erro ao carregar extratos") }
@@ -113,7 +118,9 @@ export default function ConciliacaoBancaria({ setPage }) {
     return r
   }, { entradas: 0, saidas: 0, pendentes: 0, classificados: 0, conciliados: 0 }), [movimentos])
 
-  const movimentosVisiveis = useMemo(() => filtroStatus === "Todos" ? movimentos : movimentos.filter(m => m.statusConciliacao === filtroStatus), [movimentos, filtroStatus])
+  const movimentosVisiveis = useMemo(() => filtroStatus === "Todos" ? movimentos : filtroStatus === "A concluir" ? movimentos.filter(m => !["Conciliado", "Ignorado", "Lançado"].includes(m.statusConciliacao)) : movimentos.filter(m => m.statusConciliacao === filtroStatus), [movimentos, filtroStatus])
+  const fechamentoAtual = useMemo(() => fechamentos.find(f => f.competencia === competencia && f.status === "Fechado"), [fechamentos, competencia])
+  const faltamConcluir = useMemo(() => movimentos.filter(m => !["Conciliado", "Ignorado", "Lançado"].includes(m.statusConciliacao)).length, [movimentos])
   const planosPara = natureza => planoContas.filter(p => naturezaCompativel(p, natureza))
   function naturezaCompativel(plano, natureza) {
     const texto = `${plano?.natureza || ""} ${plano?.tipo || ""} ${plano?.conta || ""}`.toLowerCase()
@@ -160,6 +167,32 @@ export default function ConciliacaoBancaria({ setPage }) {
     try { const r = await api.post("/extratos-bancarios/gerar-lancamentos", { ids }); setSelecionados([]); await carregarExtratos(); alert(`${r.data.gerados} lançamento(s) gerado(s) com sucesso.`) }
     catch (e) { alert(e.response?.data?.message || "Erro ao gerar lançamentos") }
     finally { setProcessando(false) }
+  }
+
+  async function concluirMes() {
+    if (faltamConcluir) { setFiltroStatus("A concluir"); return }
+    if (!movimentos.length) return alert("Não existem movimentos nesta competência.")
+    if (!confirm(`Concluir a competência ${competenciaBr(competencia)}?`)) return
+    setProcessando(true)
+    try { await api.post("/extratos-bancarios/fechamentos", { contaBancariaId: contaExtratoId, competencia }); await carregarExtratos(); alert("Mês concluído com sucesso.") }
+    catch (e) { alert(e.response?.data?.message || "Erro ao concluir o mês") }
+    finally { setProcessando(false) }
+  }
+
+  async function reabrirMes(item) {
+    if (!confirm(`Reabrir a competência ${competenciaBr(item.competencia)}?`)) return
+    setProcessando(true)
+    try { await api.patch(`/extratos-bancarios/fechamentos/${item.id}/reabrir`); await carregarExtratos() }
+    catch (e) { alert(e.response?.data?.message || "Erro ao reabrir o mês") }
+    finally { setProcessando(false) }
+  }
+
+  async function baixarRelatorio(item) {
+    try {
+      const r = await api.get(`/extratos-bancarios/fechamentos/${item.id}/pdf`, { responseType: "blob" })
+      const url = URL.createObjectURL(r.data); const link = document.createElement("a")
+      link.href = url; link.download = `conciliacao-${item.competencia}.pdf`; link.click(); URL.revokeObjectURL(url)
+    } catch (e) { alert(e.response?.data?.message || "Erro ao baixar relatório") }
   }
 
   function voltarEmpresa() {
@@ -218,20 +251,25 @@ export default function ConciliacaoBancaria({ setPage }) {
       </div>}
 
       {contaExtratoId && <div style={s.card}>
-        <div style={s.titleRow}><div><h3 style={s.h3}>Movimentos importados</h3><p style={s.p}>Leitura bancária aguardando classificação e conciliação.</p></div><span style={s.next}>{importacoes.length} importação(ões)</span></div>
+        <div style={s.titleRow}><div><h3 style={s.h3}>Movimentos importados</h3><p style={s.p}>Leitura bancária aguardando classificação e conciliação.</p></div><label style={{...s.label,margin:0,minWidth:190}}>Competência<input type="month" style={s.input} value={competencia} onChange={e => { setCompetencia(e.target.value); setFiltroStatus("Todos") }} /></label></div>
         <div style={s.summary}><Resumo t="Entradas" v={moeda(resumoMovimentos.entradas)} cor="#42f5a7"/><Resumo t="Saídas" v={moeda(resumoMovimentos.saidas)} cor="#ff7d88"/><Resumo t="Movimento líquido" v={moeda(resumoMovimentos.entradas-resumoMovimentos.saidas)} cor="#53c9ff"/><Resumo t="Pendentes" v={resumoMovimentos.pendentes} cor="#ffd45b"/><Resumo t="Classificados" v={resumoMovimentos.classificados} cor="#9ac7ff"/><Resumo t="Conciliados" v={resumoMovimentos.conciliados} cor="#73ffd4"/></div>
+        <div style={fechamentoAtual ? s.closeDone : s.closeBox}>
+          <div><strong>{fechamentoAtual ? `✅ ${competenciaBr(competencia)} concluído` : `Fechamento de ${competenciaBr(competencia)}`}</strong><span style={s.closeText}>{fechamentoAtual ? `Saldo final: ${moeda(fechamentoAtual.saldoFinal)}` : faltamConcluir ? `Faltam ${faltamConcluir} movimento(s) para concluir este mês.` : movimentos.length ? "Tudo conferido. O mês já pode ser concluído." : "Nenhum movimento nesta competência."}</span></div>
+          <div style={s.actions}>{!fechamentoAtual && faltamConcluir > 0 && <button style={s.secondary} onClick={() => setFiltroStatus("A concluir")}>Ver pendentes</button>}{!fechamentoAtual && <button style={s.primary} disabled={processando || faltamConcluir > 0 || !movimentos.length} onClick={concluirMes}>Concluir mês</button>}{fechamentoAtual && <button style={s.small} onClick={() => baixarRelatorio(fechamentoAtual)}>Baixar PDF</button>}</div>
+        </div>
         {movimentos.length > 0 && <div style={s.batch}>
-          <select style={s.input} value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}><option>Todos</option><option>Pendente</option><option>Classificado</option><option>Conciliado</option><option>Ignorado</option><option>Lançado</option></select>
+          <select style={s.input} value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}><option>Todos</option><option>A concluir</option><option>Pendente</option><option>Classificado</option><option>Conciliado</option><option>Ignorado</option><option>Lançado</option></select>
           <button style={s.secondary} onClick={selecionarVisiveis}>Selecionar visíveis</button><button style={s.secondary} onClick={() => setSelecionados([])}>Limpar seleção</button>
           <select style={s.input} value={planoLoteId} onChange={e => setPlanoLoteId(e.target.value)}><option value="">Conta contábil para o lote</option>{planoContas.map(p => <option key={p.id} value={p.id}>{p.codigo} • {p.conta}</option>)}</select>
-          <button style={s.small} disabled={processando} onClick={() => classificarLote("Classificado")}>Classificar lote</button>
-          <button style={s.primary} disabled={processando} onClick={() => classificarLote("Conciliado")}>Conciliar lote</button>
-          <button style={s.secondary} disabled={processando} onClick={() => classificarLote("Ignorado")}>Ignorar lote</button>
-          <button style={s.small} disabled={processando} onClick={sugerirClassificacoes}>Sugerir pelo histórico</button>
-          <button style={s.launch} disabled={processando} onClick={gerarLancamentos}>Gerar lançamentos</button>
+          <button style={s.small} disabled={processando || Boolean(fechamentoAtual)} onClick={() => classificarLote("Classificado")}>Classificar lote</button>
+          <button style={s.primary} disabled={processando || Boolean(fechamentoAtual)} onClick={() => classificarLote("Conciliado")}>Conciliar lote</button>
+          <button style={s.secondary} disabled={processando || Boolean(fechamentoAtual)} onClick={() => classificarLote("Ignorado")}>Ignorar lote</button>
+          <button style={s.small} disabled={processando || Boolean(fechamentoAtual)} onClick={sugerirClassificacoes}>Sugerir pelo histórico</button>
+          <button style={s.launch} disabled={processando || Boolean(fechamentoAtual)} onClick={gerarLancamentos}>Gerar lançamentos</button>
           <strong>{selecionados.length} selecionado(s)</strong>
         </div>}
-        {movimentos.length === 0 ? <div style={s.empty}>Nenhum extrato importado para esta conta.</div> : <div style={{ overflowX: "auto" }}><table style={s.table}><thead><tr><th>✓</th><th>Data</th><th>Descrição</th><th>Natureza</th><th>Valor</th><th>Plano de Contas</th><th>Status</th><th>Ações</th></tr></thead><tbody>{movimentosVisiveis.map(m => <tr key={m.id}><td><input type="checkbox" checked={selecionados.includes(m.id)} disabled={Boolean(m.lancamentoContabilId)} onChange={() => alternarSelecao(m.id)} /></td><td>{dataBr(m.data)}</td><td><strong>{m.descricao}</strong><small style={s.block}>{m.documento || ""}</small></td><td><span style={m.natureza === "Entrada" ? s.entrada : s.saida}>{m.natureza}</span></td><td style={{ color: m.natureza === "Entrada" ? "#42f5a7" : "#ff9ba4", fontWeight: 800 }}>{m.natureza === "Saída" ? "- " : "+ "}{moeda(m.valor)}</td><td><select style={s.tableSelect} value={classificacoes[m.id] || ""} disabled={Boolean(m.lancamentoContabilId)} onChange={e => setClassificacoes(a => ({ ...a, [m.id]: e.target.value }))}><option value="">Selecione</option>{planosPara(m.natureza).map(p => <option key={p.id} value={p.id}>{p.codigo} • {p.conta}</option>)}</select>{m.categoriaSugerida && <small style={s.block}>Sugestão: {m.categoriaSugerida}</small>}</td><td>{m.statusConciliacao}</td><td><div style={s.actions}>{!m.lancamentoContabilId && <><button style={s.small} disabled={processando} onClick={() => classificarUm(m,"Classificado")}>Classificar</button><button style={s.primary} disabled={processando} onClick={() => classificarUm(m,"Conciliado")}>Conciliar</button><button style={s.secondary} disabled={processando} onClick={() => classificarUm(m,"Ignorado")}>Ignorar</button></>}{m.lancamentoContabilId && <span style={s.lancado}>Lançamento #{m.lancamentoContabilId}</span>}</div></td></tr>)}</tbody></table></div>}
+        {movimentos.length === 0 ? <div style={s.empty}>Nenhum movimento em {competenciaBr(competencia)}.</div> : <div style={{ overflowX: "auto" }}><table style={s.table}><thead><tr><th>✓</th><th>Data</th><th>Descrição</th><th>Natureza</th><th>Valor</th><th>Plano de Contas</th><th>Status</th><th>Ações</th></tr></thead><tbody>{movimentosVisiveis.map(m => <tr key={m.id}><td><input type="checkbox" checked={selecionados.includes(m.id)} disabled={Boolean(m.lancamentoContabilId) || Boolean(fechamentoAtual)} onChange={() => alternarSelecao(m.id)} /></td><td>{dataBr(m.data)}</td><td><strong>{m.descricao}</strong><small style={s.block}>{m.documento || ""}</small></td><td><span style={m.natureza === "Entrada" ? s.entrada : s.saida}>{m.natureza}</span></td><td style={{ color: m.natureza === "Entrada" ? "#42f5a7" : "#ff9ba4", fontWeight: 800 }}>{m.natureza === "Saída" ? "- " : "+ "}{moeda(m.valor)}</td><td><select style={s.tableSelect} value={classificacoes[m.id] || ""} disabled={Boolean(m.lancamentoContabilId) || Boolean(fechamentoAtual)} onChange={e => setClassificacoes(a => ({ ...a, [m.id]: e.target.value }))}><option value="">Selecione</option>{planosPara(m.natureza).map(p => <option key={p.id} value={p.id}>{p.codigo} • {p.conta}</option>)}</select>{m.categoriaSugerida && <small style={s.block}>Sugestão: {m.categoriaSugerida}</small>}</td><td>{m.statusConciliacao}</td><td><div style={s.actions}>{!m.lancamentoContabilId && !fechamentoAtual && <><button style={s.small} disabled={processando} onClick={() => classificarUm(m,"Classificado")}>Classificar</button><button style={s.primary} disabled={processando} onClick={() => classificarUm(m,"Conciliado")}>Conciliar</button><button style={s.secondary} disabled={processando} onClick={() => classificarUm(m,"Ignorado")}>Ignorar</button></>}{m.lancamentoContabilId && <span style={s.lancado}>Lançamento #{m.lancamentoContabilId}</span>}{fechamentoAtual && !m.lancamentoContabilId && <span style={s.lancado}>Mês fechado</span>}</div></td></tr>)}</tbody></table></div>}
+        {fechamentos.filter(f => f.status === "Fechado").length > 0 && <details style={s.history}><summary style={s.historySummary}>Meses anteriores ({fechamentos.filter(f => f.status === "Fechado").length})</summary>{fechamentos.filter(f => f.status === "Fechado").map(f => <div key={f.id} style={s.importItem}><span><strong>{competenciaBr(f.competencia)}</strong> • Saldo final {moeda(f.saldoFinal)}</span><span style={s.actions}><button style={s.small} onClick={() => baixarRelatorio(f)}>PDF</button><button style={s.secondary} disabled={processando} onClick={() => reabrirMes(f)}>Reabrir</button></span></div>)}</details>}
         {importacoes.length > 0 && <div style={{ marginTop: 18 }}><h4>Histórico de importações</h4>{importacoes.slice(0, 5).map(i => <div key={i.id} style={s.importItem}><span><strong>{i.nomeArquivo}</strong> • {i.formato}</span><span>{i.totalImportados} novos • {i.totalDuplicados} duplicados • {dataBr(String(i.createdAt).slice(0,10))}</span></div>)}</div>}
       </div>}
     </>}
@@ -245,6 +283,7 @@ function moedaCampo(v) { return moeda(v) }
 function formatarMoedaDigitada(v) { const d=String(v||"").replace(/\D/g,""); return d ? (Number(d)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "" }
 function numeroMoeda(v) { const t=String(v||"").replace(/R\$/g,"").replace(/\s/g,"").replace(/\./g,"").replace(",","."); return Number(t||0) }
 function dataBr(v) { if(!v)return "-"; return new Date(`${String(v).slice(0,10)}T12:00:00`).toLocaleDateString("pt-BR") }
+function competenciaBr(v) { const [ano,mes]=String(v||"").split("-"); return mes&&ano ? `${mes}/${ano}` : "-" }
 const s = {
-  page:{padding:24,color:"#fff",background:"#082e61",minHeight:"100vh"},hero:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,background:"linear-gradient(135deg,#0b4a84,#087c7c)",padding:24,borderRadius:20,marginBottom:18,border:"1px solid #18c9b2"},badge:{color:"#58ffd0",fontWeight:800},h2:{margin:"6px 0",fontSize:30},h3:{margin:"0 0 6px"},p:{margin:0,color:"#bcd8f5"},home:{width:46,height:46,borderRadius:12,border:"1px solid #49f2c2",background:"#092750",fontSize:23,cursor:"pointer"},card:{background:"#0b2852",border:"1px solid #22558d",borderRadius:18,padding:20,marginBottom:18},grid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14},label:{display:"flex",flexDirection:"column",gap:7,color:"#bcd8f5",fontSize:13,fontWeight:700,marginBottom:12},input:{boxSizing:"border-box",width:"100%",padding:"12px 13px",borderRadius:10,border:"1px solid #2b6098",background:"#071f43",color:"#fff",fontSize:14},check:{display:"flex",gap:9,alignItems:"center",margin:"4px 0 16px",color:"#dff"},primary:{border:0,borderRadius:10,padding:"12px 18px",background:"linear-gradient(90deg,#08b8ef,#27ed8b)",fontWeight:800,cursor:"pointer"},secondary:{border:"1px solid #2f74ae",borderRadius:9,padding:"9px 13px",background:"#123b6b",color:"#fff",cursor:"pointer"},danger:{border:"1px solid #ff6a78",borderRadius:9,padding:"9px 13px",background:"#6b2433",color:"#fff",cursor:"pointer"},small:{border:0,borderRadius:9,padding:"9px 13px",background:"#09bcea",fontWeight:800,cursor:"pointer"},titleRow:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"},next:{background:"#164f69",color:"#65ffd0",padding:"8px 12px",borderRadius:999,fontSize:12,fontWeight:800},table:{width:"100%",borderCollapse:"collapse"},actions:{display:"flex",gap:8,flexWrap:"wrap"},principal:{display:"inline-block",marginLeft:8,padding:"3px 7px",background:"#167a64",borderRadius:999,fontSize:10},empty:{padding:20,textAlign:"center",color:"#9ab8d7",background:"#071f43",borderRadius:12},success:{display:"flex",flexDirection:"column",gap:5,marginTop:15,padding:14,borderRadius:12,background:"#0c5c50",color:"#caffee"},summary:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:18},summaryItem:{display:"flex",flexDirection:"column",gap:6,padding:14,background:"#071f43",borderRadius:12},entrada:{padding:"4px 8px",borderRadius:999,background:"#145c4a",color:"#6cffc5"},saida:{padding:"4px 8px",borderRadius:999,background:"#652c3b",color:"#ffabb2"},importItem:{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"10px 12px",marginTop:7,background:"#071f43",borderRadius:10,color:"#bcd8f5"},batch:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:14,marginBottom:14,background:"#071f43",borderRadius:12},tableSelect:{minWidth:210,padding:8,borderRadius:8,border:"1px solid #2b6098",background:"#071f43",color:"#fff"},launch:{border:0,borderRadius:9,padding:"10px 14px",background:"#8f69ff",color:"#fff",fontWeight:800,cursor:"pointer"},block:{display:"block",marginTop:5,color:"#91b4d8"},lancado:{padding:"6px 9px",borderRadius:8,background:"#3c3476",color:"#d9d2ff",whiteSpace:"nowrap"}
+  page:{padding:24,color:"#fff",background:"#082e61",minHeight:"100vh"},hero:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,background:"linear-gradient(135deg,#0b4a84,#087c7c)",padding:24,borderRadius:20,marginBottom:18,border:"1px solid #18c9b2"},badge:{color:"#58ffd0",fontWeight:800},h2:{margin:"6px 0",fontSize:30},h3:{margin:"0 0 6px"},p:{margin:0,color:"#bcd8f5"},home:{width:46,height:46,borderRadius:12,border:"1px solid #49f2c2",background:"#092750",fontSize:23,cursor:"pointer"},card:{background:"#0b2852",border:"1px solid #22558d",borderRadius:18,padding:20,marginBottom:18},grid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14},label:{display:"flex",flexDirection:"column",gap:7,color:"#bcd8f5",fontSize:13,fontWeight:700,marginBottom:12},input:{boxSizing:"border-box",width:"100%",padding:"12px 13px",borderRadius:10,border:"1px solid #2b6098",background:"#071f43",color:"#fff",fontSize:14},check:{display:"flex",gap:9,alignItems:"center",margin:"4px 0 16px",color:"#dff"},primary:{border:0,borderRadius:10,padding:"12px 18px",background:"linear-gradient(90deg,#08b8ef,#27ed8b)",fontWeight:800,cursor:"pointer"},secondary:{border:"1px solid #2f74ae",borderRadius:9,padding:"9px 13px",background:"#123b6b",color:"#fff",cursor:"pointer"},danger:{border:"1px solid #ff6a78",borderRadius:9,padding:"9px 13px",background:"#6b2433",color:"#fff",cursor:"pointer"},small:{border:0,borderRadius:9,padding:"9px 13px",background:"#09bcea",fontWeight:800,cursor:"pointer"},titleRow:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"},next:{background:"#164f69",color:"#65ffd0",padding:"8px 12px",borderRadius:999,fontSize:12,fontWeight:800},table:{width:"100%",borderCollapse:"collapse"},actions:{display:"flex",gap:8,flexWrap:"wrap"},principal:{display:"inline-block",marginLeft:8,padding:"3px 7px",background:"#167a64",borderRadius:999,fontSize:10},empty:{padding:20,textAlign:"center",color:"#9ab8d7",background:"#071f43",borderRadius:12},success:{display:"flex",flexDirection:"column",gap:5,marginTop:15,padding:14,borderRadius:12,background:"#0c5c50",color:"#caffee"},summary:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:18},summaryItem:{display:"flex",flexDirection:"column",gap:6,padding:14,background:"#071f43",borderRadius:12},entrada:{padding:"4px 8px",borderRadius:999,background:"#145c4a",color:"#6cffc5"},saida:{padding:"4px 8px",borderRadius:999,background:"#652c3b",color:"#ffabb2"},importItem:{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"10px 12px",marginTop:7,background:"#071f43",borderRadius:10,color:"#bcd8f5"},batch:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:14,marginBottom:14,background:"#071f43",borderRadius:12},tableSelect:{minWidth:210,padding:8,borderRadius:8,border:"1px solid #2b6098",background:"#071f43",color:"#fff"},launch:{border:0,borderRadius:9,padding:"10px 14px",background:"#8f69ff",color:"#fff",fontWeight:800,cursor:"pointer"},block:{display:"block",marginTop:5,color:"#91b4d8"},lancado:{padding:"6px 9px",borderRadius:8,background:"#3c3476",color:"#d9d2ff",whiteSpace:"nowrap"},closeBox:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap",padding:16,marginBottom:16,borderRadius:13,background:"#102f59",border:"1px solid #2b6098"},closeDone:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap",padding:16,marginBottom:16,borderRadius:13,background:"#105443",border:"1px solid #29c98d"},closeText:{display:"block",marginTop:5,color:"#c2d9ed",fontSize:13},history:{marginTop:18,padding:12,borderRadius:12,background:"#082243",border:"1px solid #22558d"},historySummary:{cursor:"pointer",fontWeight:800,color:"#bfe1ff"}
 }
