@@ -65,9 +65,10 @@ export default function ConciliacaoBancaria({ setPage }) {
 
   async function carregarExtratos() {
     try {
+      const semCache = Date.now()
       const [m, i] = await Promise.all([
-        api.get("/extratos-bancarios/movimentos", { params: { contaBancariaId: contaExtratoId } }),
-        api.get("/extratos-bancarios/importacoes", { params: { contaBancariaId: contaExtratoId } }),
+        api.get("/extratos-bancarios/movimentos", { params: { contaBancariaId: contaExtratoId, _t: semCache } }),
+        api.get("/extratos-bancarios/importacoes", { params: { contaBancariaId: contaExtratoId, _t: semCache } }),
       ])
       setMovimentos(m.data || []); setImportacoes(i.data || [])
     } catch (e) { alert(e.response?.data?.message || "Erro ao carregar extratos") }

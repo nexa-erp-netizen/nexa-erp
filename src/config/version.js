@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.25.0",
-  build: "3250",
-  release: "Importação de extratos OFX e CSV",
+  version: "3.25.1",
+  build: "3251",
+  release: "Atualização imediata dos movimentos bancários",
   date: "14/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.25.1", release: "Atualização imediata dos movimentos bancários", date: "14/08/2026", items: ["Movimentos aparecem imediatamente após importar", "Histórico de importações atualizado sem cache", "Extratos já salvos são recuperados ao abrir a conta"] },
     { version: "3.25.0", release: "Importação de extratos OFX e CSV", date: "14/08/2026", items: ["Upload e leitura de OFX e CSV", "Bloqueio de arquivos e movimentos duplicados", "Resumo de entradas, saídas e saldo líquido", "Movimentos vinculados à conta e à empresa", "Saldo inicial no padrão brasileiro"] },
     { version: "3.24.0", release: "Cadastro de contas para conciliação bancária", date: "14/08/2026", items: ["Conciliação dentro do Contábil", "Várias contas por empresa", "Conta principal, saldo inicial e data-base", "Acesso direto pela ficha do cliente", "Casinha retorna para a empresa selecionada"] },
     { version: "3.23.6", release: "Navegação do cliente e prioridades trabalhistas", date: "14/08/2026", items: ["Casinha em Corrigir Cliente retorna para a ficha da empresa", "Folha vencida em Prioridades do Dia", "Rescisões vencidas ou pagas aguardando finalização", "Itens dentro do prazo continuam fora das pendências"] },
