@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.28.0",
-  build: "3280",
-  release: "Fechamento mensal simplificado",
+  version: "3.28.1",
+  build: "3281",
+  release: "Guias fiscais visíveis para escritório e cliente",
   date: "15/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.28.1", release: "Guias fiscais visíveis para escritório e cliente", date: "17/08/2026", items: ["DAS a vencer aparece no Portal Cliente", "Guias fiscais reunidas em Pendências Clientes", "Itens a vencer não são tratados como atraso", "DAS sincronizado sem duplicidade"] },
     { version: "3.28.0", release: "Fechamento mensal simplificado", date: "15/08/2026", items: ["Competência mensal na conciliação", "Aviso direto dos movimentos que faltam", "Conclusão do mês em um botão", "Histórico recolhido de meses anteriores", "PDF da conciliação e reabertura pelo administrador"] },
     { version: "3.27.0", release: "Atualização cadastral e gráfico de movimentos", date: "15/08/2026", items: ["Atualização de contato e endereço pelo Portal Cliente", "Proteção de dados fiscais e internos", "Gráfico de receitas e despesas dos últimos seis meses", "Visualização responsiva no computador e celular"] },
     { version: "3.26.0", release: "Classificação e conciliação bancária", date: "15/08/2026", items: ["Classificação individual e em lote", "Sugestões com base no histórico", "Status pendente, classificado, conciliado, ignorado e lançado", "Geração de lançamentos contábeis", "Bloqueio contra lançamento duplicado"] },
