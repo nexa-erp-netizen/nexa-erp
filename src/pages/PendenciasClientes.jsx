@@ -34,9 +34,20 @@ export default function PendenciasClientes() {
 
     setClientes(Array.isArray(clientesResp.data) ? clientesResp.data : [])
     setPendencias(Array.isArray(pendenciasResp.data) ? pendenciasResp.data : [])
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+
     setGuiasFiscais((Array.isArray(fiscalResp.data) ? fiscalResp.data : []).filter((item) => {
-      const status = String(item.status || "").toLowerCase()
-      return !status.includes("pago") && !status.includes("concluído") && !status.includes("concluido")
+      const status = String(item.status || "").trim().toLowerCase()
+      const regularizada =
+        status.includes("pago") ||
+        status.includes("concluído") ||
+        status.includes("concluido")
+
+      if (regularizada || !item.vencimento) return false
+
+      const vencimento = new Date(`${String(item.vencimento).slice(0, 10)}T00:00:00`)
+      return !Number.isNaN(vencimento.getTime()) && vencimento < hoje
     }))
 
     const clienteSolicitado = localStorage.getItem("nexaFiltroPendenciaCliente")
@@ -407,7 +418,7 @@ export default function PendenciasClientes() {
       </div>
 
       <div className="pd-card">
-        <div className="pd-card-title">Guias e obrigações em aberto ({guiasFiscais.length})</div>
+        <div className="pd-card-title">Guias e obrigações vencidas ({guiasFiscais.length})</div>
         <div className="pd-table-wrapper">
           <table className="pd-table">
             <thead><tr><th>Cliente</th><th>Obrigação</th><th>Competência</th><th>Vencimento</th><th>Valor</th><th>Situação</th></tr></thead>
@@ -416,7 +427,7 @@ export default function PendenciasClientes() {
                 const situacao = situacaoGuia(item)
                 return <tr key={`fiscal-${item.id}`}><td>{item.cliente}</td><td>{item.obrigacao || item.descricao || "Guia fiscal"}</td><td>{item.competencia || "-"}</td><td>{formatarData(String(item.vencimento || "").slice(0, 10))}</td><td>{valorGuia(item.valor)}</td><td><span className={`pd-guide-status ${situacao.startsWith("Vencida") ? "pd-guide-overdue" : ""}`}>{situacao}</span></td></tr>
               })}
-              {!guiasFiscais.length && <tr><td colSpan="6" className="empty">Nenhuma guia ou obrigação em aberto.</td></tr>}
+              {!guiasFiscais.length && <tr><td colSpan="6" className="empty">Nenhuma guia ou obrigação vencida.</td></tr>}
             </tbody>
           </table>
         </div>
