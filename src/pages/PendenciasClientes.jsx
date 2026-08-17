@@ -5,6 +5,7 @@ import { FaTrash, FaCheck, FaClock, FaEye } from "react-icons/fa"
 export default function PendenciasClientes() {
   const [clientes, setClientes] = useState([])
   const [pendencias, setPendencias] = useState([])
+  const [guiasFiscais, setGuiasFiscais] = useState([])
   const [detalhe, setDetalhe] = useState(null)
 
   const [form, setForm] = useState({
@@ -25,13 +26,18 @@ export default function PendenciasClientes() {
   }, [])
 
   async function carregarDados() {
-    const [clientesResp, pendenciasResp] = await Promise.all([
+    const [clientesResp, pendenciasResp, fiscalResp] = await Promise.all([
       api.get("/clientes"),
       api.get("/solicitacoes-clientes"),
+      api.get("/fiscal"),
     ])
 
     setClientes(Array.isArray(clientesResp.data) ? clientesResp.data : [])
     setPendencias(Array.isArray(pendenciasResp.data) ? pendenciasResp.data : [])
+    setGuiasFiscais((Array.isArray(fiscalResp.data) ? fiscalResp.data : []).filter((item) => {
+      const status = String(item.status || "").toLowerCase()
+      return !status.includes("pago") && !status.includes("concluído") && !status.includes("concluido")
+    }))
 
     const clienteSolicitado = localStorage.getItem("nexaFiltroPendenciaCliente")
     if (clienteSolicitado) {
@@ -104,6 +110,21 @@ export default function PendenciasClientes() {
     }
   }, [pendencias])
 
+  function situacaoGuia(item) {
+    if (!item.vencimento) return "Em aberto"
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    const vencimento = new Date(`${String(item.vencimento).slice(0, 10)}T00:00:00`)
+    const dias = Math.ceil((vencimento - hoje) / 86400000)
+    if (dias < 0) return `Vencida há ${Math.abs(dias)} dia(s)`
+    if (dias === 0) return "Vence hoje"
+    return `Vence em ${dias} dia(s)`
+  }
+
+  function valorGuia(valor) {
+    if (String(valor || "").includes("R$")) return valor
+    return Number(valor || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+  }
+
   return (
     <div className="pd-page">
       <style>{`
@@ -129,6 +150,9 @@ export default function PendenciasClientes() {
           gap: 15px;
           margin-bottom: 25px;
         }
+
+        .pd-guide-status { display: inline-block; border-radius: 999px; padding: 6px 9px; background: rgba(255,193,7,.16); color: #ffd65a; font-size: 12px; font-weight: 900; white-space: nowrap; }
+        .pd-guide-overdue { background: rgba(255,92,112,.15); color: #ff8c9a; }
 
         .pd-box {
           background: rgba(255,255,255,.06);
@@ -379,6 +403,22 @@ export default function PendenciasClientes() {
         <div className="pd-box">
           <span>Concluídas</span>
           <strong className="green">{resumo.concluidas}</strong>
+        </div>
+      </div>
+
+      <div className="pd-card">
+        <div className="pd-card-title">Guias e obrigações em aberto ({guiasFiscais.length})</div>
+        <div className="pd-table-wrapper">
+          <table className="pd-table">
+            <thead><tr><th>Cliente</th><th>Obrigação</th><th>Competência</th><th>Vencimento</th><th>Valor</th><th>Situação</th></tr></thead>
+            <tbody>
+              {guiasFiscais.map((item) => {
+                const situacao = situacaoGuia(item)
+                return <tr key={`fiscal-${item.id}`}><td>{item.cliente}</td><td>{item.obrigacao || item.descricao || "Guia fiscal"}</td><td>{item.competencia || "-"}</td><td>{formatarData(String(item.vencimento || "").slice(0, 10))}</td><td>{valorGuia(item.valor)}</td><td><span className={`pd-guide-status ${situacao.startsWith("Vencida") ? "pd-guide-overdue" : ""}`}>{situacao}</span></td></tr>
+              })}
+              {!guiasFiscais.length && <tr><td colSpan="6" className="empty">Nenhuma guia ou obrigação em aberto.</td></tr>}
+            </tbody>
+          </table>
         </div>
       </div>
 
