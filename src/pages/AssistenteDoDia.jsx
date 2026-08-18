@@ -257,8 +257,12 @@ export default function AssistenteDoDia({ setPage }) {
       localStorage.setItem("nexaFiltroPendenciaId", String(acao.referenciaId || ""))
     }
 
-    if (acao.destino === "Clientes" && acao.clienteId) {
-      localStorage.setItem("nexaAbrirClienteId", String(acao.clienteId))
+    if (acao.destino === "Clientes" && (acao.clienteId || acao.cliente)) {
+      if (acao.clienteId) {
+        localStorage.setItem("nexaAbrirClienteId", String(acao.clienteId))
+      } else {
+        localStorage.removeItem("nexaAbrirClienteId")
+      }
       localStorage.setItem("nexaAbrirClienteNome", acao.cliente || "")
       if (acao.secao) localStorage.setItem("nexaAbrirSecaoCliente", String(acao.secao))
     }
