@@ -64,6 +64,13 @@ export default function ObrigacoesCliente() {
     if (!item.anexos || item.anexos.length === 0) return ""
 
     const arquivo = item.anexos[0]
+    const dasMeiId = arquivo.dasMeiId || item.dasMeiId
+
+    if (dasMeiId) {
+      const resposta = await api.get(`/das-mei/${dasMeiId}/arquivo`)
+      return resposta.data?.url || ""
+    }
+
     const caminho = arquivo.caminho || arquivo.url || ""
 
     if (!caminho) return ""
@@ -77,13 +84,6 @@ export default function ObrigacoesCliente() {
 
   async function baixarGuia(item) {
     try {
-      if (item.dasMeiId) {
-        const resposta = await api.get(`/das-mei/${item.dasMeiId}/arquivo`)
-        await api.post("/acessos-clientes/atividade", { tipo: "download", pagina: "Pendências e Guias", recurso: "DAS-MEI", recursoId: item.dasMeiId, descricao: `Baixou guia: ${obterTitulo(item)}` })
-        window.open(resposta.data.url, "_blank")
-        return
-      }
-
       const url = await obterUrlAnexo(item)
 
       if (!url) {
@@ -91,7 +91,6 @@ export default function ObrigacoesCliente() {
         return
       }
 
-      await api.post("/acessos-clientes/atividade", { tipo: "download", pagina: "Pendências e Guias", recurso: "Guia fiscal", recursoId: item.id, descricao: `Baixou guia: ${obterTitulo(item)}` })
       window.open(url, "_blank")
     } catch (error) {
       console.error(error)
@@ -107,11 +106,7 @@ export default function ObrigacoesCliente() {
     if (!confirmar) return
 
     try {
-      if (item.dasMeiId) {
-        await api.patch(`/das-mei/${item.dasMeiId}/marcar-pago-cliente`)
-      } else {
-        await api.patch(`/fiscal/${item.id}/marcar-pago-cliente`)
-      }
+      await api.patch(`/fiscal/${item.id}/marcar-pago-cliente`)
       await carregarFiscal()
     } catch (error) {
       console.error(error)
