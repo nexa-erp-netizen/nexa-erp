@@ -265,6 +265,9 @@ export default function AssistenteDoDia({ setPage }) {
       }
       localStorage.setItem("nexaAbrirClienteNome", acao.cliente || "")
       if (acao.secao) localStorage.setItem("nexaAbrirSecaoCliente", String(acao.secao))
+      if (acao.referenciaId && acao.secao === "servicos") {
+        localStorage.setItem("nexaAbrirCobrancaId", String(acao.referenciaId))
+      } else localStorage.removeItem("nexaAbrirCobrancaId")
     }
 
     if (acao.destino === "Folha de Pagamento" && acao.clienteId) {

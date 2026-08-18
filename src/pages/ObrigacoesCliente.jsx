@@ -106,11 +106,13 @@ export default function ObrigacoesCliente() {
     if (!confirmar) return
 
     try {
-      await api.patch(`/fiscal/${item.id}/marcar-pago-cliente`)
+      const dasMeiId = item.anexos?.[0]?.dasMeiId || item.dasMeiId
+      if (dasMeiId) await api.patch(`/das-mei/${dasMeiId}/marcar-pago-cliente`)
+      else await api.patch(`/fiscal/${item.id}/marcar-pago-cliente`)
       await carregarFiscal()
     } catch (error) {
       console.error(error)
-      alert("Erro ao confirmar pagamento.")
+      alert(error.response?.data?.message || "Erro ao confirmar pagamento.")
     }
   }
 

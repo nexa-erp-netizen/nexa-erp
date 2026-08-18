@@ -68,6 +68,7 @@ export default function ServicosCobrancasCliente({ cliente, onAtualizado }) {
   const [editandoId, setEditandoId] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const [carregando, setCarregando] = useState(false)
+  const [cobrancaDestacadaId, setCobrancaDestacadaId] = useState(null)
 
   const clienteId = cliente?.id
 
@@ -77,6 +78,21 @@ export default function ServicosCobrancasCliente({ cliente, onAtualizado }) {
     setEditandoId(null)
     carregarTudo()
   }, [clienteId])
+
+  useEffect(() => {
+    const cobrancaId = localStorage.getItem("nexaAbrirCobrancaId")
+    const cobranca = registros.find((item) => (
+      String(item.id) === String(cobrancaId)
+      || String(item.financeiroId) === String(cobrancaId)
+    ))
+    if (!cobrancaId || !cobranca) return
+
+    setCobrancaDestacadaId(String(cobranca.id))
+    localStorage.removeItem("nexaAbrirCobrancaId")
+    setTimeout(() => {
+      document.querySelector(`[data-cobranca-id="${cobranca.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+    }, 180)
+  }, [registros])
 
   async function carregarTudo() {
     if (!clienteId) return
@@ -373,7 +389,11 @@ export default function ServicosCobrancasCliente({ cliente, onAtualizado }) {
             {registros.map((item) => {
               const status = statusVisual(item)
               return (
-                <tr key={item.id}>
+                <tr
+                  key={item.id}
+                  data-cobranca-id={item.id}
+                  style={String(cobrancaDestacadaId) === String(item.id) ? linhaDestacada : undefined}
+                >
                   <td style={td}>
                     <strong>{item.descricao}</strong>
                     {item.observacao && <small style={observacaoTabela}>{item.observacao}</small>}
@@ -442,6 +462,7 @@ const td = { padding: "11px 9px", borderBottom: "1px solid rgba(255,255,255,.07)
 const tdValor = { ...td, color: "#37f07a", fontWeight: 900 }
 const vazio = { ...td, textAlign: "center", color: "#b9c7d8", padding: "22px" }
 const observacaoTabela = { display: "block", color: "#a9bdd8", marginTop: "5px", fontWeight: 400 }
+const linhaDestacada = { background: "rgba(255, 193, 7, .18)", outline: "2px solid #ffc107", outlineOffset: "-2px" }
 const acoes = { display: "flex", flexWrap: "wrap", gap: "6px" }
 const botaoBase = { border: "none", borderRadius: "8px", padding: "7px 9px", fontSize: "11px", fontWeight: 900, cursor: "pointer" }
 const botaoPendente = { ...botaoBase, background: "#ffd54a", color: "#3b2d00" }

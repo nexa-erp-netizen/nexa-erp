@@ -156,6 +156,7 @@ export function calcularPrioridadeCliente(clienteItem = {}) {
 
   const prioridade = Math.max(0, Math.min(100, Math.round(score)))
   const classificacao =
+    atrasadas.length ? "critico" :
     prioridade >= 85 ? "critico" :
     prioridade >= 65 ? "alto" :
     prioridade >= 40 ? "medio" :

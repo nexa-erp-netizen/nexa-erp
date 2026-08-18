@@ -211,6 +211,19 @@ export default function Dashboard({ setPage }) {
     return
   }
 
+  if (destino === "Clientes" && (item.clienteId || item.cliente)) {
+    if (item.clienteId) localStorage.setItem("nexaAbrirClienteId", String(item.clienteId))
+    else localStorage.removeItem("nexaAbrirClienteId")
+
+    localStorage.setItem("nexaAbrirClienteNome", item.cliente || "")
+    if (item.secao) localStorage.setItem("nexaAbrirSecaoCliente", String(item.secao))
+    if (item.referenciaId && item.secao === "servicos") {
+      localStorage.setItem("nexaAbrirCobrancaId", String(item.referenciaId))
+    } else localStorage.removeItem("nexaAbrirCobrancaId")
+    setPage("Clientes")
+    return
+  }
+
   if (destino === "Folha de Pagamento" && item.clienteId) {
     localStorage.setItem("nexaFolhaClienteId", String(item.clienteId))
     setPage(destino)

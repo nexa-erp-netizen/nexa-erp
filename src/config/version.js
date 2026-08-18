@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.28.7",
-  build: "3287",
-  release: "Abertura direta da cobrança do cliente",
+  version: "3.28.9",
+  build: "3289",
+  release: "Fluxo completo de pendências e DAS",
   date: "18/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,8 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.28.9", release: "Fluxo completo de pendências e DAS", date: "18/08/2026", items: ["Confirmação do pagamento do DAS pela rota correta", "DAS pago sai imediatamente das pendências", "Pagamento gera movimentação da própria empresa sem duplicidade", "Inclui abertura direta da cobrança e prioridade urgente da versão 3.28.8"] },
+    { version: "3.28.8", release: "Pendência urgente e abertura direta", date: "18/08/2026", items: ["Prioridade vencida aparece como urgente", "Assistente do Dia abre diretamente a ficha do cliente", "Prioridades do Dia abre diretamente a ficha do cliente", "Cobrança exata é localizada e destacada para conclusão"] },
     { version: "3.28.7", release: "Abertura direta da cobrança do cliente", date: "18/08/2026", items: ["Assistente do Dia abre o cliente mesmo quando a ação não contém ID", "Busca segura pelo nome normalizado", "Cobrança abre diretamente na seção Serviços e cobranças", "ID antigo é removido para impedir abertura do cliente errado"] },
     { version: "3.28.6", release: "Download seguro das guias no Portal Cliente", date: "18/08/2026", items: ["Download do DAS pela rota própria da guia", "Autorização do cliente com identificação normalizada", "PDF do Portal vinculado ao mesmo arquivo disponível no escritório", "Correção da abertura das guias antes do vencimento"] },
     { version: "3.28.2", release: "Pendências somente após o vencimento", date: "17/08/2026", items: ["Tela Pendências Clientes mostra somente guias vencidas", "Guias dentro do prazo permanecem disponíveis apenas no Portal Cliente", "Vencimento passa a ser pendência somente no dia seguinte", "Contadores e lista voltam a usar a mesma regra"] },

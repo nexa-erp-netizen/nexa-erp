@@ -120,6 +120,7 @@ export default function Clientes({ setPage }) {
 
     return clientes.find((item) => normalizarNomeSolicitado(item.nome) === nomeSolicitado)
       || clientes.find((item) => normalizarNomeSolicitado(item.nome).includes(nomeSolicitado))
+      || clientes.find((item) => nomeSolicitado.includes(normalizarNomeSolicitado(item.nome)))
       || null
   }
 
