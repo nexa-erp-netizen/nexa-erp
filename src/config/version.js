@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.28.9",
-  build: "3289",
-  release: "Fluxo completo de pendências e DAS",
+  version: "3.28.10",
+  build: "32810",
+  release: "Movimentação e lançamento contábil integrados",
   date: "18/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.28.10", release: "Movimentação e lançamento contábil integrados", date: "18/08/2026", items: ["Pagamento do DAS gera movimento do cliente e lançamento contábil", "Lançamento vinculado à mesma empresa", "Proteção contra registros duplicados", "Movimentos antigos sem lançamento são reparados automaticamente ao consultar"] },
     { version: "3.28.9", release: "Fluxo completo de pendências e DAS", date: "18/08/2026", items: ["Confirmação do pagamento do DAS pela rota correta", "DAS pago sai imediatamente das pendências", "Pagamento gera movimentação da própria empresa sem duplicidade", "Inclui abertura direta da cobrança e prioridade urgente da versão 3.28.8"] },
     { version: "3.28.8", release: "Pendência urgente e abertura direta", date: "18/08/2026", items: ["Prioridade vencida aparece como urgente", "Assistente do Dia abre diretamente a ficha do cliente", "Prioridades do Dia abre diretamente a ficha do cliente", "Cobrança exata é localizada e destacada para conclusão"] },
     { version: "3.28.7", release: "Abertura direta da cobrança do cliente", date: "18/08/2026", items: ["Assistente do Dia abre o cliente mesmo quando a ação não contém ID", "Busca segura pelo nome normalizado", "Cobrança abre diretamente na seção Serviços e cobranças", "ID antigo é removido para impedir abertura do cliente errado"] },
