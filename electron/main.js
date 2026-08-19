@@ -11,6 +11,30 @@ let nativeVoiceReady = false
 let nativeVoiceShouldRun = false
 let nativeVoiceRestartTimer = null
 
+function configurarAtualizacaoAutomatica() {
+  if (!app.isPackaged) return
+
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on("error", (error) => {
+    console.error("Falha ao verificar atualização da Nexa:", error)
+  })
+
+  autoUpdater.on("update-downloaded", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    mainWindow.webContents.send("nexa-update:downloaded", {
+      message: "Uma nova versão da Nexa foi baixada e será instalada ao fechar o aplicativo.",
+    })
+  })
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch((error) => {
+      console.error("Não foi possível consultar atualizações da Nexa:", error)
+    })
+  }, 5000)
+}
+
 function origemPermitida(url = "") {
   try {
     const origem = new URL(url).origin
@@ -275,8 +299,8 @@ function createWindow() {
 app.whenReady().then(() => {
   configurarPermissoesDeAudio()
   configurarMotorDeVozDesktop()
-  autoUpdater.checkForUpdatesAndNotify()
   createWindow()
+  configurarAtualizacaoAutomatica()
 })
 
 app.on("before-quit", () => {
