@@ -94,6 +94,21 @@ export default function PortalCliente({ setPage }) {
     return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear()
   }
 
+  function ehCredito(item) {
+    const tipo = String(item?.tipo || "").trim().toLowerCase()
+    return ["receita", "crédito", "credito", "entrada"].includes(tipo)
+  }
+
+  function ehDebito(item) {
+    const tipo = String(item?.tipo || "").trim().toLowerCase()
+    return ["despesa", "débito", "debito", "saída", "saida"].includes(tipo)
+  }
+
+  function competenciaMovimento(data) {
+    const valor = String(data || "").slice(0, 7)
+    return /^\d{4}-\d{2}$/.test(valor) ? valor : ""
+  }
+
   function abrirPendencias() {
     if (typeof setPage === "function") {
       setPage("Pendências e Guias")
@@ -112,16 +127,39 @@ export default function PortalCliente({ setPage }) {
     const movimentosMes = movimentos.filter((item) => mesAtual(item.data))
 
     const receitasMes = movimentosMes
-      .filter((item) => item.tipo === "Receita")
+      .filter(ehCredito)
       .reduce((total, item) => total + valorSeguro(item.valor), 0)
 
     const despesasMes = movimentosMes
-      .filter((item) => item.tipo === "Despesa")
+      .filter(ehDebito)
       .reduce((total, item) => total + valorSeguro(item.valor), 0)
+
+    const mesesComMovimento = new Set(
+      movimentos.map((item) => competenciaMovimento(item.data)).filter(Boolean)
+    )
+    const quantidadeMesesMedia = mesesComMovimento.size
+
+    const totalCreditos = movimentos
+      .filter(ehCredito)
+      .reduce((total, item) => total + valorSeguro(item.valor), 0)
+
+    const totalDebitos = movimentos
+      .filter(ehDebito)
+      .reduce((total, item) => total + valorSeguro(item.valor), 0)
+
+    const mediaCreditos = quantidadeMesesMedia
+      ? totalCreditos / quantidadeMesesMedia
+      : 0
+
+    const mediaDebitos = quantidadeMesesMedia
+      ? totalDebitos / quantidadeMesesMedia
+      : 0
 
     const saldoTotal = movimentos.reduce((total, item) => {
       const valor = valorSeguro(item.valor)
-      return item.tipo === "Receita" ? total + valor : total - valor
+      if (ehCredito(item)) return total + valor
+      if (ehDebito(item)) return total - valor
+      return total
     }, 0)
 
     const solicitacoesAbertas = solicitacoes.filter((item) => {
@@ -151,6 +189,9 @@ export default function PortalCliente({ setPage }) {
     return {
       receitasMes,
       despesasMes,
+      mediaCreditos,
+      mediaDebitos,
+      quantidadeMesesMedia,
       saldoTotal,
       pendenciasAbertas,
     }
@@ -194,9 +235,15 @@ export default function PortalCliente({ setPage }) {
 
         .pc-cards {
           display: grid;
-          grid-template-columns: repeat(4, minmax(190px, 1fr));
+          grid-template-columns: repeat(3, minmax(210px, 1fr));
           gap: 15px;
-          margin-bottom: 24px;
+          margin-bottom: 12px;
+        }
+
+        .pc-media-info {
+          color: #9fb1c8;
+          font-size: 12px;
+          margin: 0 2px 24px;
         }
 
         .pc-card {
@@ -401,9 +448,17 @@ export default function PortalCliente({ setPage }) {
       <div className="pc-cards">
         <Card icon={<FaArrowUp />} label="Receitas do mês" value={exibirMoeda(resumo.receitasMes)} color="green" />
         <Card icon={<FaArrowDown />} label="Despesas do mês" value={exibirMoeda(resumo.despesasMes)} color="red" />
+        <Card icon={<FaArrowUp />} label="Média mensal de créditos" value={exibirMoeda(resumo.mediaCreditos)} color="green" />
+        <Card icon={<FaArrowDown />} label="Média mensal de débitos" value={exibirMoeda(resumo.mediaDebitos)} color="red" />
         <Card icon={<FaWallet />} label="Saldo atual" value={exibirMoeda(resumo.saldoTotal)} color={resumo.saldoTotal >= 0 ? "green" : "red"} />
         <Card icon={<FaClipboardList />} label="Pendências e Guias" value={resumo.pendenciasAbertas} color="yellow" />
       </div>
+
+      <p className="pc-media-info">
+        {resumo.quantidadeMesesMedia > 0
+          ? `Médias calculadas com base em ${resumo.quantidadeMesesMedia} competência(s) com movimentação.`
+          : "As médias serão calculadas quando existirem movimentações registradas."}
+      </p>
 
       <div className="pc-center-box">
         <h2>Bem-vindo ao Portal Nexa</h2>
