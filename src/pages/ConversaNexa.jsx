@@ -367,6 +367,9 @@ export default function ConversaNexa({ usuario, setPage }) {
         fallback: Boolean(resposta.fallback),
         acao: resposta.acao || null,
         consulta: resposta.consulta || null,
+        alteracaoSensivel: Boolean(resposta.alteracaoSensivel),
+        confirmacaoAlteracaoPendente: resposta.confirmacaoAlteracaoPendente || null,
+        confirmacaoAlteracaoConcluida: Boolean(resposta.confirmacaoAlteracaoConcluida),
         memoriaRegistrada: Boolean(resposta.memoriaRegistrada),
         data: resposta.respondidoEm || new Date().toISOString(),
       }])
@@ -524,6 +527,12 @@ export default function ConversaNexa({ usuario, setPage }) {
                 {item.fallback && <div style={styles.fallbackNotice}>Resposta gerada pelo Ollama local.</div>}
                 {item.memoriaRegistrada && <div style={styles.memoryNotice}>✓ Informação adicionada à memória.</div>}
                 {item.acao && <div style={styles.actionNotice}>✓ Pronto.</div>}
+                {(item.confirmacaoAlteracaoPendente || item.confirmacaoAlteracaoConcluida) && (
+                  <EstadoAcaoGuiada
+                    pendente={Boolean(item.confirmacaoAlteracaoPendente)}
+                    concluida={Boolean(item.confirmacaoAlteracaoConcluida)}
+                  />
+                )}
                 {item.consulta && <ResultadoConsulta consulta={item.consulta} onAbrir={() => executarAcaoNexa(item.consulta.acaoSugerida)} />}
                 {!item.consulta && !!item.pontos?.length && <ul style={styles.list}>{item.pontos.map((ponto) => <li key={ponto}>{ponto}</li>)}</ul>}
                 {item.recomendacao && <div style={styles.recommendation}><span>Recomendação</span><strong>{item.recomendacao}</strong></div>}
@@ -574,6 +583,9 @@ function mapearMensagemPersistida(item) {
     fallback: Boolean(dados.fallback),
     acao: dados.acao || null,
     consulta: dados.consulta || null,
+    alteracaoSensivel: Boolean(dados.alteracaoSensivel),
+    confirmacaoAlteracaoPendente: dados.confirmacaoAlteracaoPendente || null,
+    confirmacaoAlteracaoConcluida: Boolean(dados.confirmacaoAlteracaoConcluida),
     memoriaRegistrada: Boolean(dados.memoriaRegistrada),
     data: item.createdAt,
   }
@@ -662,6 +674,25 @@ function ResultadoConsulta({ consulta, onAbrir }) {
   )
 }
 
+function EstadoAcaoGuiada({ pendente, concluida }) {
+  if (concluida) {
+    return (
+      <div style={{ ...styles.guidedAction, ...styles.guidedActionDone }}>
+        <strong>✓ Ação guiada concluída</strong>
+        <span>O resultado e o histórico foram registrados pela Nexa.</span>
+      </div>
+    )
+  }
+
+  if (!pendente) return null
+  return (
+    <div style={{ ...styles.guidedAction, ...styles.guidedActionPending }}>
+      <strong>Ação guiada aguardando confirmação</strong>
+      <span>Responda na conversa com os dados solicitados. Nenhuma alteração foi realizada ainda.</span>
+    </div>
+  )
+}
+
 function nomeProvedor(provedor, modelo = "") {
   const nome = String(provedor || "").toLowerCase()
   if (nome === "ollama") return "Ollama local"
@@ -722,6 +753,9 @@ const styles = {
   fallbackNotice: { marginTop: "10px", color: "#ffd298", fontSize: "12px" },
   memoryNotice: { marginTop: "10px", color: "#aaffc2", fontSize: "12px", fontWeight: "bold" },
   actionNotice: { marginTop: "10px", color: "#aaffc2", fontSize: "12px", fontWeight: "bold" },
+  guidedAction: { marginTop: "10px", borderRadius: "11px", padding: "11px", display: "flex", flexDirection: "column", gap: "4px", fontSize: "12px" },
+  guidedActionPending: { background: "rgba(255,184,77,.10)", border: "1px solid rgba(255,184,77,.30)", color: "#ffd298" },
+  guidedActionDone: { background: "rgba(55,255,116,.08)", border: "1px solid rgba(55,255,116,.25)", color: "#aaffc2" },
   list: { margin: "10px 0 0", paddingLeft: "20px", color: "#dce8f8", lineHeight: 1.65 },
   recommendation: { marginTop: "12px", background: "rgba(55,255,116,.08)", border: "1px solid rgba(55,255,116,.20)", borderRadius: "11px", padding: "11px", display: "flex", flexDirection: "column", gap: "4px" },
   details: { marginTop: "11px", color: "#a9c5df" },
