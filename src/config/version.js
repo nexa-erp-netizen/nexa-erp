@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.29.0",
-  build: "32900",
-  release: "Módulo 4 Nexa Assist concluído",
+  version: "3.30.0",
+  build: "33000",
+  release: "Motor Universal Nexa Actions",
   date: "19/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.30.0", release: "Motor Universal Nexa Actions", date: "19/08/2026", items: ["Mesmo motor para comandos falados e digitados", "Novo cliente cadastrado passo a passo pela Nexa", "Atualização assistida dos dados cadastrais permitidos", "Validação de CPF, telefone, e-mail, CEP, UF e data", "Confirmação final, cancelamento e bloqueio de duplicidade", "Base preparada para conectar os demais módulos"] },
     { version: "3.29.0", release: "Módulo 4 Nexa Assist concluído", date: "19/08/2026", items: ["Ações sensíveis conduzidas passo a passo pela conversa", "Confirmação recuperada mesmo após atualizar a página", "Nenhuma alteração antes dos dados obrigatórios", "Estado aguardando confirmação ou concluído exibido no chat", "Testes automáticos dos fluxos críticos consolidados"] },
     { version: "3.28.12", release: "Médias financeiras no Portal Cliente", date: "19/08/2026", items: ["Média mensal de créditos no Portal Cliente", "Média mensal de débitos no Portal Cliente", "Cálculo sobre todas as competências com movimentação", "Quantidade de meses utilizada apresentada ao cliente"] },
     { version: "3.28.11", release: "Prioridades pagas e carregamento otimizado", date: "19/08/2026", items: ["Guias pagas são removidas das Prioridades do Dia", "Guias pagas não entram no Assistente do Dia", "Removida conferência repetitiva de todos os lançamentos a cada consulta", "Criação integrada permanece automática no momento do pagamento"] },

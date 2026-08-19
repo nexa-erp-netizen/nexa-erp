@@ -370,6 +370,8 @@ export default function ConversaNexa({ usuario, setPage }) {
         alteracaoSensivel: Boolean(resposta.alteracaoSensivel),
         confirmacaoAlteracaoPendente: resposta.confirmacaoAlteracaoPendente || null,
         confirmacaoAlteracaoConcluida: Boolean(resposta.confirmacaoAlteracaoConcluida),
+        acaoGuiadaPendente: resposta.acaoGuiadaPendente || null,
+        acaoGuiadaConcluida: Boolean(resposta.acaoGuiadaConcluida),
         memoriaRegistrada: Boolean(resposta.memoriaRegistrada),
         data: resposta.respondidoEm || new Date().toISOString(),
       }])
@@ -533,6 +535,12 @@ export default function ConversaNexa({ usuario, setPage }) {
                     concluida={Boolean(item.confirmacaoAlteracaoConcluida)}
                   />
                 )}
+                {(item.acaoGuiadaPendente || item.acaoGuiadaConcluida) && (
+                  <EstadoAcaoGuiada
+                    pendente={Boolean(item.acaoGuiadaPendente)}
+                    concluida={Boolean(item.acaoGuiadaConcluida)}
+                  />
+                )}
                 {item.consulta && <ResultadoConsulta consulta={item.consulta} onAbrir={() => executarAcaoNexa(item.consulta.acaoSugerida)} />}
                 {!item.consulta && !!item.pontos?.length && <ul style={styles.list}>{item.pontos.map((ponto) => <li key={ponto}>{ponto}</li>)}</ul>}
                 {item.recomendacao && <div style={styles.recommendation}><span>Recomendação</span><strong>{item.recomendacao}</strong></div>}
@@ -586,6 +594,8 @@ function mapearMensagemPersistida(item) {
     alteracaoSensivel: Boolean(dados.alteracaoSensivel),
     confirmacaoAlteracaoPendente: dados.confirmacaoAlteracaoPendente || null,
     confirmacaoAlteracaoConcluida: Boolean(dados.confirmacaoAlteracaoConcluida),
+    acaoGuiadaPendente: dados.acaoGuiadaPendente || null,
+    acaoGuiadaConcluida: Boolean(dados.acaoGuiadaConcluida),
     memoriaRegistrada: Boolean(dados.memoriaRegistrada),
     data: item.createdAt,
   }
