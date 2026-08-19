@@ -153,7 +153,7 @@ function fiscalAtivo(item) {
     !status.includes("concluído") &&
     !status.includes("concluido") &&
     !status.includes("cancelado") &&
-    !status.includes("pago pelo escritório")
+    !status.includes("pago")
   )
 }
 
@@ -296,9 +296,8 @@ export function montarAcoesDoDia({
       return
     }
 
-    // Antes do vencimento é obrigação programada, não pendência. A única
-    // exceção é pagamento já informado pelo cliente, que exige conferência.
-    if (!status.includes("pago pelo cliente")) return
+    // Antes do vencimento é obrigação programada, não pendência.
+    if (dias === null || dias >= 0) return
 
     if (dias !== null && dias === 0 && aguardandoPagamentoFiscal(item)) {
       acoes.push(criarAcao({
@@ -388,21 +387,6 @@ export function montarAcoesDoDia({
       }))
     }
 
-    if (status.includes("pago pelo cliente")) {
-      acoes.push(criarAcao({
-        id: `fiscal-pago-cliente-${item.id}`,
-        cliente,
-        clienteId,
-        clienteDados: clienteCadastro,
-        modulo: "Fiscal",
-        titulo: "Conferir pagamento recebido",
-        descricao: `${obrigacao} foi marcada como paga pelo cliente. Conferir recibo e concluir.`,
-        prioridade: 65,
-        destino: "Fiscal",
-        referenciaId: item.id,
-        data: item.vencimento,
-      }))
-    }
   })
 
   pendencias.filter(pendenciaAberta).forEach((item) => {

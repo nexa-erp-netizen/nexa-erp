@@ -450,7 +450,7 @@ export default function Dashboard({ setPage }) {
     const lista = []
 
     fiscal
-      .filter((item) => item.status !== "Concluído" && pertenceClienteOperacional(item))
+      .filter((item) => fiscalAguardandoPagamento(item) && pertenceClienteOperacional(item))
       .forEach((item) => {
         const dias = diferencaDias(item.vencimento)
 
@@ -492,19 +492,6 @@ export default function Dashboard({ setPage }) {
           })
         }
 
-        if (item.status === "Pago pelo cliente") {
-          lista.push({
-            id: `fiscal-pago-${item.id}`,
-            nivel: "success",
-            peso: 3,
-            titulo: item.cliente,
-            descricao: `${item.obrigacao || "Obrigação"} paga pelo cliente. Conferir e concluir.`,
-            etiqueta: "Conferir",
-            destino: "Fiscal",
-            cliente: item.cliente,
-            referenciaId: item.id,
-          })
-        }
       })
 
     pendencias
