@@ -51,6 +51,7 @@ const NAVEGACAO_LOCAL = [
   { pagina: "Movimentos Clientes", aliases: ["movimentos dos clientes", "movimentacoes dos clientes", "movimentos clientes", "movimentacoes clientes", "movimentacao", "movimentacoes", "movimento", "movimentos"] },
   { pagina: "Lançamentos Contábeis", aliases: ["lancamentos contabeis", "lancamento contabil", "contabilidade", "contabil"] },
   { pagina: "Clientes", secao: "servicos", aliases: ["servicos e cobrancas", "servico e cobranca", "servicos avulsos", "servico avulso", "lancar servico avulso", "lancamento de servico avulso"] },
+  { pagina: "Clientes", secao: "historico", aliases: ["historico do cliente", "historico da empresa", "anotacoes do cliente", "anotacoes da empresa", "historico", "anotacoes"] },
   { pagina: "DRE Gerencial", aliases: ["dre gerencial", "demonstracao do resultado", "dre"] },
   { pagina: "Documentos Digitais", aliases: ["documentos digitais", "documentos"] },
   { pagina: "Pendências Clientes", aliases: ["pendencias dos clientes", "pendencias clientes", "pendencias"] },
