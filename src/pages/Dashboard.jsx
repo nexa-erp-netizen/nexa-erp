@@ -32,8 +32,6 @@ import {
   FaArrowRight,
 } from "react-icons/fa"
 
-const API_URL = "https://nexa-erp-api.onrender.com"
-
 export default function Dashboard({ setPage }) {
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}")
 
@@ -169,12 +167,8 @@ export default function Dashboard({ setPage }) {
       setSugestoesEnviadas(new Set(resultadoArray(enviosWhatsAppResp).map((item) => item.sugestaoId)))
 
       if (token) {
-        const resposta = await fetch(`${API_URL}/notificacoes/contador`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
-        const dados = await resposta.json()
-        setNotificacoes(dados.total || 0)
+        const resposta = await api.get("/notificacoes/contador")
+        setNotificacoes(resposta.data?.total || 0)
       }
     } catch (error) {
       alert("Erro ao carregar dashboard")

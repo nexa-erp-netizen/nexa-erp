@@ -1,45 +1,25 @@
 import { useEffect, useState } from "react"
-
-const API_URL = "https://nexa-erp-api.onrender.com"
+import api from "../services/api"
 
 export default function Notificacoes() {
   const [notificacoes, setNotificacoes] = useState([])
-  const usuarioSalvo = JSON.parse(localStorage.getItem("usuario"))
-  const token = localStorage.getItem("token") || usuarioSalvo?.token
-
   async function carregarNotificacoes() {
     try {
-      const resposta = await fetch(`${API_URL}/notificacoes`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      const dados = await resposta.json()
-      setNotificacoes(Array.isArray(dados) ? dados : [])
+      const resposta = await api.get("/notificacoes")
+      setNotificacoes(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (error) {
       console.error("Erro ao carregar notificações:", error)
     }
   }
 
   async function marcarComoLida(id) {
-    await fetch(`${API_URL}/notificacoes/${id}/lida`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    await api.patch(`/notificacoes/${id}/lida`)
 
     carregarNotificacoes()
   }
 
   async function marcarTodasComoLidas() {
-    await fetch(`${API_URL}/notificacoes/marcar-todas/lidas`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    await api.patch("/notificacoes/marcar-todas/lidas")
 
     carregarNotificacoes()
   }

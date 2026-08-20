@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import axios from "axios"
+import api from "../services/api"
 
 import "./FluxoCaixa.css"
 
@@ -18,9 +18,7 @@ export default function FluxoCaixa() {
   async function carregarFluxo() {
     try {
 
-      const response = await axios.get(
-        "http://localhost:3000/fluxo-caixa"
-      )
+      const response = await api.get("/fluxo-caixa")
 
       setFluxo(response.data)
 
@@ -32,8 +30,8 @@ export default function FluxoCaixa() {
   async function criarLancamento() {
     try {
 
-      await axios.post(
-        "http://localhost:3000/fluxo-caixa",
+      await api.post(
+        "/fluxo-caixa",
         {
           ...novo,
           status: "Realizado",

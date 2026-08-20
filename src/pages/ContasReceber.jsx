@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import axios from "axios"
+import api from "../services/api"
 
 import "./ContasReceber.css"
 
@@ -15,9 +15,7 @@ export default function ContasReceber() {
 
   async function carregarContas() {
     try {
-      const response = await axios.get(
-        "http://localhost:3000/contas-receber"
-      )
+      const response = await api.get("/contas-receber")
 
       const contasAtualizadas = response.data.map((conta) => {
         if (
@@ -41,9 +39,7 @@ export default function ContasReceber() {
 
   async function carregarServicos() {
     try {
-      const response = await axios.get(
-        "http://localhost:3000/servicos"
-      )
+      const response = await api.get("/servicos")
 
       setServicos(response.data)
     } catch (error) {
@@ -62,7 +58,7 @@ export default function ContasReceber() {
         return
       }
 
-      await axios.post("http://localhost:3000/contas-receber", {
+      await api.post("/contas-receber", {
         ...novaConta,
         status: "Pendente",
       })
@@ -81,9 +77,7 @@ export default function ContasReceber() {
 
   async function receberConta(id) {
     try {
-      await axios.put(
-        `http://localhost:3000/contas-receber/${id}/receber`
-      )
+      await api.put(`/contas-receber/${id}/receber`)
 
       carregarContas()
     } catch (error) {

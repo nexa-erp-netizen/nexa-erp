@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import api from "../services/api"
+import api, { montarUrlApi } from "../services/api"
 
 export default function DocumentosDigitais() {
   const usuario = JSON.parse(localStorage.getItem("usuario"))
@@ -297,9 +297,7 @@ export default function DocumentosDigitais() {
                             arquivo.url ||
                             (arquivo.caminho?.startsWith("http")
                               ? arquivo.caminho
-                              : `https://nexa-erp-api.onrender.com/${String(
-                                  arquivo.caminho || ""
-                                ).replace(/^\/+/, "")}`)
+                              : montarUrlApi(arquivo.caminho))
                           }
                           target="_blank"
                           rel="noreferrer"

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import api from "../services/api"
 import logo from "../assets/logo.png"
 import {
   FaChartLine,
@@ -13,8 +14,6 @@ import {
   FaBell,
   FaFlask,
 } from "react-icons/fa"
-
-const API_URL = "https://nexa-erp-api.onrender.com"
 
 export default function Sidebar({ page, setPage, usuario }) {
   const [grupoAberto, setGrupoAberto] = useState("")
@@ -36,20 +35,11 @@ export default function Sidebar({ page, setPage, usuario }) {
     async function carregarContador() {
       if (usuario?.perfil === "Cliente") return
 
-      const usuarioSalvo = JSON.parse(localStorage.getItem("usuario") || "{}")
-      const token = localStorage.getItem("token") || usuarioSalvo?.token
-
-      if (!token) return
+      if (!localStorage.getItem("token")) return
 
       try {
-        const resposta = await fetch(`${API_URL}/notificacoes/contador`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        const dados = await resposta.json()
-        setContadorNotificacoes(dados.total || 0)
+        const resposta = await api.get("/notificacoes/contador")
+        setContadorNotificacoes(resposta.data?.total || 0)
       } catch (error) {
         console.error("Erro ao carregar contador de notificações:", error)
       }

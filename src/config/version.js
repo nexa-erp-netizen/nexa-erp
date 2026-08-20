@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.31.1",
-  build: "33101",
-  release: "Localização segura de clientes",
+  version: "3.31.3",
+  build: "33103",
+  release: "Aviso de instabilidade do sistema",
   date: "20/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.31.3", release: "Aviso de instabilidade do sistema", date: "20/08/2026", items: ["Falha de comunicação identificada automaticamente", "Aviso claro para escritório e clientes", "Orientação para não salvar informações durante a falha", "Botão para verificar novamente", "Aviso removido automaticamente após normalização"] },
     { version: "3.31.1", release: "Localização segura de clientes", date: "20/08/2026", items: ["Cliente localizado pelo nome parcial no comando", "Compatibilidade com acentos e nomes compostos", "Correção do filtro que confundia empresa com escritório", "Isolamento multiempresa preservado pelo código do escritório"] },
     { version: "3.31.0", release: "Lançamentos por voz e texto", date: "20/08/2026", items: ["Receitas e despesas registradas pela conversa da Nexa", "Mesmo fluxo para comandos falados e digitados", "Movimento do cliente e lançamento contábil criados juntos", "Resumo e confirmação obrigatória antes de gravar", "Bloqueio de duplicidade recente e isolamento por escritório"] },
     { version: "3.30.0", release: "Motor Universal Nexa Actions", date: "19/08/2026", items: ["Mesmo motor para comandos falados e digitados", "Novo cliente cadastrado passo a passo pela Nexa", "Atualização assistida dos dados cadastrais permitidos", "Validação de CPF, telefone, e-mail, CEP, UF e data", "Confirmação final, cancelamento e bloqueio de duplicidade", "Base preparada para conectar os demais módulos"] },

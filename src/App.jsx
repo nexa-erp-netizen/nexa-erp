@@ -4,6 +4,7 @@ import api from "./services/api"
 import Sidebar from "./components/Sidebar"
 import Header from "./components/Header"
 import NexaVoiceListener from "./components/NexaVoiceListener"
+import SistemaInstavelAviso from "./components/SistemaInstavelAviso"
 
 import Login from "./pages/Login"
 
@@ -351,22 +352,26 @@ export default function App() {
 
   if (!usuario) {
     return (
-      <Login
-        onLogin={(usuarioLogado) => {
-          setUsuario(usuarioLogado)
+      <>
+        <SistemaInstavelAviso />
+        <Login
+          onLogin={(usuarioLogado) => {
+            setUsuario(usuarioLogado)
 
-          if (usuarioLogado?.perfil === "Cliente") {
-            setPage("Portal Cliente")
-          } else {
-            setPage("Dashboard")
-          }
-        }}
-      />
+            if (usuarioLogado?.perfil === "Cliente") {
+              setPage("Portal Cliente")
+            } else {
+              setPage("Dashboard")
+            }
+          }}
+        />
+      </>
     )
   }
 
   return (
     <div style={styles.body}>
+      <SistemaInstavelAviso />
       <div
         style={{
           ...styles.app,
