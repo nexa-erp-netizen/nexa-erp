@@ -207,7 +207,8 @@ export default function Financeiro() {
   const totalReceitas = lancamentosCompetencia.filter(ehReceita).reduce((total, item) => total + item.valorNumber, 0)
   const totalDespesas = lancamentosCompetencia.filter(ehDespesa).reduce((total, item) => total + item.valorNumber, 0)
   const saldoAnterior = calcularSaldo(lancamentosAnteriores)
-  const saldoAtual = saldoAnterior + totalReceitas - totalDespesas
+  // Saldo anterior é apenas informativo e nunca compõe o resultado do mês atual.
+  const saldoAtual = totalReceitas - totalDespesas
 
   const evolucao = useMemo(() => {
     const hoje = new Date()

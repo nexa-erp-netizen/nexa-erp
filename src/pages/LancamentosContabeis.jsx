@@ -206,8 +206,20 @@ export default function LancamentosContabeis() {
     return d.toLocaleDateString("pt-BR")
   }
 
+  function dataLancamentoValida(valor) {
+    const achou = String(valor || "").match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!achou) return false
+    const ano = Number(achou[1])
+    const mes = Number(achou[2])
+    const dia = Number(achou[3])
+    const limiteAno = new Date().getFullYear() + 1
+    const data = new Date(Date.UTC(ano, mes - 1, dia))
+    return ano >= 1900 && ano <= limiteAno
+      && data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia
+  }
+
   function obterCompetenciaValor(data) {
-    if (!data) return ""
+    if (!dataLancamentoValida(data)) return ""
 
     const d = new Date(data + "T00:00:00")
     const ano = d.getFullYear()
@@ -271,7 +283,7 @@ export default function LancamentosContabeis() {
 
 
   function nomeMes(data) {
-    if (!data) return "Sem data"
+    if (!dataLancamentoValida(data)) return "Data inválida"
 
     const meses = [
       "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
@@ -333,6 +345,11 @@ export default function LancamentosContabeis() {
 
     if (!form.cliente || !form.descricao || !form.valor || !form.data) {
       alert("Preencha cliente, descrição, quantidade, valor unitário e data.")
+      return
+    }
+
+    if (!dataLancamentoValida(form.data)) {
+      alert("Data inválida. Confira principalmente o ano antes de salvar.")
       return
     }
 
@@ -425,7 +442,7 @@ export default function LancamentosContabeis() {
   const clientesAgrupados = useMemo(() => {
     const grupos = {}
 
-    lancamentos.forEach((lancamento) => {
+    lancamentos.filter((lancamento) => dataLancamentoValida(lancamento.data)).forEach((lancamento) => {
       const clienteOriginal = lancamento.cliente || "Sem cliente"
       const chaveCliente = normalizarNome(clienteOriginal) || "sem cliente"
       const clienteCadastrado = clientes.find(
@@ -980,6 +997,8 @@ export default function LancamentosContabeis() {
           <input
             className="lc-input"
             type="date"
+            min="1900-01-01"
+            max={`${new Date().getFullYear() + 1}-12-31`}
             value={form.data}
             onChange={(e) =>
               setForm({

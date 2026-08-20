@@ -106,7 +106,9 @@ export default function PortalCliente({ setPage }) {
 
   function competenciaMovimento(data) {
     const valor = String(data || "").slice(0, 7)
-    return /^\d{4}-\d{2}$/.test(valor) ? valor : ""
+    if (!/^\d{4}-\d{2}$/.test(valor)) return ""
+    const [ano, mes] = valor.split("-").map(Number)
+    return ano >= 1900 && ano <= new Date().getFullYear() + 1 && mes >= 1 && mes <= 12 ? valor : ""
   }
 
   function abrirPendencias() {
@@ -124,7 +126,8 @@ export default function PortalCliente({ setPage }) {
   }
 
   const resumo = useMemo(() => {
-    const movimentosMes = movimentos.filter((item) => mesAtual(item.data))
+    const movimentosValidos = movimentos.filter((item) => competenciaMovimento(item.data))
+    const movimentosMes = movimentosValidos.filter((item) => mesAtual(item.data))
 
     const receitasMes = movimentosMes
       .filter(ehCredito)
@@ -135,15 +138,15 @@ export default function PortalCliente({ setPage }) {
       .reduce((total, item) => total + valorSeguro(item.valor), 0)
 
     const mesesComMovimento = new Set(
-      movimentos.map((item) => competenciaMovimento(item.data)).filter(Boolean)
+      movimentosValidos.map((item) => competenciaMovimento(item.data)).filter(Boolean)
     )
     const quantidadeMesesMedia = mesesComMovimento.size
 
-    const totalCreditos = movimentos
+    const totalCreditos = movimentosValidos
       .filter(ehCredito)
       .reduce((total, item) => total + valorSeguro(item.valor), 0)
 
-    const totalDebitos = movimentos
+    const totalDebitos = movimentosValidos
       .filter(ehDebito)
       .reduce((total, item) => total + valorSeguro(item.valor), 0)
 
@@ -155,7 +158,7 @@ export default function PortalCliente({ setPage }) {
       ? totalDebitos / quantidadeMesesMedia
       : 0
 
-    const saldoTotal = movimentos.reduce((total, item) => {
+    const saldoTotal = movimentosValidos.reduce((total, item) => {
       const valor = valorSeguro(item.valor)
       if (ehCredito(item)) return total + valor
       if (ehDebito(item)) return total - valor

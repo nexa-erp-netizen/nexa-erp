@@ -122,6 +122,18 @@ export default function MovimentosCliente() {
     return new Date(data + "T00:00:00").toLocaleDateString("pt-BR")
   }
 
+  function dataMovimentoValida(valor) {
+    const achou = String(valor || "").match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!achou) return false
+    const ano = Number(achou[1])
+    const mes = Number(achou[2])
+    const dia = Number(achou[3])
+    const limiteAno = new Date().getFullYear() + 1
+    const data = new Date(Date.UTC(ano, mes - 1, dia))
+    return ano >= 1900 && ano <= limiteAno
+      && data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia
+  }
+
   function competenciaAtual() {
     setCompetencia(new Date().toISOString().slice(0, 7))
   }
@@ -177,6 +189,11 @@ export default function MovimentosCliente() {
 
   async function salvarLancamentos() {
     try {
+      const linhaComDataInvalida = linhas.findIndex((linha) => linha.data && !dataMovimentoValida(linha.data))
+      if (linhaComDataInvalida >= 0) {
+        alert(`A data da linha ${linhaComDataInvalida + 1} é inválida. Confira principalmente o ano.`)
+        return
+      }
       const linhasValidas = linhas.filter(
         (linha) =>
           linha.data &&
@@ -347,19 +364,24 @@ export default function MovimentosCliente() {
     input.click()
   }
 
-  const movimentosFiltrados = useMemo(() => {
-    if (!competencia) return movimentos
+  const movimentosComDataValida = useMemo(
+    () => movimentos.filter((item) => dataMovimentoValida(item.data)),
+    [movimentos]
+  )
 
-    return movimentos.filter((item) => {
+  const movimentosFiltrados = useMemo(() => {
+    if (!competencia) return movimentosComDataValida
+
+    return movimentosComDataValida.filter((item) => {
       if (!item.data) return false
       return String(item.data).slice(0, 7) === competencia
     })
-  }, [movimentos, competencia])
+  }, [movimentosComDataValida, competencia])
 
   const saldoAnterior = useMemo(() => {
     if (!competencia) return 0
 
-    return movimentos
+    return movimentosComDataValida
       .filter((item) => {
         if (!item.data) return false
 
@@ -374,7 +396,7 @@ export default function MovimentosCliente() {
           ? total + valor
           : total - valor
       }, 0)
-  }, [movimentos, competencia])
+  }, [movimentosComDataValida, competencia])
 
   const resumo = useMemo(() => {
     const receitas = movimentosFiltrados
@@ -410,7 +432,7 @@ export default function MovimentosCliente() {
 
     const porChave = new Map(meses.map((mes) => [mes.chave, mes]))
 
-    movimentos.forEach((item) => {
+    movimentosComDataValida.forEach((item) => {
       const mes = porChave.get(String(item.data || "").slice(0, 7))
       if (!mes) return
       const valor = valorSeguro(item.valor)
@@ -420,7 +442,7 @@ export default function MovimentosCliente() {
 
     const maiorValor = Math.max(1, ...meses.flatMap((mes) => [mes.receitas, mes.despesas]))
     return { meses, maiorValor }
-  }, [movimentos])
+  }, [movimentosComDataValida])
 
   return (
     <div className="mv-page">
@@ -924,6 +946,8 @@ export default function MovimentosCliente() {
                     <input
                       className="mv-input"
                       type="date"
+                      min="1900-01-01"
+                      max={`${new Date().getFullYear() + 1}-12-31`}
                       value={linha.data}
                       onChange={(e) =>
                         atualizarLinha(index, "data", e.target.value)
