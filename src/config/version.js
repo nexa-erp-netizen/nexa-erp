@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.30.6",
-  build: "33006",
-  release: "Proteção de datas, saldos e navegação",
+  version: "3.31.0",
+  build: "33100",
+  release: "Lançamentos por voz e texto",
   date: "20/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,7 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
-    { version: "3.30.6", release: "Proteção de datas, saldos e navegação", date: "20/08/2026", items: ["Bloqueio de anos e datas inválidas em movimentos e lançamentos", "Correção segura do registro legado 0226 para 2026", "Registros inválidos não contaminam saldos nem gráficos", "Saldo anterior permanece apenas informativo", "Confirmação de cliente retoma e executa a navegação original"] },
+    { version: "3.31.0", release: "Lançamentos por voz e texto", date: "20/08/2026", items: ["Receitas e despesas registradas pela conversa da Nexa", "Mesmo fluxo para comandos falados e digitados", "Movimento do cliente e lançamento contábil criados juntos", "Resumo e confirmação obrigatória antes de gravar", "Bloqueio de duplicidade recente e isolamento por escritório"] },
     { version: "3.30.0", release: "Motor Universal Nexa Actions", date: "19/08/2026", items: ["Mesmo motor para comandos falados e digitados", "Novo cliente cadastrado passo a passo pela Nexa", "Atualização assistida dos dados cadastrais permitidos", "Validação de CPF, telefone, e-mail, CEP, UF e data", "Confirmação final, cancelamento e bloqueio de duplicidade", "Base preparada para conectar os demais módulos"] },
     { version: "3.29.0", release: "Módulo 4 Nexa Assist concluído", date: "19/08/2026", items: ["Ações sensíveis conduzidas passo a passo pela conversa", "Confirmação recuperada mesmo após atualizar a página", "Nenhuma alteração antes dos dados obrigatórios", "Estado aguardando confirmação ou concluído exibido no chat", "Testes automáticos dos fluxos críticos consolidados"] },
     { version: "3.28.12", release: "Médias financeiras no Portal Cliente", date: "19/08/2026", items: ["Média mensal de créditos no Portal Cliente", "Média mensal de débitos no Portal Cliente", "Cálculo sobre todas as competências com movimentação", "Quantidade de meses utilizada apresentada ao cliente"] },
