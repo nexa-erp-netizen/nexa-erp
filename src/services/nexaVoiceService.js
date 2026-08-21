@@ -229,8 +229,8 @@ export async function resolverAcaoAbrirClientePorVoz(comando) {
   }
 }
 
-function emitirAberturaCliente(clienteId, clienteNome) {
-  const detalhe = { id: clienteId, nome: clienteNome }
+function emitirAberturaCliente(clienteId, clienteNome, secao = "") {
+  const detalhe = { id: clienteId, nome: clienteNome, secao }
   ;[0, 100, 300, 700].forEach((atraso) => {
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent("nexa:abrir-cliente", { detail: detalhe }))
@@ -333,7 +333,7 @@ export function executarAcaoDeVoz({ acao, setPage }) {
     // evento por alguns instantes, cobrindo tanto a lista já aberta quanto a
     // navegação iniciada em outra página.
     setPage("Clientes")
-    emitirAberturaCliente(clienteId, clienteNome)
+    emitirAberturaCliente(clienteId, clienteNome, String(acao.secao || ""))
     return true
   }
   if (pagina === "Fiscal") {

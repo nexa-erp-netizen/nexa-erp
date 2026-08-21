@@ -37,6 +37,7 @@ const STATUS_INICIAL = {
 
 const ATIVAR_VISAO_PATTERN = /\b(?:visualiz(?:a|e|ar)|visualis(?:a|e|ar)|analis(?:a|e|ar)|vej(?:a|am)|ver|olh(?:a|e|ar)|enxerg(?:a|ue|ar))\b[\s\S]{0,65}\b(?:esta|essa|minha|a)?\s*tela\b|\b(?:ver|vendo|visualizar|visualisar|enxergar)\b[\s\S]{0,45}\bo\s+que\s+(?:eu\s+)?(?:estou|to|t[oô])\s+vendo\b/i
 const ANALISAR_TELA_PATTERN = /\b(?:analis|avali|identifi|verifi|confir|erro|problema|inconsist|melhoria|layout|design|apar[eê]ncia|opini[aã]o|parecer|sugest|valor|saldo|status|pend[eê]ncia|cliente|fiscal|financeir)\w*/i
+const PEDIDO_ANALISE_TELA_ATIVA_PATTERN = /\b(?:analis|avali|identifi|verifi|erro|problema|inconsist|melhoria|layout|design|apar[eê]ncia|opini[aã]o|parecer|sugest)\w*/i
 const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|pode|pode desativar|desative|desativar)[.!?]*\s*$/i
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:n[aã]o|continue|continuar|mantenha|deixe ativa)[.!?]*\s*$/i
 
@@ -415,7 +416,7 @@ export default function ConversaNexa({ usuario, setPage }) {
       } else if (aguardandoDesativacaoTelaRef.current && CONFIRMACAO_NAO_PATTERN.test(pergunta)) {
         aguardandoDesativacaoTelaRef.current = false
         resposta = { resposta: "Certo. A visualização continua ativa.", provedor: "sistema", respondidoEm: new Date().toISOString() }
-      } else if (pedidoVisual || visualizacaoTelaRef.current?.active) {
+      } else if (pedidoVisual || (visualizacaoTelaRef.current?.active && PEDIDO_ANALISE_TELA_ATIVA_PATTERN.test(perguntaInterpretada))) {
         if (!visualizacaoTelaRef.current?.active) await iniciarVisualizacaoTela()
         const imagem = await capturarTelaAtual()
         if (ANALISAR_TELA_PATTERN.test(perguntaInterpretada)) {

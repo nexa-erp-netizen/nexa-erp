@@ -124,7 +124,7 @@ export default function Clientes({ setPage }) {
       || null
   }
 
-  function consumirSolicitacaoAbertura(clienteIdSolicitado, clienteNomeSolicitado) {
+  function consumirSolicitacaoAbertura(clienteIdSolicitado, clienteNomeSolicitado, secaoSolicitada = "") {
     if (!clienteIdSolicitado && !clienteNomeSolicitado) return false
 
     const clienteEncontrado = localizarClienteSolicitado(clienteIdSolicitado, clienteNomeSolicitado)
@@ -132,7 +132,8 @@ export default function Clientes({ setPage }) {
 
     localStorage.removeItem("nexaAbrirClienteId")
     localStorage.removeItem("nexaAbrirClienteNome")
-    visualizarCliente(clienteEncontrado)
+    if (secaoSolicitada) localStorage.setItem("nexaAbrirSecaoCliente", String(secaoSolicitada))
+    visualizarCliente(clienteEncontrado, secaoSolicitada)
     return true
   }
 
@@ -146,7 +147,7 @@ export default function Clientes({ setPage }) {
     function abrirClienteSolicitado(evento) {
       const clienteIdSolicitado = evento?.detail?.id || localStorage.getItem("nexaAbrirClienteId")
       const clienteNomeSolicitado = evento?.detail?.nome || localStorage.getItem("nexaAbrirClienteNome")
-      consumirSolicitacaoAbertura(clienteIdSolicitado, clienteNomeSolicitado)
+      consumirSolicitacaoAbertura(clienteIdSolicitado, clienteNomeSolicitado, evento?.detail?.secao || "")
     }
 
     window.addEventListener("nexa:abrir-cliente", abrirClienteSolicitado)
@@ -447,7 +448,7 @@ export default function Clientes({ setPage }) {
     })
   }
 
-  function visualizarCliente(cliente) {
+  function visualizarCliente(cliente, secaoDireta = "") {
     registrarClienteVoz(cliente)
     setClienteSelecionado(cliente)
     setEditandoId(cliente.id)
@@ -457,10 +458,10 @@ export default function Clientes({ setPage }) {
       rolarParaTopo()
       setTimeout(rolarParaTopo, 80)
 
-      const secaoSolicitada = localStorage.getItem("nexaAbrirSecaoCliente")
+      const secaoSolicitada = secaoDireta || localStorage.getItem("nexaAbrirSecaoCliente")
       if (secaoSolicitada) {
         localStorage.removeItem("nexaAbrirSecaoCliente")
-        setTimeout(() => rolarParaSecao(secaoSolicitada), 240)
+        ;[240, 500, 900].forEach((atraso) => setTimeout(() => rolarParaSecao(secaoSolicitada), atraso))
       }
     })
   }

@@ -1210,7 +1210,11 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           visualizacaoAtiva: true,
           respondidoEm: new Date().toISOString(),
         }
-      } else if (ATIVAR_VISAO_PATTERN.test(comandoInterpretado) || visualizacaoTelaRef.current?.active || focoAnalisePendente) {
+      } else if (
+        ATIVAR_VISAO_PATTERN.test(comandoInterpretado)
+        || focoAnalisePendente
+        || (visualizacaoTelaRef.current?.active && ANALISAR_CONTEUDO_TELA_PATTERN.test(comandoInterpretado))
+      ) {
         const estavaAtiva = Boolean(visualizacaoTelaRef.current?.active)
         if (!estavaAtiva) await iniciarVisualizacaoTela()
         const imagem = await capturarTelaAtual()
