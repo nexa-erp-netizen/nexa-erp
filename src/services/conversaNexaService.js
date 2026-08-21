@@ -308,6 +308,11 @@ export async function abrirConversaNexa(id) {
   return resposta.data
 }
 
+export async function abrirConversaRecenteNexa() {
+  const resposta = await api.get("/conversa/sessoes-recente")
+  return resposta.data
+}
+
 export async function atualizarConversaNexa(id, alteracoes) {
   const resposta = await api.patch(`/conversa/sessoes/${id}`, alteracoes)
   return resposta.data

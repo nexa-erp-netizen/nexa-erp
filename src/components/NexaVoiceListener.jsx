@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { abrirConversaNexa, conversarComNexa } from "../services/conversaNexaService"
+import { abrirConversaNexa, abrirConversaRecenteNexa, conversarComNexa } from "../services/conversaNexaService"
 import {
   sintetizarVozNeural,
   transcreverVozGroq,
@@ -555,6 +555,14 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       ? { ...contextoSalvo, ...contextoClienteRef.current }
       : contextoSalvo
     if (contexto.conversaId) carregarHistoricoPainel(contexto.conversaId)
+    else abrirConversaRecenteNexa().then((dados) => {
+      const id = dados?.conversa?.id
+      if (!id) return
+      conversaIdRef.current = String(id)
+      registrarConversaVoz(id)
+      setHistoricoSalvo(true)
+      carregarHistoricoPainel(id)
+    }).catch(() => {})
 
     const sincronizarConversa = (evento) => {
       const conversaId = evento?.detail?.conversaId || obterContextoVoz().conversaId

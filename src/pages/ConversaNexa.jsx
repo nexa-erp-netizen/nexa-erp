@@ -87,9 +87,8 @@ export default function ConversaNexa({ usuario, setPage }) {
     contextoInicialAplicadoRef.current = true
 
     const contexto = obterContextoVoz()
-    if (!contexto.conversaId) return
     const conversaAtual = conversas.find((item) => String(item.id) === String(contexto.conversaId))
-    if (conversaAtual) selecionarConversa(conversaAtual)
+    selecionarConversa(conversaAtual || conversas[0])
   }, [conversas])
 
   useEffect(() => {
