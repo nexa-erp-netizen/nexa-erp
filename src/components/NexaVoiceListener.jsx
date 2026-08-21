@@ -821,6 +821,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     let url = null
     let audio = null
     let concluida = false
+    let reproducaoIniciada = false
 
     const finalizar = (resultado) => {
       if (concluida) return
@@ -854,7 +855,17 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       audio.onerror = () => finalizar(false)
       setVozAtiva("Nexa — voz neural")
       await audio.play()
-      setTimeout(() => finalizar(false), TEMPO_MAXIMO_FALA_MS)
+      reproducaoIniciada = true
+      setTimeout(() => {
+        if (concluida) return
+        try {
+          audio.pause()
+          audio.src = ""
+        } catch {
+          // Encerramento defensivo da reprodução longa.
+        }
+        finalizar(reproducaoIniciada)
+      }, TEMPO_MAXIMO_FALA_MS)
     } catch (error) {
       console.warn("[Nexa Voice] Voz neural indisponível. Usando voz do Windows.", error)
       finalizar(false)
