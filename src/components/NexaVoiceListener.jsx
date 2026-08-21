@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { analisarDocumentoNexa, analisarTelaComNexa, abrirConversaNexa, abrirConversaRecenteNexa, baixarRelatorioNexa, conversarComNexa } from "../services/conversaNexaService"
+import { analisarDocumentoNexa, analisarTelaComNexa, abrirConversaNexa, abrirConversaRecenteNexa, baixarRelatorioNexa, conversarComNexa, registrarAnaliseProativaProduto } from "../services/conversaNexaService"
 import {
   sintetizarVozNeural,
   transcreverVozGroq,
@@ -39,7 +39,7 @@ const TEMPO_REARME_MICROFONE_MS = 380
 const TEMPO_BLOQUEIO_ECO_MS = 1050
 const TEMPO_REARME_COMANDO_DIRETO_MS = 180
 const COMANDO_SITE_PATTERN = /\b(carteira(?:\s+de)?\s+trabalho(?:\s+digital)?|carteira\s+digital|ctps(?:\s+digital)?|e-?cac|simples\s+nacional|pgmei|nfs-?e|receita\s+federal|gov\.?\s*br)\b/i
-const ATIVAR_VISAO_PATTERN = /\b(?:visualiz(?:a|e|ar)|analis(?:a|e|ar)|vej(?:a|am)|ver|olh(?:a|e|ar)|enxerg(?:a|ue|ar))\b[\s\S]{0,55}\b(?:esta|essa|minha|a)?\s*tela\b|\b(?:visualiza[cç][aã]o|vis[aã]o)\s+(?:da\s+|desta\s+|dessa\s+)?tela\b|\b(?:ver|vendo|visualizar|enxergar)\b[\s\S]{0,40}\bo\s+que\s+(?:eu\s+)?(?:estou|to|t[oô])\s+vendo\b|\best[aá]\b[\s\S]{0,20}\bvendo\b[\s\S]{0,25}\b(?:esta|essa|minha)?\s*tela\b/i
+const ATIVAR_VISAO_PATTERN = /\b(?:visualiz(?:a|e|ar)|visualis(?:a|e|ar)|analis(?:a|e|ar)|vej(?:a|am)|ver|olh(?:a|e|ar)|enxerg(?:a|ue|ar))\b[\s\S]{0,55}\b(?:esta|essa|minha|a)?\s*tela\b|\b(?:visualiza[cç][aã]o|vis[aã]o)\s+(?:da\s+|desta\s+|dessa\s+)?tela\b|\b(?:ver|vendo|visualizar|visualisar|enxergar)\b[\s\S]{0,40}\bo\s+que\s+(?:eu\s+)?(?:estou|to|t[oô])\s+vendo\b|\best[aá]\b[\s\S]{0,20}\bvendo\b[\s\S]{0,25}\b(?:esta|essa|minha)?\s*tela\b/i
 const DESATIVAR_VISAO_PATTERN = /\b(?:pare|parar|encerre|encerrar|desative|desativar|desligue|desligar)\b[\s\S]{0,30}\b(?:visualiza[cç][aã]o|vis[aã]o|tela)\b/i
 const ANALISAR_CONTEUDO_TELA_PATTERN = /\b(?:analis(?:a|e|ar)|identifi(?:ca|que|car)|confir(?:a|e|ar)|verifi(?:ca|que|car)|avali(?:a|e|ar)|ach(?:a|ou)|opini[aã]o|parecer|sugest[aã]o|ideia|erro|problema|inconsist[eê]ncia|melhoria|o\s+que\s+(?:tem|aparece|est[aá]\s+errado))\b/i
 const ANALISE_TELA_ESPECIFICA_PATTERN = /\b(?:cliente|pend[eê]ncia|obriga[cç][aã]o|pagamento|valor|saldo|status|lan[cç]amento|fiscal|financeir|honor[aá]rio|das|documento|layout|formato|design|apar[eê]ncia|organiza[cç][aã]o|bot(?:[aã]o|ões?)|menu|campo|texto|digita[cç][aã]o|visual|usabilidade|funcionamento|navega[cç][aã]o|completa|tudo)\b/i
@@ -199,7 +199,10 @@ function limparRespostaDaNexa(valor, fallback = "Comando concluído.") {
       const objeto = JSON.parse(texto)
       return String(objeto?.resposta || "Comando concluído.").trim()
     } catch {
-      return texto
+      const parcial = texto.match(/^[\s\S]*?["']resposta["']\s*:\s*["']([\s\S]*)/i)
+      return parcial?.[1]
+        ? parcial[1].replace(/["']?\s*[,}]?\s*$/, "").replace(/\\n/g, "\n").replace(/\\"/g, '"').trim()
+        : texto
     }
   }
 
@@ -377,6 +380,21 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const videoTelaRef = useRef(null)
   const aguardandoDesativacaoTelaRef = useRef(false)
   const aguardandoFocoAnaliseTelaRef = useRef(false)
+
+  useEffect(() => {
+    if (usuario?.perfil !== "Administrador") return undefined
+    const hoje = new Date().toISOString().slice(0, 10)
+    const chave = "nexaAnaliseProdutoProativaEm"
+    if (localStorage.getItem(chave) === hoje) return undefined
+
+    const timer = setTimeout(() => {
+      const contexto = obterContextoVoz()
+      registrarAnaliseProativaProduto({ paginaAtual: page || "", clienteId: contexto.clienteId || null })
+        .then(() => localStorage.setItem(chave, hoje))
+        .catch((error) => console.warn("[Nexa Produto] Análise proativa adiada.", error))
+    }, 12000)
+    return () => clearTimeout(timer)
+  }, [page, usuario?.perfil])
   const ultimaRespostaFaladaRef = useRef("")
   const ignorarEcoAteRef = useRef(0)
   const fimPainelRef = useRef(null)
@@ -1082,6 +1100,13 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     if (!video.videoWidth || !video.videoHeight) {
       await new Promise((resolve) => setTimeout(resolve, 350))
     }
+    const painel = document.querySelector('[data-nexa-painel-flutuante="true"]')
+    const displayAnterior = painel?.style.display || ""
+    if (painel) {
+      painel.style.display = "none"
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+
     const larguraOriginal = video.videoWidth || 1280
     const alturaOriginal = video.videoHeight || 720
     const escala = Math.min(1, 1600 / larguraOriginal, 1000 / alturaOriginal)
@@ -1089,6 +1114,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     canvas.width = Math.max(1, Math.round(larguraOriginal * escala))
     canvas.height = Math.max(1, Math.round(alturaOriginal * escala))
     canvas.getContext("2d", { alpha: false }).drawImage(video, 0, 0, canvas.width, canvas.height)
+    if (painel) painel.style.display = displayAnterior
 
     return new Promise((resolve, reject) => {
       canvas.toBlob(
@@ -2043,6 +2069,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   return (
     <aside
       ref={containerFlutuanteRef}
+      data-nexa-painel-flutuante="true"
       style={{
         ...styles.container,
         ...(expandido ? styles.containerExpanded : {}),

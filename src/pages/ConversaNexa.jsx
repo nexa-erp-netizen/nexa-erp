@@ -12,6 +12,7 @@ import {
   listarMemoriasNexa,
   baixarRelatorioNexa,
   analisarDocumentoNexa,
+  analisarTelaComNexa,
   verificarProvedores,
 } from "../services/conversaNexaService"
 import {
@@ -34,6 +35,24 @@ const STATUS_INICIAL = {
   ollama: { online: false, instalado: false, modelo: "" },
 }
 
+const ATIVAR_VISAO_PATTERN = /\b(?:visualiz(?:a|e|ar)|visualis(?:a|e|ar)|analis(?:a|e|ar)|vej(?:a|am)|ver|olh(?:a|e|ar)|enxerg(?:a|ue|ar))\b[\s\S]{0,65}\b(?:esta|essa|minha|a)?\s*tela\b|\b(?:ver|vendo|visualizar|visualisar|enxergar)\b[\s\S]{0,45}\bo\s+que\s+(?:eu\s+)?(?:estou|to|t[oô])\s+vendo\b/i
+const ANALISAR_TELA_PATTERN = /\b(?:analis|avali|identifi|verifi|confir|erro|problema|inconsist|melhoria|layout|design|apar[eê]ncia|opini[aã]o|parecer|sugest|valor|saldo|status|pend[eê]ncia|cliente|fiscal|financeir)\w*/i
+const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|pode|pode desativar|desative|desativar)[.!?]*\s*$/i
+const CONFIRMACAO_NAO_PATTERN = /^\s*(?:n[aã]o|continue|continuar|mantenha|deixe ativa)[.!?]*\s*$/i
+
+function limparTextoResposta(valor, fallback = "Comando concluído.") {
+  const texto = String(valor || "").trim()
+  if (!texto) return fallback
+  try {
+    const json = JSON.parse(texto)
+    return String(json?.resposta || json?.answer || json?.resultado || fallback).trim()
+  } catch {
+    const parcial = texto.match(/^[\s\S]*?["']resposta["']\s*:\s*["']([\s\S]*)/i)
+    if (parcial?.[1]) return parcial[1].replace(/["']?\s*[,}]?\s*$/, "").replace(/\\n/g, "\n").replace(/\\"/g, '"').trim()
+    return texto.replace(/^\s*(?:resposta final|resposta)\s*:\s*/i, "").trim() || fallback
+  }
+}
+
 export default function ConversaNexa({ usuario, setPage }) {
   const [clientes, setClientes] = useState([])
   const [conversas, setConversas] = useState([])
@@ -54,11 +73,18 @@ export default function ConversaNexa({ usuario, setPage }) {
   const arquivoRef = useRef(null)
   const contextoInicialAplicadoRef = useRef(false)
   const consultaAutomaticaAplicadaRef = useRef(false)
+  const visualizacaoTelaRef = useRef(null)
+  const videoTelaRef = useRef(null)
+  const aguardandoDesativacaoTelaRef = useRef(false)
 
   useEffect(() => {
     const atualizar = () => setIsMobile(window.innerWidth < 900)
     window.addEventListener("resize", atualizar)
     return () => window.removeEventListener("resize", atualizar)
+  }, [])
+
+  useEffect(() => () => {
+    visualizacaoTelaRef.current?.getTracks().forEach((track) => track.stop())
   }, [])
 
   useEffect(() => {
@@ -304,6 +330,49 @@ export default function ConversaNexa({ usuario, setPage }) {
     setPage(pagina)
   }
 
+  async function iniciarVisualizacaoTela() {
+    if (visualizacaoTelaRef.current?.active) return
+    if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("Este navegador não permite compartilhar a tela com a Nexa.")
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 1, max: 2 } }, audio: false, preferCurrentTab: true })
+    const video = document.createElement("video")
+    video.muted = true
+    video.playsInline = true
+    video.srcObject = stream
+    await video.play()
+    stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+      visualizacaoTelaRef.current = null
+      videoTelaRef.current = null
+      aguardandoDesativacaoTelaRef.current = false
+    }, { once: true })
+    visualizacaoTelaRef.current = stream
+    videoTelaRef.current = video
+  }
+
+  async function capturarTelaAtual() {
+    const video = videoTelaRef.current
+    if (!video || !visualizacaoTelaRef.current?.active) throw new Error("A visualização da tela não está ativa.")
+    if (!video.videoWidth || !video.videoHeight) await new Promise((resolve) => setTimeout(resolve, 350))
+    const painel = document.querySelector('[data-nexa-painel-flutuante="true"]')
+    const displayAnterior = painel?.style.display || ""
+    if (painel) {
+      painel.style.display = "none"
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    const largura = video.videoWidth || 1280
+    const altura = video.videoHeight || 720
+    const escala = Math.min(1, 1600 / largura, 1000 / altura)
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.max(1, Math.round(largura * escala))
+    canvas.height = Math.max(1, Math.round(altura * escala))
+    canvas.getContext("2d", { alpha: false }).drawImage(video, 0, 0, canvas.width, canvas.height)
+    if (painel) painel.style.display = displayAnterior
+    return new Promise((resolve, reject) => canvas.toBlob(
+      (blob) => blob ? resolve(blob) : reject(new Error("Não consegui capturar a tela atual.")),
+      "image/jpeg",
+      0.76,
+    ))
+  }
+
   async function enviar(texto = mensagem) {
     const pergunta = String(texto || "").trim()
     if (!pergunta || enviando) return
@@ -326,16 +395,53 @@ export default function ConversaNexa({ usuario, setPage }) {
     setEnviando(true)
 
     try {
-      const resposta = await conversarComNexa({
-        mensagem: pergunta,
-        clienteId: tipoContexto === "cliente" ? clienteId || null : null,
-        historico: conversa,
-        conversaId,
-        tipoContexto,
-        interessadoNome,
-        origem: "texto",
-        paginaAtual: "Conversa com a Nexa",
-      })
+      let resposta
+      const pedidoVisual = ATIVAR_VISAO_PATTERN.test(pergunta)
+      if (aguardandoDesativacaoTelaRef.current && CONFIRMACAO_SIM_PATTERN.test(pergunta)) {
+        visualizacaoTelaRef.current?.getTracks().forEach((track) => track.stop())
+        visualizacaoTelaRef.current = null
+        videoTelaRef.current = null
+        aguardandoDesativacaoTelaRef.current = false
+        resposta = { resposta: "Visualização da tela desativada.", provedor: "sistema", respondidoEm: new Date().toISOString() }
+      } else if (aguardandoDesativacaoTelaRef.current && CONFIRMACAO_NAO_PATTERN.test(pergunta)) {
+        aguardandoDesativacaoTelaRef.current = false
+        resposta = { resposta: "Certo. A visualização continua ativa.", provedor: "sistema", respondidoEm: new Date().toISOString() }
+      } else if (pedidoVisual || visualizacaoTelaRef.current?.active) {
+        if (!visualizacaoTelaRef.current?.active) await iniciarVisualizacaoTela()
+        const imagem = await capturarTelaAtual()
+        if (ANALISAR_TELA_PATTERN.test(pergunta)) {
+          resposta = await analisarTelaComNexa({
+            imagem,
+            mensagem: pergunta,
+            paginaAtual: "Conversa com a Nexa",
+            contextoVisivel: String(document.body?.innerText || "").slice(0, 14000),
+            conversaId,
+            clienteId: tipoContexto === "cliente" ? clienteId || null : null,
+          })
+          resposta.resposta = `${limparTextoResposta(resposta.resposta)}\n\nDeseja desativar a visualização?`
+          aguardandoDesativacaoTelaRef.current = true
+        } else {
+          resposta = {
+            resposta: "Sim, consigo visualizar esta tela. Deseja desativar a visualização?",
+            provedor: "confirmacao-visual-local",
+            respondidoEm: new Date().toISOString(),
+          }
+          aguardandoDesativacaoTelaRef.current = true
+        }
+      } else {
+        resposta = await conversarComNexa({
+          mensagem: pergunta,
+          clienteId: tipoContexto === "cliente" ? clienteId || null : null,
+          historico: conversa,
+          conversaId,
+          tipoContexto,
+          interessadoNome,
+          origem: "texto",
+          paginaAtual: "Conversa com a Nexa",
+        })
+      }
+
+      resposta.resposta = limparTextoResposta(resposta.resposta)
 
       if (resposta.conversaId) {
         setConversaId(resposta.conversaId)
@@ -364,7 +470,7 @@ export default function ConversaNexa({ usuario, setPage }) {
       setConversa((atual) => [...atual, {
         id: `n-${Date.now()}`,
         autor: "Nexa",
-        texto: resposta.resposta,
+        texto: limparTextoResposta(resposta.resposta),
         pontos: resposta.pontos || [],
         recomendacao: resposta.recomendacao || "",
         fundamentos: resposta.fundamentos || [],
@@ -622,7 +728,7 @@ function mapearMensagemPersistida(item) {
   return {
     id: `db-${item.id}`,
     autor: item.autor === "usuario" ? "Você" : "Nexa",
-    texto: item.texto,
+    texto: limparTextoResposta(item.texto),
     pontos: dados.pontos || [],
     recomendacao: dados.recomendacao || "",
     fundamentos: dados.fundamentos || [],
