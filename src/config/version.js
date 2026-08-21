@@ -1,5 +1,5 @@
 const NEXA_VERSION = {
-  version: "3.35.4",
+  version: "3.35.6",
   build: "33400",
   release: "Nexa Documentos Universais",
   date: "21/08/2026",
@@ -9,6 +9,8 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.35.6", release: "Parecer visual e sugestões de layout", date: "21/08/2026", items: ["Reconhece perguntas como ‘o que achou do layout?’", "Aceita pedidos de opinião, parecer, ideia e sugestão", "Avaliação visual separada de pendências contábeis", "Apresenta ao menos uma melhoria prática para a tela"] },
+    { version: "3.35.5", release: "Foco da análise visual", date: "21/08/2026", items: ["Pergunta de esclarecimento para pedidos genéricos", "Análise separada entre cliente, valores e layout", "Visualização permanece ativa enquanto aguarda o foco", "Resposta baseada somente na categoria escolhida"] },
     { version: "3.35.4", release: "Análise visual curta e voz exclusiva", date: "21/08/2026", items: ["Análise visual limitada a três frases", "Somente uma pergunta final sobre desativação", "Voz alternativa bloqueada após início da voz neural", "Respostas objetivas para identificação de erros"] },
     { version: "3.35.3", release: "Confirmação visual direta", date: "21/08/2026", items: ["Confirmação simples ao ativar a visualização", "Análise detalhada somente quando solicitada", "Proteção contra duas vozes reproduzidas ao mesmo tempo", "Resposta inicial curta e objetiva"] },
     { version: "3.35.2", release: "Resposta visual limpa", date: "21/08/2026", items: ["Raciocínio interno do modelo visual não é exibido", "Conteúdo técnico em inglês não é apresentado", "A voz fala somente a resposta final em português", "Versões da API e Web sincronizadas"] },
