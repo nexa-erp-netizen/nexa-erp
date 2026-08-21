@@ -1,5 +1,5 @@
 const NEXA_VERSION = {
-  version: "3.36.3",
+  version: "3.36.4",
   build: "33603",
   release: "Execução operacional durante a visão",
   date: "21/08/2026",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.36.4", release: "Diagnóstico contextual de lançamentos", date: "21/08/2026", items: ["Correção identifica a pendência do cliente aberto", "Resposta informa lançamento, valor, vencimento e status reais", "Ausência de pendência é informada sem resposta genérica", "Múltiplas pendências são listadas para seleção", "Alteração financeira permanece protegida por confirmação"] },
     { version: "3.36.3", release: "Execução operacional durante a visão", date: "21/08/2026", items: ["Navegação e consultas funcionam com a visualização ativa", "Visão acionada somente por pedidos reais de análise da tela", "Consulta exclusiva de clientes inadimplentes", "Mensagem objetiva quando não existem inadimplentes", "Histórico e anotações abertos na seção correta", "Correção de lançamento inicia fluxo guiado em vez de explicação genérica", "Alterações de recebimento continuam exigindo confirmação"] },
     { version: "3.36.2", release: "Compreensão Natural e Correção Contextual", date: "21/08/2026", items: ["Correção segura de digitação em texto e voz", "Interpretação anterior ao roteamento dos comandos", "Frase original preservada no histórico", "Versão corrigida utilizada apenas internamente", "Nomes, documentos, valores e datas protegidos contra correção automática", "Vocabulário adaptativo do escritório e do cliente preservado", "Palavras ambíguas não são alteradas por adivinhação"] },
     { version: "3.36.1", release: "Visão unificada e respostas limpas", date: "21/08/2026", items: ["Visualização disponível também na conversa completa", "Comandos de visão têm prioridade sobre a conversa textual", "Compatibilidade com visualizar e visualise", "Painel flutuante ocultado durante a captura", "JSON interno removido das respostas", "Confirmação sim encerra o compartilhamento", "Abertura limitada às 120 mensagens mais recentes sem apagar o histórico"] },
