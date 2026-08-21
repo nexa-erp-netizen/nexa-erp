@@ -1,5 +1,5 @@
 const NEXA_VERSION = {
-  version: "3.35.2",
+  version: "3.35.3",
   build: "33400",
   release: "Nexa Documentos Universais",
   date: "21/08/2026",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.35.3", release: "Confirmação visual direta", date: "21/08/2026", items: ["Confirmação simples ao ativar a visualização", "Análise detalhada somente quando solicitada", "Proteção contra duas vozes reproduzidas ao mesmo tempo", "Resposta inicial curta e objetiva"] },
     { version: "3.35.2", release: "Resposta visual limpa", date: "21/08/2026", items: ["Raciocínio interno do modelo visual não é exibido", "Conteúdo técnico em inglês não é apresentado", "A voz fala somente a resposta final em português", "Versões da API e Web sincronizadas"] },
     { version: "3.35.1", release: "Comandos naturais da Visão Contextual", date: "21/08/2026", items: ["Reconhece ‘consegue visualizar esta tela?’", "Reconhece ‘consegue ver o que estou vendo?’", "Reconhece pedidos naturais com visualizar, analisar, olhar e enxergar", "Ativação encaminhada diretamente ao compartilhamento da tela"] },
     { version: "3.35.0", release: "Nexa Visão Contextual e controle de acesso", date: "21/08/2026", items: ["Visualização da tela ativada por comando de texto ou voz", "Permissão controlada pelo navegador e encerramento por comando", "Análise visual com o modelo multimodal atual da Groq", "Capturas usadas somente durante a análise e não armazenadas", "Bloqueio reversível de usuários sem excluir cadastro ou histórico", "Bloqueio do Portal diretamente pela Central do Cliente", "Alerta de cliente bloqueado com motivo", "Desbloqueio preservando usuários, senhas, documentos e vínculos"] },
