@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { analisarDocumentoNexa, abrirConversaNexa, abrirConversaRecenteNexa, baixarRelatorioNexa, conversarComNexa } from "../services/conversaNexaService"
+import { analisarDocumentoNexa, analisarTelaComNexa, abrirConversaNexa, abrirConversaRecenteNexa, baixarRelatorioNexa, conversarComNexa } from "../services/conversaNexaService"
 import {
   sintetizarVozNeural,
   transcreverVozGroq,
@@ -39,6 +39,8 @@ const TEMPO_REARME_MICROFONE_MS = 380
 const TEMPO_BLOQUEIO_ECO_MS = 1050
 const TEMPO_REARME_COMANDO_DIRETO_MS = 180
 const COMANDO_SITE_PATTERN = /\b(carteira(?:\s+de)?\s+trabalho(?:\s+digital)?|carteira\s+digital|ctps(?:\s+digital)?|e-?cac|simples\s+nacional|pgmei|nfs-?e|receita\s+federal|gov\.?\s*br)\b/i
+const ATIVAR_VISAO_PATTERN = /\b(?:visualiz[ea]|analise|veja|olhe|enxergue)\b[\s\S]{0,30}\b(?:esta|essa|a)?\s*tela\b|\b(?:visualiza[cç][aã]o|vis[aã]o)\s+(?:da\s+)?tela\b/i
+const DESATIVAR_VISAO_PATTERN = /\b(?:pare|parar|encerre|encerrar|desative|desativar|desligue|desligar)\b[\s\S]{0,30}\b(?:visualiza[cç][aã]o|vis[aã]o|tela)\b/i
 
 const NAVEGACAO_LOCAL = [
   { tipo: "abrir-grupo", grupo: "Ferramentas", aliases: ["menu ferramentas", "grupo ferramentas", "ferramentas"] },
@@ -334,6 +336,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const [expandido, setExpandido] = useState(false)
   const [totalVocabulario, setTotalVocabulario] = useState(0)
   const [historicoSalvo, setHistoricoSalvo] = useState(() => Boolean(obterContextoVoz().conversaId))
+  const [visualizacaoTelaAtiva, setVisualizacaoTelaAtiva] = useState(false)
   const [escutaProtegida, setEscutaProtegida] = useState(
     () => localStorage.getItem(PROTECTED_LISTENING_KEY) !== "false",
   )
@@ -368,6 +371,9 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const audioVozRef = useRef(null)
   const finalizarAudioVozRef = useRef(null)
   const geracaoFalaRef = useRef(0)
+  const visualizacaoTelaRef = useRef(null)
+  const videoTelaRef = useRef(null)
+  const aguardandoDesativacaoTelaRef = useRef(false)
   const ultimaRespostaFaladaRef = useRef("")
   const ignorarEcoAteRef = useRef(0)
   const fimPainelRef = useRef(null)
@@ -996,6 +1002,93 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     voltarParaEscuta()
   }, [falarResposta, pausarReconhecimento, renovarJanelaProtegida, voltarParaEscuta])
 
+  const encerrarVisualizacaoTela = useCallback(() => {
+    const stream = visualizacaoTelaRef.current
+    if (stream) stream.getTracks().forEach((track) => track.stop())
+    visualizacaoTelaRef.current = null
+    videoTelaRef.current = null
+    aguardandoDesativacaoTelaRef.current = false
+    setVisualizacaoTelaAtiva(false)
+  }, [])
+
+  const iniciarVisualizacaoTela = useCallback(async () => {
+    if (visualizacaoTelaRef.current?.active) return visualizacaoTelaRef.current
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      throw new Error("Este navegador não permite compartilhar a tela com a Nexa.")
+    }
+
+    let stream
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 1, max: 2 } },
+        audio: false,
+        preferCurrentTab: true,
+      })
+    } catch (error) {
+      if (error?.name === "NotAllowedError") {
+        throw new Error("A visualização não foi autorizada. Escolha a aba da Nexa e confirme o compartilhamento.")
+      }
+      throw error
+    }
+    const video = document.createElement("video")
+    video.muted = true
+    video.playsInline = true
+    video.srcObject = stream
+    await video.play()
+
+    stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+      visualizacaoTelaRef.current = null
+      videoTelaRef.current = null
+      aguardandoDesativacaoTelaRef.current = false
+      setVisualizacaoTelaAtiva(false)
+    }, { once: true })
+
+    visualizacaoTelaRef.current = stream
+    videoTelaRef.current = video
+    setVisualizacaoTelaAtiva(true)
+    return stream
+  }, [])
+
+  const capturarTelaAtual = useCallback(async () => {
+    const video = videoTelaRef.current
+    if (!video || !visualizacaoTelaRef.current?.active) {
+      throw new Error("A visualização da tela não está ativa.")
+    }
+
+    if (!video.videoWidth || !video.videoHeight) {
+      await new Promise((resolve) => setTimeout(resolve, 350))
+    }
+    const larguraOriginal = video.videoWidth || 1280
+    const alturaOriginal = video.videoHeight || 720
+    const escala = Math.min(1, 1600 / larguraOriginal, 1000 / alturaOriginal)
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.max(1, Math.round(larguraOriginal * escala))
+    canvas.height = Math.max(1, Math.round(alturaOriginal * escala))
+    canvas.getContext("2d", { alpha: false }).drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => blob ? resolve(blob) : reject(new Error("Não consegui capturar a tela atual.")),
+        "image/jpeg",
+        0.76,
+      )
+    })
+  }, [])
+
+  const obterTextoVisivelSanitizado = useCallback(() => {
+    const texto = String(document.body?.innerText || "")
+      .replace(/(senha|password|token|api[ _-]?key|chave secreta)\s*[:=]?\s*\S+/gi, "$1: [PROTEGIDO]")
+      .replace(/\bBearer\s+[A-Za-z0-9._~-]+/gi, "Bearer [PROTEGIDO]")
+      .replace(/\s{3,}/g, "\n")
+      .trim()
+    return texto.slice(0, 14000)
+  }, [])
+
+  useEffect(() => () => {
+    const stream = visualizacaoTelaRef.current
+    if (stream) stream.getTracks().forEach((track) => track.stop())
+  }, [])
+
   const processarComando = useCallback(async (texto, opcoes = {}) => {
     const comando = String(texto || "").trim()
     if (!comando || processandoRef.current) return
@@ -1038,18 +1131,51 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       : null
 
     try {
-      const resposta = await conversarComNexa({
-        mensagem: comando,
-        clienteId: contexto.clienteId || null,
-        conversaId: conversaIdRef.current || contexto.conversaId || null,
-        tipoContexto: contexto.clienteId ? "cliente" : "geral",
-        historico: historicoRef.current,
-        origem,
-        paginaAtual: page || "",
-        selecaoClientePendente,
-        selecaoClienteId: clienteEscolhido?.id || null,
-        cancelarSelecaoCliente,
-      })
+      let resposta
+      const confirmarDesativacao = aguardandoDesativacaoTelaRef.current && CONFIRMACAO_SIM_PATTERN.test(comando)
+      const manterVisualizacao = aguardandoDesativacaoTelaRef.current && CONFIRMACAO_NAO_PATTERN.test(comando)
+
+      if (DESATIVAR_VISAO_PATTERN.test(comando) || confirmarDesativacao) {
+        encerrarVisualizacaoTela()
+        resposta = {
+          resposta: "Visualização da tela desativada.",
+          fala: "Visualização desativada.",
+          visualizacaoAtiva: false,
+          respondidoEm: new Date().toISOString(),
+        }
+      } else if (manterVisualizacao) {
+        aguardandoDesativacaoTelaRef.current = false
+        resposta = {
+          resposta: "Certo. A visualização continua ativa.",
+          visualizacaoAtiva: true,
+          respondidoEm: new Date().toISOString(),
+        }
+      } else if (ATIVAR_VISAO_PATTERN.test(comando) || visualizacaoTelaRef.current?.active) {
+        if (!visualizacaoTelaRef.current?.active) await iniciarVisualizacaoTela()
+        const imagem = await capturarTelaAtual()
+        resposta = await analisarTelaComNexa({
+          imagem,
+          mensagem: comando,
+          paginaAtual: page || "",
+          contextoVisivel: obterTextoVisivelSanitizado(),
+          conversaId: conversaIdRef.current || contexto.conversaId || null,
+          clienteId: contexto.clienteId || null,
+        })
+        aguardandoDesativacaoTelaRef.current = true
+      } else {
+        resposta = await conversarComNexa({
+          mensagem: comando,
+          clienteId: contexto.clienteId || null,
+          conversaId: conversaIdRef.current || contexto.conversaId || null,
+          tipoContexto: contexto.clienteId ? "cliente" : "geral",
+          historico: historicoRef.current,
+          origem,
+          paginaAtual: page || "",
+          selecaoClientePendente,
+          selecaoClienteId: clienteEscolhido?.id || null,
+          cancelarSelecaoCliente,
+        })
+      }
 
       if (resposta.conversaId) {
         conversaIdRef.current = resposta.conversaId
@@ -1068,7 +1194,10 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         })
       }
 
-      const textoResposta = limparRespostaDaNexa(resposta.resposta || "Comando concluído.")
+      const textoRespostaBase = limparRespostaDaNexa(resposta.resposta || "Comando concluído.")
+      const textoResposta = resposta.visualizacaoAtiva === true && resposta.provedor === "groq-visao"
+        ? `${textoRespostaBase}\n\nDeseja desativar a visualização?`
+        : textoRespostaBase
       const temFalaEspecifica = Object.prototype.hasOwnProperty.call(resposta, "fala")
       const textoFalado = temFalaEspecifica
         ? limparRespostaDaNexa(resposta.fala, resposta.acao ? "Pronto." : textoResposta)
@@ -1180,7 +1309,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       atualizarEstado("erro", mensagem)
       if (ativadaRef.current) agendarReinicio(1800)
     }
-  }, [agendarReinicio, atualizarEstado, carregarVocabulario, falarResposta, page, pausarReconhecimento, renovarJanelaProtegida, setPage, voltarParaEscuta])
+  }, [agendarReinicio, atualizarEstado, capturarTelaAtual, carregarVocabulario, encerrarVisualizacaoTela, falarResposta, iniciarVisualizacaoTela, obterTextoVisivelSanitizado, page, pausarReconhecimento, renovarJanelaProtegida, setPage, voltarParaEscuta])
 
   const enviarMensagemDigitada = useCallback(async () => {
     const texto = String(mensagemDigitada || "").trim()
@@ -2050,6 +2179,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
           <div style={styles.statusRow}>
             <span>{historicoSalvo ? "Histórico salvo" : "Nova conversa"}</span>
+            <span>{visualizacaoTelaAtiva ? "Visualização da tela ativa" : "Tela não compartilhada"}</span>
             <span>{respostasFaladasAtivas ? "Respostas faladas" : "Respostas em texto"}</span>
             <span>{escutaProtegida ? "Ambiente filtrado" : "Escuta padrão"}</span>
             <span>{sessaoAtiva ? "Conversa por voz aberta" : estado.ativada ? "Aguardando chamada" : "Microfone pausado"}</span>

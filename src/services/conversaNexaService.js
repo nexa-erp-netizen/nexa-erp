@@ -247,6 +247,29 @@ export async function conversarComNexa({
   }
 }
 
+export async function analisarTelaComNexa({
+  imagem,
+  mensagem,
+  paginaAtual = "",
+  contextoVisivel = "",
+  conversaId = null,
+  clienteId = null,
+}) {
+  const form = new FormData()
+  form.append("imagem", imagem, `tela-nexa-${Date.now()}.jpg`)
+  form.append("mensagem", String(mensagem || "Analise esta tela."))
+  form.append("paginaAtual", String(paginaAtual || ""))
+  form.append("contextoVisivel", String(contextoVisivel || "").slice(0, 14000))
+  if (conversaId) form.append("conversaId", String(conversaId))
+  if (clienteId) form.append("clienteId", String(clienteId))
+
+  const resposta = await api.post("/conversa/visao/analisar", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 100000,
+  })
+  return resposta.data
+}
+
 export async function verificarOllama() {
   const { ollamaUrl, modelo } = configuracaoLocal()
   const controller = new AbortController()

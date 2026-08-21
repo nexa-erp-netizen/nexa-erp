@@ -119,18 +119,21 @@ export default function Usuarios() {
     setClienteVinculado(usuario.clienteVinculado || "")
   }
 
-  async function excluirUsuario(id) {
+  async function alterarAcessoUsuario(usuario) {
+    const novoEstado = usuario.ativo === false
     const confirmar = window.confirm(
-      "Deseja realmente excluir este usuário?"
+      novoEstado
+        ? `Deseja desbloquear o acesso de ${usuario.nome}?`
+        : `Deseja bloquear o acesso de ${usuario.nome}? O cadastro e o histórico serão preservados.`
     )
 
     if (!confirmar) return
 
     try {
-      await api.delete(`/usuarios/${id}`)
+      await api.patch(`/usuarios/${usuario.id}/acesso`, { ativo: novoEstado })
       await carregarUsuarios()
     } catch (error) {
-      alert("Erro ao excluir usuário")
+      alert(error.response?.data?.message || "Erro ao alterar o acesso do usuário")
       console.error(error)
     }
   }
@@ -272,10 +275,10 @@ export default function Usuarios() {
                   </button>
 
                   <button
-                    style={deleteButton}
-                    onClick={() => excluirUsuario(usuario.id)}
+                    style={usuario.ativo === false ? unlockButton : deleteButton}
+                    onClick={() => alterarAcessoUsuario(usuario)}
                   >
-                    Bloquear
+                    {usuario.ativo === false ? "Desbloquear" : "Bloquear"}
                   </button>
                 </div>
               </td>
@@ -392,4 +395,10 @@ const deleteButton = {
   color: "white",
   fontWeight: "bold",
   cursor: "pointer",
+}
+
+const unlockButton = {
+  ...deleteButton,
+  background: "#22c55e",
+  color: "#052e16",
 }

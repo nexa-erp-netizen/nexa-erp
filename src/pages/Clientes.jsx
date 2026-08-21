@@ -177,6 +177,44 @@ export default function Clientes({ setPage }) {
     if (atualizado) setClienteSelecionado(atualizado)
   }
 
+  async function alterarAcessoPortalCliente() {
+    if (!clienteSelecionado?.id) return
+
+    const bloquear = clienteSelecionado.portalBloqueado !== true
+    let motivo = null
+
+    if (bloquear) {
+      motivo = window.prompt(
+        "Informe o motivo do bloqueio do Portal:",
+        "Inadimplência",
+      )
+      if (motivo === null) return
+      if (!motivo.trim()) {
+        alert("Informe o motivo do bloqueio.")
+        return
+      }
+    }
+
+    const confirmar = window.confirm(
+      bloquear
+        ? `Bloquear o Portal de ${clienteSelecionado.nome}? O cadastro e todos os dados serão preservados.`
+        : `Desbloquear o Portal de ${clienteSelecionado.nome}?`,
+    )
+    if (!confirmar) return
+
+    try {
+      const resposta = await api.patch(`/clientes/${clienteSelecionado.id}/acesso-portal`, {
+        bloqueado: bloquear,
+        motivo,
+      })
+      if (resposta.data?.cliente) setClienteSelecionado(resposta.data.cliente)
+      await carregarClientes()
+    } catch (error) {
+      alert(error.response?.data?.message || "Erro ao alterar o acesso ao Portal.")
+      console.error(error)
+    }
+  }
+
   async function carregarFinanceiroCliente() {
     try {
       const resposta = await api.get("/movimentos-cliente")
@@ -1535,6 +1573,8 @@ export default function Clientes({ setPage }) {
 
             <input
               style={input}
+              type="password"
+              autoComplete="new-password"
               placeholder="Senha Gov.br"
               value={senhaGovBr}
               onChange={(e) => setSenhaGovBr(e.target.value)}
@@ -1622,6 +1662,13 @@ export default function Clientes({ setPage }) {
 
       {tela === "detalhes" && clienteSelecionado && (
         <>
+          {clienteSelecionado.portalBloqueado === true && (
+            <div style={portalBloqueadoAlerta} role="alert">
+              <strong>⚠ Portal do cliente bloqueado</strong>
+              <span>Motivo: {clienteSelecionado.portalBloqueioMotivo || "Não informado"}</span>
+            </div>
+          )}
+
           <div id="central-resumo" style={centralHero}>
             <div style={centralHeroInfo}>
               <div style={clienteAvatar}>
@@ -1661,6 +1708,13 @@ export default function Clientes({ setPage }) {
               <button style={button} onClick={abrirProLaboreCliente}>Pró-labore</button>
               <button style={button} onClick={abrirFeriasCliente}>Férias</button>
               <button style={button} onClick={abrirConciliacaoCliente}>Conciliação</button>
+
+              <button
+                style={clienteSelecionado.portalBloqueado === true ? portalDesbloquearButton : portalBloquearButton}
+                onClick={alterarAcessoPortalCliente}
+              >
+                {clienteSelecionado.portalBloqueado === true ? "Desbloquear Portal" : "Bloquear Portal"}
+              </button>
 
               <WhatsAppMenu
                 cliente={clienteSelecionado}
@@ -2239,7 +2293,7 @@ export default function Clientes({ setPage }) {
               <Info label="Data Nascimento" value={formatarDataBR(clienteSelecionado.dataNascimento)} />
               <Info label="Título de Eleitor" value={clienteSelecionado.tituloEleitor} />
               <Info label="Código Simples Nacional" value={clienteSelecionado.codigoSimplesNacional} />
-              <Info label="Senha Gov.br" value={clienteSelecionado.senhaGovBr} />
+              <Info label="Senha Gov.br" value={clienteSelecionado.senhaGovBr ? "••••••••" : ""} />
               <Info label="CNAE Principal" value={clienteSelecionado.cnaePrincipal} />
               <Info label="Inscrição Municipal" value={clienteSelecionado.inscricaoMunicipal} />
               <Info label="Inscrição Estadual" value={clienteSelecionado.inscricaoEstadual} />
@@ -2315,6 +2369,20 @@ const centralHero = {
   alignItems: "center",
   gap: "20px",
   flexWrap: "wrap",
+}
+
+const portalBloqueadoAlerta = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "14px",
+  flexWrap: "wrap",
+  marginBottom: "14px",
+  padding: "14px 18px",
+  borderRadius: "14px",
+  border: "1px solid rgba(255,77,79,.55)",
+  background: "rgba(127,29,29,.55)",
+  color: "#ffe4e6",
 }
 
 const centralHeroInfo = {
@@ -2869,6 +2937,18 @@ const deleteButton = {
   color: "white",
   fontWeight: "bold",
   cursor: "pointer",
+}
+
+const portalBloquearButton = {
+  ...deleteButton,
+  background: "#f59e0b",
+  color: "#2b1700",
+}
+
+const portalDesbloquearButton = {
+  ...deleteButton,
+  background: "#22c55e",
+  color: "#052e16",
 }
 
  const anotacaoTopo = {
