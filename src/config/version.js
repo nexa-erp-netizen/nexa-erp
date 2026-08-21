@@ -1,5 +1,5 @@
 const NEXA_VERSION = {
-  version: "3.37.1",
+  version: "3.37.2",
   build: "33603",
   release: "Execução operacional durante a visão",
   date: "21/08/2026",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.37.2", release: "Modo Desenvolvedor Conversacional", date: "21/08/2026", items: ["Resultados técnicos explicados pela IA em linguagem natural", "Histórico e tela atual usados como contexto", "Fatos confirmados continuam controlados pela API", "Número e status do incidente são validados antes da resposta", "Contradições acionam resposta segura automática", "Fallback disponível se o provedor estiver indisponível", "Diagnóstico e conversa funcionam em uma camada híbrida"] },
     { version: "3.37.1", release: "Causa raiz e gestão de incidentes", date: "21/08/2026", items: ["Exceção original registrada na rota de acessos", "Incidentes genéricos atualizados com a causa real", "Classificação temporária, persistente ou em observação", "Encerramento de incidente pela conversa", "Reabertura manual e automática", "Falhas repetidas vinculadas ao mesmo incidente", "Validação e histórico técnico preservados"] },
     { version: "3.37.0", release: "Nexa Modo Desenvolvedor", date: "21/08/2026", items: ["Diagnóstico técnico baseado em incidentes reais", "Verificação de saúde da API e do banco", "Identificador de correlação para rastrear falhas", "Planos de correção vinculados ao incidente", "Etapas, testes e rollback registrados", "Acesso técnico restrito ao administrador", "Nenhuma alteração estrutural é executada sem confirmação"] },
     { version: "3.36.4", release: "Diagnóstico contextual de lançamentos", date: "21/08/2026", items: ["Correção identifica a pendência do cliente aberto", "Resposta informa lançamento, valor, vencimento e status reais", "Ausência de pendência é informada sem resposta genérica", "Múltiplas pendências são listadas para seleção", "Alteração financeira permanece protegida por confirmação"] },
