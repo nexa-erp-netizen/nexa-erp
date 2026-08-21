@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.31.4",
-  build: "33104",
-  release: "Cérebro Universal da Nexa",
+  version: "3.32.0",
+  build: "33200",
+  release: "Nexa Dev — Central de Incidentes",
   date: "20/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.32.0", release: "Nexa Dev — Central de Incidentes", date: "20/08/2026", items: ["Erros da API e do Web capturados automaticamente", "Ocorrências repetidas agrupadas com contexto técnico", "Dados sensíveis removidos antes do registro", "Consulta de incidentes diretamente pela conversa da Nexa", "Autodiagnóstico preventivo do saldo anterior incorporado", "Base preparada para correções testadas, publicação e reversão"] },
     { version: "3.31.4", release: "Cérebro Universal da Nexa", date: "20/08/2026", items: ["Perguntas gerais encaminhadas para resposta por IA", "Respostas amplas para redações, análises, planos, traduções e comparações", "Pesquisa online preservada para informações atuais", "Histórico e anotações abertos diretamente pelo comando", "Anotações internas consultáveis somente pelo escritório", "Mesmo motor de decisão preparado para texto e voz"] },
     { version: "3.31.3", release: "Aviso de instabilidade do sistema", date: "20/08/2026", items: ["Falha de comunicação identificada automaticamente", "Aviso claro para escritório e clientes", "Orientação para não salvar informações durante a falha", "Botão para verificar novamente", "Aviso removido automaticamente após normalização"] },
     { version: "3.31.1", release: "Localização segura de clientes", date: "20/08/2026", items: ["Cliente localizado pelo nome parcial no comando", "Compatibilidade com acentos e nomes compostos", "Correção do filtro que confundia empresa com escritório", "Isolamento multiempresa preservado pelo código do escritório"] },

@@ -1,4 +1,5 @@
 import axios from "axios"
+import { registrarIncidenteWeb } from "./incidentesNexaService"
 
 const URL_PRINCIPAL = String(import.meta.env.VITE_API_PRIMARY_URL || "https://nexa-erp-api.onrender.com").replace(/\/+$/, "")
 let urlAtiva = URL_PRINCIPAL
@@ -65,6 +66,12 @@ api.interceptors.response.use((resposta) => {
   if (falhaDeRede || falhaDoServidor) {
     ultimaVerificacao = 0
     avisarStatus(false)
+    registrarIncidenteWeb({
+      origem: "web-api", titulo: `Falha ao acessar ${erro.config?.url || "a API"}`,
+      mensagem: erro.response?.data?.message || erro.message, rota: erro.config?.url,
+      metodo: erro.config?.method?.toUpperCase(), statusHttp: erro.response?.status || 0,
+      componente: "axios",
+    })
   }
   return Promise.reject(erro)
 })
