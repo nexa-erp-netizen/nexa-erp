@@ -39,7 +39,7 @@ const TEMPO_REARME_MICROFONE_MS = 380
 const TEMPO_BLOQUEIO_ECO_MS = 1050
 const TEMPO_REARME_COMANDO_DIRETO_MS = 180
 const COMANDO_SITE_PATTERN = /\b(carteira(?:\s+de)?\s+trabalho(?:\s+digital)?|carteira\s+digital|ctps(?:\s+digital)?|e-?cac|simples\s+nacional|pgmei|nfs-?e|receita\s+federal|gov\.?\s*br)\b/i
-const ATIVAR_VISAO_PATTERN = /\b(?:visualiz[ea]|analise|veja|olhe|enxergue)\b[\s\S]{0,30}\b(?:esta|essa|a)?\s*tela\b|\b(?:visualiza[cç][aã]o|vis[aã]o)\s+(?:da\s+)?tela\b/i
+const ATIVAR_VISAO_PATTERN = /\b(?:visualiz(?:a|e|ar)|analis(?:a|e|ar)|vej(?:a|am)|ver|olh(?:a|e|ar)|enxerg(?:a|ue|ar))\b[\s\S]{0,55}\b(?:esta|essa|minha|a)?\s*tela\b|\b(?:visualiza[cç][aã]o|vis[aã]o)\s+(?:da\s+|desta\s+|dessa\s+)?tela\b|\b(?:ver|vendo|visualizar|enxergar)\b[\s\S]{0,40}\bo\s+que\s+(?:eu\s+)?(?:estou|to|t[oô])\s+vendo\b|\best[aá]\b[\s\S]{0,20}\bvendo\b[\s\S]{0,25}\b(?:esta|essa|minha)?\s*tela\b/i
 const DESATIVAR_VISAO_PATTERN = /\b(?:pare|parar|encerre|encerrar|desative|desativar|desligue|desligar)\b[\s\S]{0,30}\b(?:visualiza[cç][aã]o|vis[aã]o|tela)\b/i
 
 const NAVEGACAO_LOCAL = [
