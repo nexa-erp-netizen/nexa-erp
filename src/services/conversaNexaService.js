@@ -270,6 +270,11 @@ export async function analisarTelaComNexa({
   return resposta.data
 }
 
+export async function registrarAnaliseProativaProduto({ paginaAtual = "", clienteId = null } = {}) {
+  const resposta = await api.post("/melhorias-nexa/proativa", { paginaAtual, clienteId })
+  return resposta.data
+}
+
 export async function verificarOllama() {
   const { ollamaUrl, modelo } = configuracaoLocal()
   const controller = new AbortController()
