@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { abrirConversaNexa, abrirConversaRecenteNexa, baixarRelatorioNexa, conversarComNexa } from "../services/conversaNexaService"
+import { analisarDocumentoNexa, abrirConversaNexa, abrirConversaRecenteNexa, baixarRelatorioNexa, conversarComNexa } from "../services/conversaNexaService"
 import {
   sintetizarVozNeural,
   transcreverVozGroq,
@@ -372,6 +372,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const ignorarEcoAteRef = useRef(0)
   const fimPainelRef = useRef(null)
   const campoMensagemRef = useRef(null)
+  const arquivoDocumentoRef = useRef(null)
   const containerFlutuanteRef = useRef(null)
   const arrasteFlutuanteRef = useRef(null)
   const timeoutSessaoProtegidaRef = useRef(null)
@@ -1193,6 +1194,71 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     focarCampoMensagem()
   }, [enviandoTexto, focarCampoMensagem, mensagemDigitada, processarComando])
 
+  const analisarDocumentoPainel = useCallback(async (evento) => {
+    const arquivo = evento.target.files?.[0]
+    evento.target.value = ""
+    if (!arquivo || enviandoTexto || processandoRef.current) return
+
+    const idBase = Date.now()
+    processandoRef.current = true
+    setEnviandoTexto(true)
+    pausarReconhecimento()
+    setMensagensPainel((atual) => [...atual, {
+      id: `doc-usuario-${idBase}`,
+      autor: "Você",
+      texto: `Analisar documento: ${arquivo.name}`,
+      data: new Date().toISOString(),
+    }].slice(-30))
+
+    try {
+      const contextoSalvo = obterContextoVoz()
+      const contexto = contextoClienteRef.current?.clienteId
+        ? { ...contextoSalvo, ...contextoClienteRef.current }
+        : contextoSalvo
+      const resposta = await analisarDocumentoNexa({
+        arquivo,
+        pergunta: String(mensagemDigitada || "").trim(),
+        conversaId: conversaIdRef.current || contexto.conversaId || null,
+        clienteId: contexto.clienteId || null,
+      })
+      setMensagemDigitada("")
+      if (resposta.conversaId) {
+        conversaIdRef.current = String(resposta.conversaId)
+        registrarConversaVoz(resposta.conversaId)
+        setHistoricoSalvo(true)
+      }
+      const textoResposta = limparRespostaDaNexa(resposta.resposta || "Documento analisado.")
+      setUltimaResposta(textoResposta)
+      setMensagensPainel((atual) => [...atual, {
+        id: `doc-nexa-${idBase}`,
+        autor: "Nexa",
+        texto: textoResposta,
+        data: new Date().toISOString(),
+        documentoAnaliseId: resposta.documentoAnaliseId || null,
+      }].slice(-30))
+      historicoRef.current = [
+        ...historicoRef.current,
+        { autor: "Você", texto: `Analisar documento: ${arquivo.name}` },
+        { autor: "Nexa", texto: textoResposta },
+      ].slice(-12)
+    } catch (error) {
+      const mensagemErro = error.response?.data?.message || error.message || "Não consegui analisar esse documento."
+      setUltimaResposta(mensagemErro)
+      setMensagensPainel((atual) => [...atual, {
+        id: `doc-erro-${idBase}`,
+        autor: "Nexa",
+        texto: mensagemErro,
+        data: new Date().toISOString(),
+        erro: true,
+      }].slice(-30))
+    } finally {
+      setEnviandoTexto(false)
+      processandoRef.current = false
+      if (ativadaRef.current) voltarParaEscuta()
+      else atualizarEstado("pausada", "Escuta contínua pausada.")
+    }
+  }, [atualizarEstado, enviandoTexto, mensagemDigitada, pausarReconhecimento, voltarParaEscuta])
+
   const confirmarSugestaoVocabulario = useCallback(async (texto) => {
     const sugestao = sugestaoVocabularioRef.current
     if (!sugestao) return false
@@ -1939,6 +2005,23 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           </section>
 
           <div style={styles.composer}>
+            <input
+              ref={arquivoDocumentoRef}
+              type="file"
+              accept=".pdf,.docx,.txt,.csv,.json,.xml"
+              onChange={analisarDocumentoPainel}
+              style={{ display: "none" }}
+            />
+            <button
+              type="button"
+              style={{ ...styles.attachButton, ...(enviandoTexto ? styles.sendButtonDisabled : {}) }}
+              onClick={() => arquivoDocumentoRef.current?.click()}
+              disabled={enviandoTexto}
+              title="Enviar documento para análise"
+              aria-label="Enviar documento para análise"
+            >
+              📎
+            </button>
             <textarea
               ref={campoMensagemRef}
               value={mensagemDigitada}
@@ -2078,7 +2161,8 @@ const styles = {
   documentFallbackText: { color: "#ffd298", lineHeight: 1.35 },
   openDocumentButton: { display: "inline-block", border: "1px solid rgba(139,215,255,.36)", borderRadius: "8px", padding: "7px 10px", background: "rgba(0,168,255,.16)", color: "#d9edff", fontWeight: 800, cursor: "pointer", fontSize: "11px", textDecoration: "none" },
   typingText: { color: "#8bd7ff", fontSize: "11px", fontStyle: "italic" },
-  composer: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "8px", alignItems: "stretch" },
+  composer: { display: "grid", gridTemplateColumns: "42px minmax(0,1fr) auto", gap: "8px", alignItems: "stretch" },
+  attachButton: { borderRadius: "11px", border: "1px solid rgba(139,215,255,.24)", background: "rgba(0,168,255,.10)", color: "#bfe8ff", fontSize: "17px", cursor: "pointer" },
   composerInput: { width: "100%", boxSizing: "border-box", resize: "none", minHeight: "58px", maxHeight: "110px", background: "#071f43", color: "#f4fbff", border: "1px solid rgba(139,215,255,.22)", borderRadius: "11px", padding: "10px 11px", outline: "none", fontFamily: "inherit", fontSize: "12px", lineHeight: 1.4 },
   sendButton: { border: 0, borderRadius: "11px", padding: "0 15px", background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", fontWeight: 800, cursor: "pointer" },
   sendButtonDisabled: { opacity: .48, cursor: "not-allowed" },

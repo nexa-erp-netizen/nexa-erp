@@ -426,7 +426,11 @@ export default function ConversaNexa({ usuario, setPage }) {
     setErro("")
     setConversa((atual) => [...atual.filter((item) => item.id !== "boas-vindas"), { id: `u-arquivo-${Date.now()}`, autor: "Você", texto: `Analisar documento: ${arquivo.name}`, data: new Date().toISOString() }])
     try {
-      const resposta = await analisarDocumentoNexa({ arquivo, pergunta: mensagem.trim(), conversaId })
+      const resposta = await analisarDocumentoNexa({ arquivo, pergunta: mensagem.trim(), conversaId, clienteId: tipoContexto === "cliente" ? clienteId : null })
+      if (resposta.conversaId) {
+        setConversaId(resposta.conversaId)
+        registrarConversaVoz(resposta.conversaId)
+      }
       setMensagem("")
       setConversa((atual) => [...atual, { id: `n-arquivo-${Date.now()}`, autor: "Nexa", texto: resposta.resposta, pontos: resposta.pontos || [], provedor: "groq", modelo: "Nexa Documentos 1.0", data: new Date().toISOString() }])
     } catch (error) {
@@ -588,7 +592,7 @@ export default function ConversaNexa({ usuario, setPage }) {
           {erro && <div style={styles.error}>{erro}</div>}
 
           <section style={styles.composer}>
-            <input ref={arquivoRef} type="file" accept=".pdf,.doc,.docx,.txt,.csv,.json,.xml" onChange={analisarArquivo} style={{ display: "none" }} />
+            <input ref={arquivoRef} type="file" accept=".pdf,.docx,.txt,.csv,.json,.xml" onChange={analisarArquivo} style={{ display: "none" }} />
             <button type="button" style={styles.attach} onClick={() => arquivoRef.current?.click()} disabled={enviando} title="Enviar documento para análise">📎 Documento</button>
             <textarea
               style={styles.textarea}

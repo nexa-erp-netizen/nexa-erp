@@ -301,11 +301,12 @@ export async function baixarRelatorioNexa(configuracao) {
   setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
 
-export async function analisarDocumentoNexa({ arquivo, pergunta = "", conversaId = null }) {
+export async function analisarDocumentoNexa({ arquivo, pergunta = "", conversaId = null, clienteId = null }) {
   const dados = new FormData()
   dados.append("arquivo", arquivo)
   if (pergunta) dados.append("pergunta", pergunta)
   if (conversaId) dados.append("conversaId", String(conversaId))
+  if (clienteId) dados.append("clienteId", String(clienteId))
   const resposta = await api.post("/conversa/ferramentas/documento", dados, { headers: { "Content-Type": "multipart/form-data" } })
   return resposta.data
 }
