@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.32.2",
-  build: "33202",
-  release: "Conversa única entre dispositivos",
+  version: "3.33.0",
+  build: "33300",
+  release: "Nexa Ferramentas Universais",
   date: "21/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.33.0", release: "Nexa Ferramentas Universais", date: "21/08/2026", items: ["Pesquisa atual na internet combinada com dados do ERP", "Relatórios em PDF pela conversa", "Exportação de relatórios para Excel", "Leitura e análise de PDF, DOCX, TXT, CSV, JSON e XML", "Correção conversacional de cobranças com confirmação", "Sincronização transacional entre cobrança e financeiro"] },
     { version: "3.32.2", release: "Conversa única entre dispositivos", date: "21/08/2026", items: ["Conversa ativa definida no PostgreSQL por usuário", "IDs antigos do navegador deixam de separar o histórico", "Notebook e outros computadores retomam a mesma sessão", "Troca de conversa sincronizada pelo servidor", "Painel flutuante sempre consulta a sessão canônica"] },
     { version: "3.32.1", release: "Nexa Dev — Motor de Diagnóstico", date: "21/08/2026", items: ["Conversas sincronizadas entre computadores pela mesma conta", "Conversa mais recente retomada automaticamente", "Painel flutuante conectado ao histórico salvo no servidor", "Incidentes classificados por origem e categoria", "Causa provável, risco, confiança e correção sugerida", "Detalhamento de incidentes diretamente pela conversa da Nexa"] },
     { version: "3.32.0", release: "Nexa Dev — Central de Incidentes", date: "20/08/2026", items: ["Erros da API e do Web capturados automaticamente", "Ocorrências repetidas agrupadas com contexto técnico", "Dados sensíveis removidos antes do registro", "Consulta de incidentes diretamente pela conversa da Nexa", "Autodiagnóstico preventivo do saldo anterior incorporado", "Base preparada para correções testadas, publicação e reversão"] },

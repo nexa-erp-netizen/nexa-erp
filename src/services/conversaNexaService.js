@@ -287,6 +287,29 @@ export async function verificarProvedores() {
   return { groq, ollama }
 }
 
+export async function baixarRelatorioNexa(configuracao) {
+  const resposta = await api.post("/conversa/ferramentas/relatorio", configuracao, { responseType: "blob" })
+  const disposicao = String(resposta.headers?.["content-disposition"] || "")
+  const nome = disposicao.match(/filename="?([^";]+)"?/i)?.[1] || `relatorio-nexa.${configuracao.formato || "pdf"}`
+  const url = URL.createObjectURL(resposta.data)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = nome
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1500)
+}
+
+export async function analisarDocumentoNexa({ arquivo, pergunta = "", conversaId = null }) {
+  const dados = new FormData()
+  dados.append("arquivo", arquivo)
+  if (pergunta) dados.append("pergunta", pergunta)
+  if (conversaId) dados.append("conversaId", String(conversaId))
+  const resposta = await api.post("/conversa/ferramentas/documento", dados, { headers: { "Content-Type": "multipart/form-data" } })
+  return resposta.data
+}
+
 
 export async function listarConversasNexa() {
   const resposta = await api.get("/conversa/sessoes")

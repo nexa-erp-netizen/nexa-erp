@@ -10,6 +10,8 @@ import {
   excluirMemoriaNexa,
   listarConversasNexa,
   listarMemoriasNexa,
+  baixarRelatorioNexa,
+  analisarDocumentoNexa,
   verificarProvedores,
 } from "../services/conversaNexaService"
 import {
@@ -49,6 +51,7 @@ export default function ConversaNexa({ usuario, setPage }) {
   const [mostrarMemorias, setMostrarMemorias] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900)
   const fimRef = useRef(null)
+  const arquivoRef = useRef(null)
   const contextoInicialAplicadoRef = useRef(false)
   const consultaAutomaticaAplicadaRef = useRef(false)
 
@@ -369,6 +372,7 @@ export default function ConversaNexa({ usuario, setPage }) {
         modelo: resposta.modelo || "",
         fallback: Boolean(resposta.fallback),
         acao: resposta.acao || null,
+        arquivoNexa: resposta.arquivoNexa || null,
         consulta: resposta.consulta || null,
         alteracaoSensivel: Boolean(resposta.alteracaoSensivel),
         confirmacaoAlteracaoPendente: resposta.confirmacaoAlteracaoPendente || null,
@@ -403,6 +407,32 @@ export default function ConversaNexa({ usuario, setPage }) {
       await carregarMemorias()
     } catch (error) {
       setErro(error.response?.data?.message || "Não consegui remover a memória.")
+    }
+  }
+
+  async function baixarRelatorio(arquivo) {
+    try {
+      await baixarRelatorioNexa(arquivo)
+    } catch (error) {
+      setErro(error.response?.data?.message || "Não consegui gerar o arquivo agora.")
+    }
+  }
+
+  async function analisarArquivo(evento) {
+    const arquivo = evento.target.files?.[0]
+    evento.target.value = ""
+    if (!arquivo || enviando) return
+    setEnviando(true)
+    setErro("")
+    setConversa((atual) => [...atual.filter((item) => item.id !== "boas-vindas"), { id: `u-arquivo-${Date.now()}`, autor: "Você", texto: `Analisar documento: ${arquivo.name}`, data: new Date().toISOString() }])
+    try {
+      const resposta = await analisarDocumentoNexa({ arquivo, pergunta: mensagem.trim(), conversaId })
+      setMensagem("")
+      setConversa((atual) => [...atual, { id: `n-arquivo-${Date.now()}`, autor: "Nexa", texto: resposta.resposta, pontos: resposta.pontos || [], provedor: "groq", modelo: "Nexa Documentos 1.0", data: new Date().toISOString() }])
+    } catch (error) {
+      setErro(error.response?.data?.message || "Não consegui analisar esse documento.")
+    } finally {
+      setEnviando(false)
     }
   }
 
@@ -532,6 +562,7 @@ export default function ConversaNexa({ usuario, setPage }) {
                 {item.fallback && <div style={styles.fallbackNotice}>Resposta gerada pelo Ollama local.</div>}
                 {item.memoriaRegistrada && <div style={styles.memoryNotice}>✓ Informação adicionada à memória.</div>}
                 {item.acao && <div style={styles.actionNotice}>✓ Pronto.</div>}
+                {item.arquivoNexa && <button type="button" style={styles.downloadButton} onClick={() => baixarRelatorio(item.arquivoNexa)}>{item.arquivoNexa.titulo || "Baixar arquivo"}</button>}
                 {(item.confirmacaoAlteracaoPendente || item.confirmacaoAlteracaoConcluida) && (
                   <EstadoAcaoGuiada
                     pendente={Boolean(item.confirmacaoAlteracaoPendente)}
@@ -557,6 +588,8 @@ export default function ConversaNexa({ usuario, setPage }) {
           {erro && <div style={styles.error}>{erro}</div>}
 
           <section style={styles.composer}>
+            <input ref={arquivoRef} type="file" accept=".pdf,.doc,.docx,.txt,.csv,.json,.xml" onChange={analisarArquivo} style={{ display: "none" }} />
+            <button type="button" style={styles.attach} onClick={() => arquivoRef.current?.click()} disabled={enviando} title="Enviar documento para análise">📎 Documento</button>
             <textarea
               style={styles.textarea}
               value={mensagem}
@@ -593,6 +626,7 @@ function mapearMensagemPersistida(item) {
     modelo: dados.modelo || "",
     fallback: Boolean(dados.fallback),
     acao: dados.acao || null,
+    arquivoNexa: dados.arquivoNexa || null,
     consulta: dados.consulta || null,
     alteracaoSensivel: Boolean(dados.alteracaoSensivel),
     confirmacaoAlteracaoPendente: dados.confirmacaoAlteracaoPendente || null,
@@ -788,7 +822,9 @@ const styles = {
   consultaRodapeItem: { display: "flex", justifyContent: "space-between", gap: "10px", marginTop: "3px", color: "#91a6bf", fontSize: "10px" },
   consultaButton: { alignSelf: "flex-start", background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", border: 0, borderRadius: "9px", padding: "9px 13px", fontWeight: "bold", cursor: "pointer" },
   typing: { color: "#8bd7ff", fontStyle: "italic" },
-  composer: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: "10px", alignItems: "stretch" },
+  composer: { display: "grid", gridTemplateColumns: "auto minmax(0,1fr) auto", gap: "10px", alignItems: "stretch" },
+  attach: { background: "rgba(0,168,255,.10)", color: "#8bd7ff", border: "1px solid rgba(0,168,255,.28)", borderRadius: "14px", padding: "0 15px", fontWeight: "bold", cursor: "pointer" },
+  downloadButton: { marginTop: "10px", background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", border: 0, borderRadius: "9px", padding: "9px 13px", fontWeight: "bold", cursor: "pointer" },
   textarea: { resize: "vertical", minHeight: "78px", background: "#061f47", color: "white", border: "1px solid rgba(255,255,255,.18)", borderRadius: "14px", padding: "13px", fontFamily: "inherit" },
   send: { background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", border: 0, borderRadius: "14px", padding: "0 24px", fontWeight: "bold", cursor: "pointer" },
   error: { background: "rgba(255,95,101,.12)", border: "1px solid rgba(255,95,101,.35)", borderRadius: "12px", padding: "12px", color: "#ffb5b8" },

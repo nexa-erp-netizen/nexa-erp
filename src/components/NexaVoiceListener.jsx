@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { abrirConversaNexa, abrirConversaRecenteNexa, conversarComNexa } from "../services/conversaNexaService"
+import { abrirConversaNexa, abrirConversaRecenteNexa, baixarRelatorioNexa, conversarComNexa } from "../services/conversaNexaService"
 import {
   sintetizarVozNeural,
   transcreverVozGroq,
@@ -529,6 +529,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         texto: item.texto,
         data: item.createdAt || new Date().toISOString(),
         acaoExecutada: Boolean(item?.dados?.acao),
+        arquivoNexa: item?.dados?.arquivoNexa || null,
       }))
 
       conversaIdRef.current = String(conversaId)
@@ -1091,6 +1092,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           documentosDrive: resposta.consulta?.tipo === "lista-documentos-drive"
             ? (resposta.consulta.itens || []).filter((arquivo) => arquivo?.url)
             : [],
+          arquivoNexa: resposta.arquivoNexa || null,
         },
       ].slice(-30))
 
@@ -1905,6 +1907,11 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
                       </a>
                     ))}
                   </div>
+                )}
+                {item.arquivoNexa && (
+                  <button type="button" style={styles.openDocumentButton} onClick={() => baixarRelatorioNexa(item.arquivoNexa)}>
+                    {item.arquivoNexa.titulo || "Baixar relatório"}
+                  </button>
                 )}
                 {item.acaoExecutada && <small style={styles.actionDone}>Pronto.</small>}
                 {item.acaoDocumento && !item.acaoExecutada && (
