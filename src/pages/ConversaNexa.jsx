@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import api from "../services/api"
 import {
   abrirConversaNexa,
+  abrirConversaRecenteNexa,
+  ativarConversaNexa,
   atualizarConversaNexa,
   conversarComNexa,
   excluirConversaNexa,
@@ -86,9 +88,10 @@ export default function ConversaNexa({ usuario, setPage }) {
     if (contextoInicialAplicadoRef.current || !conversas.length) return
     contextoInicialAplicadoRef.current = true
 
-    const contexto = obterContextoVoz()
-    const conversaAtual = conversas.find((item) => String(item.id) === String(contexto.conversaId))
-    selecionarConversa(conversaAtual || conversas[0])
+    abrirConversaRecenteNexa().then((dados) => {
+      const conversaAtiva = dados?.conversa
+      if (conversaAtiva) selecionarConversa(conversaAtiva)
+    }).catch(() => selecionarConversa(conversas[0]))
   }, [conversas])
 
   useEffect(() => {
@@ -175,6 +178,7 @@ export default function ConversaNexa({ usuario, setPage }) {
     setErro("")
 
     try {
+      await ativarConversaNexa(item.id)
       const dados = await abrirConversaNexa(item.id)
       const sessao = dados.conversa || item
       setConversaId(sessao.id)

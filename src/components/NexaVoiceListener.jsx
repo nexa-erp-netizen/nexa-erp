@@ -554,15 +554,17 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     const contexto = contextoClienteRef.current?.clienteId
       ? { ...contextoSalvo, ...contextoClienteRef.current }
       : contextoSalvo
-    if (contexto.conversaId) carregarHistoricoPainel(contexto.conversaId)
-    else abrirConversaRecenteNexa().then((dados) => {
+    abrirConversaRecenteNexa().then((dados) => {
       const id = dados?.conversa?.id
-      if (!id) return
+      if (!id) {
+        if (contexto.conversaId) carregarHistoricoPainel(contexto.conversaId)
+        return
+      }
       conversaIdRef.current = String(id)
       registrarConversaVoz(id)
       setHistoricoSalvo(true)
       carregarHistoricoPainel(id)
-    }).catch(() => {})
+    }).catch(() => contexto.conversaId && carregarHistoricoPainel(contexto.conversaId))
 
     const sincronizarConversa = (evento) => {
       const conversaId = evento?.detail?.conversaId || obterContextoVoz().conversaId
