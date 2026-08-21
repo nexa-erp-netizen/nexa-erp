@@ -44,6 +44,14 @@ const DESATIVAR_VISAO_PATTERN = /\b(?:pare|parar|encerre|encerrar|desative|desat
 const ANALISAR_CONTEUDO_TELA_PATTERN = /\b(?:analis(?:a|e|ar)|identifi(?:ca|que|car)|confir(?:a|e|ar)|verifi(?:ca|que|car)|avali(?:a|e|ar)|ach(?:a|ou)|opini[aã]o|parecer|sugest[aã]o|ideia|erro|problema|inconsist[eê]ncia|melhoria|o\s+que\s+(?:tem|aparece|est[aá]\s+errado))\b/i
 const ANALISE_TELA_ESPECIFICA_PATTERN = /\b(?:cliente|pend[eê]ncia|obriga[cç][aã]o|pagamento|valor|saldo|status|lan[cç]amento|fiscal|financeir|honor[aá]rio|das|documento|layout|formato|design|apar[eê]ncia|organiza[cç][aã]o|bot(?:[aã]o|ões?)|menu|campo|texto|digita[cç][aã]o|visual|usabilidade|funcionamento|navega[cç][aã]o|completa|tudo)\b/i
 
+function corrigirComandoVisualLocal(valor) {
+  return String(valor || "")
+    .replace(/\b(?:visualise|vizualize)\b/gi, "visualize")
+    .replace(/\b(?:visualisar|vizualisar)\b/gi, "visualizar")
+    .replace(/\b(?:anallise|analize)\b/gi, "analise")
+    .replace(/\benxerguee\b/gi, "enxergue")
+}
+
 const NAVEGACAO_LOCAL = [
   { tipo: "abrir-grupo", grupo: "Ferramentas", aliases: ["menu ferramentas", "grupo ferramentas", "ferramentas"] },
   { tipo: "abrir-grupo", grupo: "Configurações", aliases: ["menu configuracoes", "grupo configuracoes", "configuracoes"] },
@@ -1141,6 +1149,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
   const processarComando = useCallback(async (texto, opcoes = {}) => {
     const comando = String(texto || "").trim()
+    const comandoInterpretado = corrigirComandoVisualLocal(comando)
     if (!comando || processandoRef.current) return
     if (opcoes.origem !== "texto") renovarJanelaProtegida()
 
@@ -1186,7 +1195,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       const manterVisualizacao = aguardandoDesativacaoTelaRef.current && CONFIRMACAO_NAO_PATTERN.test(comando)
       const focoAnalisePendente = aguardandoFocoAnaliseTelaRef.current
 
-      if (DESATIVAR_VISAO_PATTERN.test(comando) || confirmarDesativacao) {
+      if (DESATIVAR_VISAO_PATTERN.test(comandoInterpretado) || confirmarDesativacao) {
         encerrarVisualizacaoTela()
         resposta = {
           resposta: "Visualização da tela desativada.",
@@ -1201,12 +1210,12 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           visualizacaoAtiva: true,
           respondidoEm: new Date().toISOString(),
         }
-      } else if (ATIVAR_VISAO_PATTERN.test(comando) || visualizacaoTelaRef.current?.active || focoAnalisePendente) {
+      } else if (ATIVAR_VISAO_PATTERN.test(comandoInterpretado) || visualizacaoTelaRef.current?.active || focoAnalisePendente) {
         const estavaAtiva = Boolean(visualizacaoTelaRef.current?.active)
         if (!estavaAtiva) await iniciarVisualizacaoTela()
         const imagem = await capturarTelaAtual()
-        const informouFoco = ANALISE_TELA_ESPECIFICA_PATTERN.test(comando) || focoAnalisePendente
-        const pediuAnalise = ANALISAR_CONTEUDO_TELA_PATTERN.test(comando) || informouFoco || focoAnalisePendente
+        const informouFoco = ANALISE_TELA_ESPECIFICA_PATTERN.test(comandoInterpretado) || focoAnalisePendente
+        const pediuAnalise = ANALISAR_CONTEUDO_TELA_PATTERN.test(comandoInterpretado) || informouFoco || focoAnalisePendente
 
         if (!pediuAnalise) {
           resposta = {

@@ -40,6 +40,14 @@ const ANALISAR_TELA_PATTERN = /\b(?:analis|avali|identifi|verifi|confir|erro|pro
 const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|pode|pode desativar|desative|desativar)[.!?]*\s*$/i
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:n[aã]o|continue|continuar|mantenha|deixe ativa)[.!?]*\s*$/i
 
+function corrigirComandoVisualLocal(valor) {
+  return String(valor || "")
+    .replace(/\b(?:visualise|vizualize)\b/gi, "visualize")
+    .replace(/\b(?:visualisar|vizualisar)\b/gi, "visualizar")
+    .replace(/\b(?:anallise|analize)\b/gi, "analise")
+    .replace(/\benxerguee\b/gi, "enxergue")
+}
+
 function limparTextoResposta(valor, fallback = "Comando concluído.") {
   const texto = String(valor || "").trim()
   if (!texto) return fallback
@@ -375,6 +383,7 @@ export default function ConversaNexa({ usuario, setPage }) {
 
   async function enviar(texto = mensagem) {
     const pergunta = String(texto || "").trim()
+    const perguntaInterpretada = corrigirComandoVisualLocal(pergunta)
     if (!pergunta || enviando) return
 
     if (tipoContexto === "cliente" && !clienteId) {
@@ -396,7 +405,7 @@ export default function ConversaNexa({ usuario, setPage }) {
 
     try {
       let resposta
-      const pedidoVisual = ATIVAR_VISAO_PATTERN.test(pergunta)
+      const pedidoVisual = ATIVAR_VISAO_PATTERN.test(perguntaInterpretada)
       if (aguardandoDesativacaoTelaRef.current && CONFIRMACAO_SIM_PATTERN.test(pergunta)) {
         visualizacaoTelaRef.current?.getTracks().forEach((track) => track.stop())
         visualizacaoTelaRef.current = null
@@ -409,7 +418,7 @@ export default function ConversaNexa({ usuario, setPage }) {
       } else if (pedidoVisual || visualizacaoTelaRef.current?.active) {
         if (!visualizacaoTelaRef.current?.active) await iniciarVisualizacaoTela()
         const imagem = await capturarTelaAtual()
-        if (ANALISAR_TELA_PATTERN.test(pergunta)) {
+        if (ANALISAR_TELA_PATTERN.test(perguntaInterpretada)) {
           resposta = await analisarTelaComNexa({
             imagem,
             mensagem: pergunta,
