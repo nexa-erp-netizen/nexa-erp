@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.38.1",
-  build: "33801",
-  release: "Análise contextual e objetiva",
+  version: "3.38.2",
+  build: "33802",
+  release: "Cobertura completa do cliente",
   date: "21/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.38.2", release: "Cobertura completa do cliente", date: "21/08/2026", items: ["Análise geral cruza todos os módulos vinculados", "Conclusão bloqueada quando apenas um módulo foi consultado", "Cadastro, Fiscal, Financeiro, DAS, cobranças e documentos combinados", "Revisão crítica obrigatória antes de responder", "Lacunas e módulos indisponíveis informados claramente", "Solução prática apresentada junto com o problema", "Correção concreta exige explicação e confirmação", "Resposta final permanece curta por padrão", "Isolamento do escritório e campos sensíveis preservados"] },
     { version: "3.38.1", release: "Análise contextual e objetiva", date: "21/08/2026", items: ["Análise de cliente não é mais confundida com avaliação do sistema", "Nome Nexa tratado como chamada da assistente", "Consultas permanecem focadas no cliente solicitado", "Respostas curtas por padrão", "Detalhamento liberado somente quando solicitado", "Análises e comparações permanecem no núcleo agente", "Limite de segurança evita respostas excessivamente longas"] },
     { version: "3.38.0", release: "Núcleo Agente da Nexa", date: "21/08/2026", items: ["Interpretação por objetivo em vez de frases cadastradas", "Planejamento em várias etapas", "Mapa amplo dos módulos e campos autorizados do ERP", "Consultas combinadas entre áreas do banco", "Ferramentas somente de leitura nesta primeira versão", "Ações encaminhadas aos fluxos seguros com confirmação", "Registro auditável de cada execução do agente", "Respostas produzidas no momento conforme os fatos encontrados"] },
     { version: "3.37.3", release: "Linguagem humana e espontânea", date: "21/08/2026", items: ["Modo Desenvolvedor responde como uma colega de equipe", "Termos técnicos traduzidos para linguagem comum", "Respostas curtas e variadas conforme a pergunta", "Detalhes técnicos aparecem somente quando solicitados", "Dados internos deixam de ser despejados na conversa", "Fatos confirmados continuam protegidos contra contradições", "Maior naturalidade sem perder segurança operacional"] },
