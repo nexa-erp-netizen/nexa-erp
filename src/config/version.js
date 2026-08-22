@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.38.3",
-  build: "33803",
-  release: "Comprovante da análise",
+  version: "3.38.4",
+  build: "33804",
+  release: "Análise resiliente",
   date: "21/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.38.4", release: "Análise resiliente", date: "21/08/2026", items: ["Contexto do agente reduzido para economizar tokens", "Registros resumidos antes do envio à IA", "Menor risco de limite no plano gratuito da Groq", "Contingência local consulta diretamente o banco", "Análise de cliente funciona mesmo com a IA indisponível", "Aviso vermelho substituído por resposta baseada nos dados", "Solução e próximo passo preservados na contingência"] },
     { version: "3.38.3", release: "Comprovante da análise", date: "21/08/2026", items: ["Resposta declara quais áreas foram verificadas", "Módulos indisponíveis não podem ser omitidos", "Análise incompleta sempre apresenta uma solução", "Registros abertos encontrados são destacados", "Proposta de investigação oferecida quando necessário", "Revisão incorporada à decisão sem chamada adicional", "Menor consumo e maior estabilidade no plano gratuito", "Cobertura confirmada mesmo se a revisão da IA falhar"] },
     { version: "3.38.2", release: "Cobertura completa do cliente", date: "21/08/2026", items: ["Análise geral cruza todos os módulos vinculados", "Conclusão bloqueada quando apenas um módulo foi consultado", "Cadastro, Fiscal, Financeiro, DAS, cobranças e documentos combinados", "Revisão crítica obrigatória antes de responder", "Lacunas e módulos indisponíveis informados claramente", "Solução prática apresentada junto com o problema", "Correção concreta exige explicação e confirmação", "Resposta final permanece curta por padrão", "Isolamento do escritório e campos sensíveis preservados"] },
     { version: "3.38.1", release: "Análise contextual e objetiva", date: "21/08/2026", items: ["Análise de cliente não é mais confundida com avaliação do sistema", "Nome Nexa tratado como chamada da assistente", "Consultas permanecem focadas no cliente solicitado", "Respostas curtas por padrão", "Detalhamento liberado somente quando solicitado", "Análises e comparações permanecem no núcleo agente", "Limite de segurança evita respostas excessivamente longas"] },
