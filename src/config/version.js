@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.38.0",
-  build: "33800",
-  release: "Núcleo Agente da Nexa",
+  version: "3.38.1",
+  build: "33801",
+  release: "Análise contextual e objetiva",
   date: "21/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.38.1", release: "Análise contextual e objetiva", date: "21/08/2026", items: ["Análise de cliente não é mais confundida com avaliação do sistema", "Nome Nexa tratado como chamada da assistente", "Consultas permanecem focadas no cliente solicitado", "Respostas curtas por padrão", "Detalhamento liberado somente quando solicitado", "Análises e comparações permanecem no núcleo agente", "Limite de segurança evita respostas excessivamente longas"] },
     { version: "3.38.0", release: "Núcleo Agente da Nexa", date: "21/08/2026", items: ["Interpretação por objetivo em vez de frases cadastradas", "Planejamento em várias etapas", "Mapa amplo dos módulos e campos autorizados do ERP", "Consultas combinadas entre áreas do banco", "Ferramentas somente de leitura nesta primeira versão", "Ações encaminhadas aos fluxos seguros com confirmação", "Registro auditável de cada execução do agente", "Respostas produzidas no momento conforme os fatos encontrados"] },
     { version: "3.37.3", release: "Linguagem humana e espontânea", date: "21/08/2026", items: ["Modo Desenvolvedor responde como uma colega de equipe", "Termos técnicos traduzidos para linguagem comum", "Respostas curtas e variadas conforme a pergunta", "Detalhes técnicos aparecem somente quando solicitados", "Dados internos deixam de ser despejados na conversa", "Fatos confirmados continuam protegidos contra contradições", "Maior naturalidade sem perder segurança operacional"] },
     { version: "3.37.2", release: "Modo Desenvolvedor Conversacional", date: "21/08/2026", items: ["Resultados técnicos explicados pela IA em linguagem natural", "Histórico e tela atual usados como contexto", "Fatos confirmados continuam controlados pela API", "Número e status do incidente são validados antes da resposta", "Contradições acionam resposta segura automática", "Fallback disponível se o provedor estiver indisponível", "Diagnóstico e conversa funcionam em uma camada híbrida"] },
