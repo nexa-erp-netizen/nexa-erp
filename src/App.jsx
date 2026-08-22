@@ -133,16 +133,21 @@ export default function App() {
       "Procurações e-CAC",
       "Identidade Digital",
       "Central e-CAC",
-      "Memória da Nexa",
-      "Segundo Contador",
-      "Consultora Tributária",
-      "Conversa com a Nexa",
-      "Radar Inteligente",
       "Relatórios",
       "Calculadora IRPF MEI",
       "Calculadora de Rescisão",
       "Agenda",
       "Sobre",
+    ],
+
+    Empresa: [
+      "Dashboard", "Notificações", "Escritório Digital", "Clientes", "Funcionários",
+      "Folha de Pagamento", "Pró-labore", "Férias", "Serviços", "Plano de Contas",
+      "Lançamentos Contábeis", "Conciliação Bancária", "Fiscal", "NF-e", "NFS-e",
+      "Financeiro", "Movimentos Clientes", "Pendências Clientes", "Acesso Rápido Fiscal",
+      "Documentos Digitais", "WhatsApp Inteligente", "Assistente do Dia", "Laboratório Tributário",
+      "Certificados Digitais", "Procurações e-CAC", "Identidade Digital", "Central e-CAC",
+      "Relatórios", "Calculadora IRPF MEI", "Calculadora de Rescisão", "Agenda", "Sobre",
     ],
 
     Cliente: [
@@ -391,7 +396,7 @@ export default function App() {
           {renderPage()}
         </main>
 
-        <NexaVoiceListener usuario={usuario} setPage={setPage} page={page} />
+        {usuario?.perfil === "Administrador" && <NexaVoiceListener usuario={usuario} setPage={setPage} page={page} />}
       </div>
     </div>
   )

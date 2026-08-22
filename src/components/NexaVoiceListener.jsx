@@ -2077,7 +2077,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     ativarVoz()
   }
 
-  if (!usuario || usuario.perfil === "Cliente") return null
+  if (!usuario || usuario.perfil !== "Administrador") return null
 
   return (
     <aside

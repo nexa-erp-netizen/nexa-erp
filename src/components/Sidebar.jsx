@@ -48,6 +48,7 @@ export default function Sidebar({ page, setPage, usuario }) {
     carregarContador()
   }, [usuario, page])
 
+  const itensExclusivosNexa = new Set(["Memória da Nexa", "Segundo Contador", "Consultora Tributária", "Conversa com a Nexa", "Radar Inteligente"])
   const gruposEscritorio = [
     {
       titulo: "Contábil",
@@ -92,6 +93,10 @@ export default function Sidebar({ page, setPage, usuario }) {
       ],
     },
   ]
+    .map((grupo) => usuario?.perfil === "Administrador"
+      ? grupo
+      : { ...grupo, itens: grupo.itens.filter((item) => !itensExclusivosNexa.has(item)) })
+    .filter((grupo) => grupo.itens.length)
 
   const menuCliente = [
     "Portal Cliente",

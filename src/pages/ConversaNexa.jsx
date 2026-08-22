@@ -77,6 +77,7 @@ export default function ConversaNexa({ usuario, setPage }) {
   const [conversa, setConversa] = useState([boasVindas()])
   const [memorias, setMemorias] = useState([])
   const [mostrarMemorias, setMostrarMemorias] = useState(false)
+  const [gerandoDiagnostico, setGerandoDiagnostico] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900)
   const fimRef = useRef(null)
   const arquivoRef = useRef(null)
@@ -250,6 +251,30 @@ export default function ConversaNexa({ usuario, setPage }) {
     setMensagem("")
     setErro("")
     setConversa([boasVindas()])
+  }
+
+  async function prepararDiagnostico() {
+    if (gerandoDiagnostico) return
+    setGerandoDiagnostico(true)
+    setErro("")
+    try {
+      const resposta = await api.post("/diagnostico-chatgpt/pacote", {
+        descricao: mensagem.trim() || "Analise os erros atuais da Nexa e prepare a correção necessária.",
+      }, { responseType: "blob" })
+      const nome = String(resposta.headers?.["content-disposition"] || "").match(/filename="([^"]+)"/)?.[1] || "diagnostico-nexa.json"
+      const url = URL.createObjectURL(resposta.data)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = nome
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setErro(error.response?.data?.message || "Não consegui preparar o diagnóstico.")
+    } finally {
+      setGerandoDiagnostico(false)
+    }
   }
 
   async function removerConversa(event, id) {
@@ -567,6 +592,9 @@ export default function ConversaNexa({ usuario, setPage }) {
         <div style={styles.heroActions}>
           <button style={styles.memoryButton} onClick={() => setMostrarMemorias((valor) => !valor)}>
             Memória ativa • {memorias.length}
+          </button>
+          <button style={styles.memoryButton} onClick={prepararDiagnostico} disabled={gerandoDiagnostico}>
+            {gerandoDiagnostico ? "Preparando..." : "Diagnóstico para ChatGPT"}
           </button>
           <button style={styles.newButton} onClick={novaConversa}>+ Nova conversa</button>
         </div>

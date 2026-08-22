@@ -152,7 +152,7 @@ export default function Usuarios() {
       <h2>Usuários</h2>
 
       <p style={subtitle}>
-        Crie acessos para administradores, funcionários e clientes.
+        Crie acessos para administradores, empresas, funcionários e clientes. A Nexa é exclusiva do Administrador.
       </p>
 
       <div style={form}>
@@ -194,6 +194,7 @@ export default function Usuarios() {
           }}
         >
           <option value="Administrador">Administrador</option>
+          <option value="Empresa">Empresa</option>
           <option value="Funcionário">Funcionário</option>
           <option value="Cliente">Cliente</option>
         </select>
