@@ -31,6 +31,7 @@ const SUGESTOES = [
 
 const STATUS_INICIAL = {
   verificando: true,
+  openai: { configurada: false, online: false, modelo: "" },
   groq: { configurada: false, online: false, modelo: "" },
   ollama: { online: false, instalado: false, modelo: "" },
 }
@@ -183,7 +184,7 @@ export default function ConversaNexa({ usuario, setPage }) {
     [clientes, clienteId]
   )
 
-  const algumProvedorDisponivel = provedores.groq.online || (provedores.ollama.online && provedores.ollama.instalado)
+  const algumProvedorDisponivel = provedores.openai?.online || provedores.groq.online || (provedores.ollama.online && provedores.ollama.instalado)
 
   async function recarregarConversas() {
     try {
@@ -601,7 +602,7 @@ export default function ConversaNexa({ usuario, setPage }) {
       </header>
 
       <div style={{ ...styles.providerStatus, ...(algumProvedorDisponivel ? styles.providerOnline : styles.providerOffline) }}>
-        <strong>{provedores.verificando ? "Verificando IA..." : provedores.groq.online ? "Groq conectada — IA online" : "Groq indisponível"}</strong>
+        <strong>{provedores.verificando ? "Verificando IA..." : provedores.openai?.online ? "OpenAI conectada — IA principal" : provedores.groq.online ? "Groq conectada — IA de reserva" : "IA indisponível"}</strong>
         <span>{provedores.ollama.online && provedores.ollama.instalado ? `Ollama pronto como alternativa local • ${provedores.ollama.modelo}` : "Ollama local opcional"}</span>
       </div>
 

@@ -1,5 +1,5 @@
 const NEXA_VERSION = {
-  version: "3.39.1",
+  version: "3.40.0",
   build: "33901",
   release: "Ponte segura de diagnóstico",
   date: "22/08/2026",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.40.0", release: "Nexa IA principal com contingência", date: "22/08/2026", items: ["OpenAI como inteligência principal", "Groq mantido como reserva automática", "Núcleo de decisão conectado às ferramentas do ERP", "Consultas e correções operacionais com confirmação", "Respostas naturais sem depender de frases fixas", "Nexa exclusiva do Administrador"] },
     { version: "3.39.1", release: "Ponte segura de diagnóstico", date: "22/08/2026", items: ["Nexa Inteligente exclusiva do Administrador", "Novo perfil Empresa sem acesso à Nexa", "Funcionários e clientes sem painel, voz ou rotas da IA", "Pacote automático de diagnóstico para enviar ao ChatGPT", "Incidentes, planos e execuções recentes reunidos em um arquivo", "Credenciais, tokens e segredos removidos automaticamente", "Alterações no banco continuam exigindo confirmação"] },
     { version: "3.39.0", release: "Nexa Intelligence Core", date: "22/08/2026", items: ["Motor agente independente de frases prontas", "Investigação combinada dos módulos do ERP", "Correções operacionais propostas pela IA", "Confirmação obrigatória antes de alterar dados", "Execução em transação com bloqueio concorrente", "Validação automática depois da correção", "Rollback documentado em cada plano", "Valores, exclusões e credenciais continuam bloqueados", "Modelo de IA desacoplado para troca futura de provedor", "Correções de contexto e negação das versões anteriores incluídas"] },
     { version: "3.38.6", release: "Negação segura", date: "22/08/2026", items: ["Comandos negativos não ativam alterações", "Não altere nada mantém a operação em leitura", "Consultas de honorários e movimentos não abrem edição", "Verbos negados deixam de iniciar ações guiadas", "Correções afirmativas continuam disponíveis com confirmação"] },
