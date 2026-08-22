@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.38.5",
-  build: "33805",
-  release: "Contexto isolado",
+  version: "3.39.0",
+  build: "33900",
+  release: "Nexa Intelligence Core",
   date: "22/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,8 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.39.0", release: "Nexa Intelligence Core", date: "22/08/2026", items: ["Motor agente independente de frases prontas", "Investigação combinada dos módulos do ERP", "Correções operacionais propostas pela IA", "Confirmação obrigatória antes de alterar dados", "Execução em transação com bloqueio concorrente", "Validação automática depois da correção", "Rollback documentado em cada plano", "Valores, exclusões e credenciais continuam bloqueados", "Modelo de IA desacoplado para troca futura de provedor", "Correções de contexto e negação das versões anteriores incluídas"] },
+    { version: "3.38.6", release: "Negação segura", date: "22/08/2026", items: ["Comandos negativos não ativam alterações", "Não altere nada mantém a operação em leitura", "Consultas de honorários e movimentos não abrem edição", "Verbos negados deixam de iniciar ações guiadas", "Correções afirmativas continuam disponíveis com confirmação"] },
     { version: "3.38.5", release: "Contexto isolado", date: "22/08/2026", items: ["Pergunta atual tem prioridade sobre o histórico", "Negação de leitura documental respeitada", "Documentos somente quando solicitados", "Resultados documentais antigos isolados do agente", "Consultas ao banco não são desviadas para PDFs anteriores"] },
     { version: "3.38.4", release: "Análise resiliente", date: "21/08/2026", items: ["Contexto do agente reduzido para economizar tokens", "Registros resumidos antes do envio à IA", "Menor risco de limite no plano gratuito da Groq", "Contingência local consulta diretamente o banco", "Análise de cliente funciona mesmo com a IA indisponível", "Aviso vermelho substituído por resposta baseada nos dados", "Solução e próximo passo preservados na contingência"] },
     { version: "3.38.3", release: "Comprovante da análise", date: "21/08/2026", items: ["Resposta declara quais áreas foram verificadas", "Módulos indisponíveis não podem ser omitidos", "Análise incompleta sempre apresenta uma solução", "Registros abertos encontrados são destacados", "Proposta de investigação oferecida quando necessário", "Revisão incorporada à decisão sem chamada adicional", "Menor consumo e maior estabilidade no plano gratuito", "Cobertura confirmada mesmo se a revisão da IA falhar"] },
