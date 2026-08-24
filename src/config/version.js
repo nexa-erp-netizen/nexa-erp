@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.45.3",
-  build: "34503",
-  release: "Diagnóstico real de incidentes",
+  version: "3.45.4",
+  build: "34504",
+  release: "Auditoria e segurança do Modo Desenvolvedor",
   date: "24/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.45.4", release: "Auditoria e segurança do Modo Desenvolvedor", date: "24/08/2026", items: ["Diagnóstico temporário sem conclusões contraditórias", "Versão única exibida pela API e pela Web", "OpenAI principal também na análise de melhorias", "Publicação exige autorização ligada claramente ao plano", "Código do pull request precisa ser exatamente o mesmo que passou nos testes", "Timeout seguro na comunicação com o GitHub"] },
     { version: "3.45.3", release: "Diagnóstico real de incidentes", date: "24/08/2026", items: ["Comandos negativos não são mais interpretados como autorização de publicação", "Falhas temporárias são diferenciadas de erros recorrentes", "Estado atual da API e do banco participa do diagnóstico", "Correções continuam bloqueadas até a confirmação do Administrador"] },
     { version: "3.45.0", release: "Modo Desenvolvedor Autônomo", date: "24/08/2026", items: ["Conexão restrita aos repositórios API e Web", "Correções pequenas preparadas pela Nexa em branch separada", "Arquivos sensíveis e mudanças extensas bloqueados", "Pull request criado automaticamente", "Testes isolados executados no GitHub", "Publicação bloqueada enquanto os testes não passarem", "Confirmação exclusiva do Administrador antes de publicar", "Código de produção nunca alterado silenciosamente", "Plano, arquivos, testes e publicação registrados para auditoria"] },
     { version: "3.44.0", release: "Auditor Visual Completo", date: "24/08/2026", items: ["Auditoria visual iniciada por comando natural", "Navegação automática pelas 35 telas gerais do Administrador", "Painel flutuante ocultado durante cada captura", "OpenAI visual como principal e Groq como reserva", "Duplicidades, textos, layout, navegação, usabilidade e responsividade analisados", "Imagens descartadas após a análise", "Melhorias registradas sem duplicação para aprovação", "Tela inicial restaurada ao concluir", "Portal de clientes bloqueado ou desbloqueado pela conversa com confirmação", "Usuários Empresa bloqueados ou desbloqueados sem excluir cadastro e histórico"] },
