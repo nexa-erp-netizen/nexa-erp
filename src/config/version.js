@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.46.0",
-  build: "34600",
-  release: "Conversa Nexa no formato ChatGPT",
+  version: "3.47.0",
+  build: "34700",
+  release: "Leitura real dos projetos pela Nexa",
   date: "24/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.47.0", release: "Leitura real dos projetos pela Nexa", date: "24/08/2026", items: ["Acesso de leitura aos arquivos da API e Web pelo GitHub", "Confirmação real dos repositórios e arquivos disponíveis", "Análise de código por tela, módulo ou erro", "Modo somente leitura sem alteração automática", "Publicação continua protegida pela autorização do Administrador", "API e Web sincronizadas"] },
     { version: "3.46.0", release: "Conversa Nexa no formato ChatGPT", date: "24/08/2026", items: ["Tela de conversa ampla e centralizada", "Histórico lateral mais limpo", "Respostas da Nexa sem balão pesado", "Parágrafos, listas e destaques formatados", "Campo de mensagem no formato de assistente moderno", "Painel flutuante preservado sem alterações", "API e Web sincronizadas"] },
     { version: "3.45.4", release: "Auditoria e segurança do Modo Desenvolvedor", date: "24/08/2026", items: ["Diagnóstico temporário sem conclusões contraditórias", "Versão única exibida pela API e pela Web", "OpenAI principal também na análise de melhorias", "Publicação exige autorização ligada claramente ao plano", "Código do pull request precisa ser exatamente o mesmo que passou nos testes", "Timeout seguro na comunicação com o GitHub"] },
     { version: "3.45.3", release: "Diagnóstico real de incidentes", date: "24/08/2026", items: ["Comandos negativos não são mais interpretados como autorização de publicação", "Falhas temporárias são diferenciadas de erros recorrentes", "Estado atual da API e do banco participa do diagnóstico", "Correções continuam bloqueadas até a confirmação do Administrador"] },
