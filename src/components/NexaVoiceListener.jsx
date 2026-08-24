@@ -44,6 +44,15 @@ const DESATIVAR_VISAO_PATTERN = /\b(?:pare|parar|encerre|encerrar|desative|desat
 const ANALISAR_CONTEUDO_TELA_PATTERN = /\b(?:analis(?:a|e|ar)|identifi(?:ca|que|car)|confir(?:a|e|ar)|verifi(?:ca|que|car)|avali(?:a|e|ar)|ach(?:a|ou)|opini[aã]o|parecer|sugest[aã]o|ideia|erro|problema|inconsist[eê]ncia|melhoria|o\s+que\s+(?:tem|aparece|est[aá]\s+errado))\b/i
 const ANALISE_TELA_ESPECIFICA_PATTERN = /\b(?:cliente|pend[eê]ncia|obriga[cç][aã]o|pagamento|valor|saldo|status|lan[cç]amento|fiscal|financeir|honor[aá]rio|das|documento|layout|formato|design|apar[eê]ncia|organiza[cç][aã]o|bot(?:[aã]o|ões?)|menu|campo|texto|digita[cç][aã]o|visual|usabilidade|funcionamento|navega[cç][aã]o|completa|tudo)\b/i
 const PEDIDO_AUDITORIA_VISUAL_COMPLETA_PATTERN = /\b(?:auditoria|an[aá]lise|avalie|verifique)\b[\s\S]{0,60}\b(?:visual|layout|telas?)\b[\s\S]{0,60}\b(?:complet|sistema|todos? os m[oó]dulos|todas? as telas)\w*/i
+const PEDIDO_ANALISE_CODIGO_PATTERN = /\b(?:api|web|github|reposit[oó]rio|c[oó]digo|arquivos?)\b/i
+const PEDIDO_LAYOUT_ESTRUTURAL_PATTERN = /\b(?:analis|revis|verifi|audit|investig)\w*\b[\s\S]{0,90}\b(?:layout|interface|componente)\b[\s\S]{0,90}\b(?:tela|p[aá]gina|m[oó]dulo)\b/i
+const REFERENCIA_TELA_ATUAL_PATTERN = /\b(?:esta|essa|minha)\s+tela\b|\bo\s+que\s+(?:eu\s+)?(?:estou|t[oô])\s+vendo\b/i
+
+function pedidoDeAnaliseDoCodigo(valor) {
+  const texto = String(valor || "")
+  if (PEDIDO_ANALISE_CODIGO_PATTERN.test(texto)) return true
+  return PEDIDO_LAYOUT_ESTRUTURAL_PATTERN.test(texto) && !REFERENCIA_TELA_ATUAL_PATTERN.test(texto)
+}
 const PAGINAS_AUDITORIA_VISUAL = [
   "Dashboard", "Notificações", "Escritório Digital", "Clientes", "Serviços", "Plano de Contas",
   "Lançamentos Contábeis", "Conciliação Bancária", "Fiscal", "NF-e", "NFS-e", "Financeiro",
@@ -1264,6 +1273,11 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       const confirmarDesativacao = aguardandoDesativacaoTelaRef.current && CONFIRMACAO_SIM_PATTERN.test(comando)
       const manterVisualizacao = aguardandoDesativacaoTelaRef.current && CONFIRMACAO_NAO_PATTERN.test(comando)
       const focoAnalisePendente = aguardandoFocoAnaliseTelaRef.current
+      const pedidoCodigo = pedidoDeAnaliseDoCodigo(comandoInterpretado)
+      if (pedidoCodigo) {
+        aguardandoFocoAnaliseTelaRef.current = false
+        aguardandoDesativacaoTelaRef.current = false
+      }
 
       if (PEDIDO_AUDITORIA_VISUAL_COMPLETA_PATTERN.test(comandoInterpretado)) {
         resposta = await executarAuditoriaVisualCompleta()
@@ -1282,11 +1296,11 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           visualizacaoAtiva: true,
           respondidoEm: new Date().toISOString(),
         }
-      } else if (
+      } else if (!pedidoCodigo && (
         ATIVAR_VISAO_PATTERN.test(comandoInterpretado)
         || focoAnalisePendente
         || (visualizacaoTelaRef.current?.active && ANALISAR_CONTEUDO_TELA_PATTERN.test(comandoInterpretado))
-      ) {
+      )) {
         const estavaAtiva = Boolean(visualizacaoTelaRef.current?.active)
         if (!estavaAtiva) await iniciarVisualizacaoTela()
         const imagem = await capturarTelaAtual()

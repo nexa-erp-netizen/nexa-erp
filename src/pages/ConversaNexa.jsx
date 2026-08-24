@@ -43,6 +43,15 @@ const PEDIDO_ANALISE_TELA_ATIVA_PATTERN = /\b(?:analis|avali|identifi|verifi|err
 const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|pode|pode desativar|desative|desativar)[.!?]*\s*$/i
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:n[aã]o|continue|continuar|mantenha|deixe ativa)[.!?]*\s*$/i
 const PEDIDO_AUDITORIA_VISUAL_COMPLETA_PATTERN = /\b(?:auditoria|an[aá]lise|avalie|verifique)\b[\s\S]{0,60}\b(?:visual|layout|telas?)\b[\s\S]{0,60}\b(?:complet|sistema|todos? os m[oó]dulos|todas? as telas)\w*/i
+const PEDIDO_ANALISE_CODIGO_PATTERN = /\b(?:api|web|github|reposit[oó]rio|c[oó]digo|arquivos?)\b/i
+const PEDIDO_LAYOUT_ESTRUTURAL_PATTERN = /\b(?:analis|revis|verifi|audit|investig)\w*\b[\s\S]{0,90}\b(?:layout|interface|componente)\b[\s\S]{0,90}\b(?:tela|p[aá]gina|m[oó]dulo)\b/i
+const REFERENCIA_TELA_ATUAL_PATTERN = /\b(?:esta|essa|minha)\s+tela\b|\bo\s+que\s+(?:eu\s+)?(?:estou|t[oô])\s+vendo\b/i
+
+function pedidoDeAnaliseDoCodigo(valor) {
+  const texto = String(valor || "")
+  if (PEDIDO_ANALISE_CODIGO_PATTERN.test(texto)) return true
+  return PEDIDO_LAYOUT_ESTRUTURAL_PATTERN.test(texto) && !REFERENCIA_TELA_ATUAL_PATTERN.test(texto)
+}
 
 function corrigirComandoVisualLocal(valor) {
   return String(valor || "")
@@ -441,7 +450,9 @@ export default function ConversaNexa({ usuario, setPage }) {
 
     try {
       let resposta
-      const pedidoVisual = ATIVAR_VISAO_PATTERN.test(perguntaInterpretada)
+      const pedidoCodigo = pedidoDeAnaliseDoCodigo(perguntaInterpretada)
+      const pedidoVisual = !pedidoCodigo && ATIVAR_VISAO_PATTERN.test(perguntaInterpretada)
+      if (pedidoCodigo) aguardandoDesativacaoTelaRef.current = false
       if (PEDIDO_AUDITORIA_VISUAL_COMPLETA_PATTERN.test(perguntaInterpretada)) {
         window.dispatchEvent(new CustomEvent("nexa:auditoria-visual-completa", { detail: { comando: pergunta } }))
         resposta = { resposta: "Vou percorrer as telas do sistema e registrar as melhorias visuais. Acompanhe o andamento no painel flutuante da Nexa.", provedor: "sistema", respondidoEm: new Date().toISOString() }
@@ -454,7 +465,7 @@ export default function ConversaNexa({ usuario, setPage }) {
       } else if (aguardandoDesativacaoTelaRef.current && CONFIRMACAO_NAO_PATTERN.test(pergunta)) {
         aguardandoDesativacaoTelaRef.current = false
         resposta = { resposta: "Certo. A visualização continua ativa.", provedor: "sistema", respondidoEm: new Date().toISOString() }
-      } else if (pedidoVisual || (visualizacaoTelaRef.current?.active && PEDIDO_ANALISE_TELA_ATIVA_PATTERN.test(perguntaInterpretada))) {
+      } else if (pedidoVisual || (!pedidoCodigo && visualizacaoTelaRef.current?.active && PEDIDO_ANALISE_TELA_ATIVA_PATTERN.test(perguntaInterpretada))) {
         if (!visualizacaoTelaRef.current?.active) await iniciarVisualizacaoTela()
         const imagem = await capturarTelaAtual()
         if (ANALISAR_TELA_PATTERN.test(perguntaInterpretada)) {
