@@ -99,6 +99,9 @@ export default function Dashboard({ setPage }) {
   }
 
   function abrirNexaAssist() {
+    localStorage.setItem("nexaAbrirConversaGeral", "true")
+    localStorage.removeItem("nexaVoiceClienteId")
+    localStorage.removeItem("nexaVoiceClienteNome")
     if (typeof setPage === "function") setPage("Conversa com a Nexa")
   }
 
@@ -1692,8 +1695,11 @@ export default function Dashboard({ setPage }) {
                   <span className="nexa-status-pill nexa-status-offline">Verificando conexão...</span>
                 ) : (
                   <>
-                    <span className={`nexa-status-pill ${statusNexaAssist.groq?.online ? "nexa-status-online" : "nexa-status-offline"}`}>
-                      {statusNexaAssist.groq?.online ? "Groq online" : "Groq indisponível"}
+                    <span className={`nexa-status-pill ${statusNexaAssist.openai?.online ? "nexa-status-online" : "nexa-status-offline"}`}>
+                      {statusNexaAssist.openai?.online ? "OpenAI online — principal" : "OpenAI indisponível"}
+                    </span>
+                    <span className={`nexa-status-pill ${statusNexaAssist.groq?.online ? "nexa-status-local" : "nexa-status-offline"}`}>
+                      {statusNexaAssist.groq?.online ? "Groq online — reserva" : "Groq indisponível"}
                     </span>
                     <span className={`nexa-status-pill ${statusNexaAssist.ollama?.online && statusNexaAssist.ollama?.instalado ? "nexa-status-local" : "nexa-status-offline"}`}>
                       {statusNexaAssist.ollama?.online && statusNexaAssist.ollama?.instalado ? "Ollama local disponível" : "Ollama local em espera"}

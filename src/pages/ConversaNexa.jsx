@@ -17,6 +17,7 @@ import {
 } from "../services/conversaNexaService"
 import {
   limparConversaVoz,
+  limparContextoClienteVoz,
   obterContextoVoz,
   registrarClienteVoz,
   registrarConversaVoz,
@@ -127,6 +128,13 @@ export default function ConversaNexa({ usuario, setPage }) {
   useEffect(() => {
     if (contextoInicialAplicadoRef.current || !conversas.length) return
     contextoInicialAplicadoRef.current = true
+
+    if (localStorage.getItem("nexaAbrirConversaGeral") === "true") {
+      localStorage.removeItem("nexaAbrirConversaGeral")
+      limparContextoClienteVoz()
+      novaConversa()
+      return
+    }
 
     abrirConversaRecenteNexa().then((dados) => {
       const conversaAtiva = dados?.conversa
@@ -891,11 +899,13 @@ function EstadoAcaoGuiada({ pendente, concluida }) {
 
 function nomeProvedor(provedor, modelo = "") {
   const nome = String(provedor || "").toLowerCase()
+  if (nome === "openai") return "OpenAI online"
+  if (nome === "groq") return "Groq — reserva"
   if (nome === "ollama") return "Ollama local"
   if (nome === "sistema" && String(modelo).includes("Memory")) return "Memória da Nexa"
   if (nome === "sistema" && String(modelo).includes("Consultas")) return "Nexa Consultas"
   if (nome === "sistema") return "Nexa Actions"
-  return "Groq online"
+  return provedor ? String(provedor) : "Nexa"
 }
 
 function formatarHora(data) {

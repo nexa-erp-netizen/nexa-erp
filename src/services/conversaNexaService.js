@@ -299,20 +299,24 @@ export async function verificarOllama() {
 }
 
 export async function verificarProvedores() {
-  const [groqResultado, ollamaResultado] = await Promise.allSettled([
+  const [statusResultado, ollamaResultado] = await Promise.allSettled([
     api.get("/conversa/status"),
     verificarOllama(),
   ])
 
-  const groq = groqResultado.status === "fulfilled"
-    ? groqResultado.value.data?.groq || {}
+  const status = statusResultado.status === "fulfilled" ? statusResultado.value.data || {} : {}
+  const openai = statusResultado.status === "fulfilled"
+    ? status.openai || {}
+    : { configurada: false, online: false, modelo: "", mensagem: "Não foi possível verificar a OpenAI" }
+  const groq = statusResultado.status === "fulfilled"
+    ? status.groq || {}
     : { configurada: false, online: false, modelo: "", mensagem: "Não foi possível verificar a Groq" }
 
   const ollama = ollamaResultado.status === "fulfilled"
     ? ollamaResultado.value
     : { online: false, instalado: false, modelo: configuracaoLocal().modelo, modelos: [] }
 
-  return { groq, ollama }
+  return { openai, groq, ollama, provedorPrincipal: status.provedorPrincipal || "openai" }
 }
 
 export async function baixarRelatorioNexa(configuracao) {
