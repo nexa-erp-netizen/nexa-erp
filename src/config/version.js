@@ -1,5 +1,5 @@
 const NEXA_VERSION = {
-  version: "3.40.1",
+  version: "3.41.0",
   build: "33901",
   release: "Ponte segura de diagnóstico",
   date: "22/08/2026",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.41.0", release: "OpenAI com diagnóstico e correção segura", date: "24/08/2026", items: ["OpenAI cruza Financeiro, honorários, DAS, Fiscal, movimentos e lançamentos", "Erros confirmados separados de possíveis duplicidades", "Correções preparadas com registro exato e estado anterior", "Execução somente após confirmação do Administrador", "Validação automática após a alteração"] },
     { version: "3.40.1", release: "Consultas autorizadas antes da IA", date: "24/08/2026", items: ["CPF, CNPJ e contatos consultados diretamente no ERP", "Permissão do Administrador validada antes da resposta", "IA não bloqueia dados cadastrais autorizados", "Indicador da OpenAI principal corrigido"] },
     { version: "3.40.0", release: "Nexa IA principal com contingência", date: "22/08/2026", items: ["OpenAI como inteligência principal", "Groq mantido como reserva automática", "Núcleo de decisão conectado às ferramentas do ERP", "Consultas e correções operacionais com confirmação", "Respostas naturais sem depender de frases fixas", "Nexa exclusiva do Administrador"] },
     { version: "3.39.1", release: "Ponte segura de diagnóstico", date: "22/08/2026", items: ["Nexa Inteligente exclusiva do Administrador", "Novo perfil Empresa sem acesso à Nexa", "Funcionários e clientes sem painel, voz ou rotas da IA", "Pacote automático de diagnóstico para enviar ao ChatGPT", "Incidentes, planos e execuções recentes reunidos em um arquivo", "Credenciais, tokens e segredos removidos automaticamente", "Alterações no banco continuam exigindo confirmação"] },
