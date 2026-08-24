@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.42.3",
-  build: "34203",
-  release: "Resposta natural concluída",
+  version: "3.43.0",
+  build: "34300",
+  release: "Correção controlada pela Nexa",
   date: "24/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.43.0", release: "Correção controlada pela Nexa", date: "24/08/2026", items: ["Nexa prepara correções operacionais a partir da análise", "Alteração exige confirmação clara do Administrador", "Perguntas intermediárias não perdem o plano pendente", "Confirmações ambíguas não executam alterações", "Plano expira em 15 minutos", "Registro é bloqueado e conferido antes da mudança", "Execução ocorre em transação e o resultado é validado", "Valores financeiros, exclusões e credenciais permanecem bloqueados"] },
     { version: "3.42.3", release: "Resposta natural concluída", date: "24/08/2026", items: ["Removido o complemento técnico automático", "OpenAI decide como explicar os fatos encontrados", "Contagens e nomes internos ficam fora da resposta comum", "Falha de consulta ainda é avisada sem esconder análise incompleta", "Detalhes técnicos permanecem disponíveis quando solicitados"] },
     { version: "3.42.2", release: "API e Web alinhados", date: "24/08/2026", items: ["Correção baseada nos projetos efetivamente publicados", "Web deixa de rotular toda resposta como Groq", "OpenAI mostrada conforme o provedor retornado pela API", "Nome do cliente separado do restante da pergunta", "API e Web passam a informar a mesma versão"] },
     { version: "3.42.1", release: "Cliente natural e provedor visível", date: "24/08/2026", items: ["Nome do cliente separado naturalmente do restante da pergunta", "Daiane e outros nomes parciais localizados corretamente", "Novo build força a atualização do Web", "OpenAI e Groq identificadas conforme o provedor real"] },
