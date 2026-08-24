@@ -645,7 +645,7 @@ export default function ConversaNexa({ usuario, setPage }) {
         </section>
       )}
 
-      <div style={{ ...styles.workspace, gridTemplateColumns: isMobile ? "1fr" : "260px minmax(0,1fr)" }}>
+      <div style={{ ...styles.workspace, gridTemplateColumns: isMobile ? "1fr" : "280px minmax(0,1fr)" }}>
         <aside style={styles.sidebar}>
           <button style={styles.sidebarNew} onClick={novaConversa}>+ Nova conversa</button>
           <span style={styles.sidebarTitle}>Histórico</span>
@@ -719,7 +719,7 @@ export default function ConversaNexa({ usuario, setPage }) {
                   <strong>{item.autor}</strong>
                   <span>{item.provedor ? `${nomeProvedor(item.provedor, item.modelo)} • ` : ""}{formatarHora(item.data)}</span>
                 </div>
-                <p style={styles.messageText}>{item.texto}</p>
+                <RespostaFormatada texto={item.texto} />
                 {item.fallback && <div style={styles.fallbackNotice}>Resposta gerada pelo Ollama local.</div>}
                 {item.memoriaRegistrada && <div style={styles.memoryNotice}>✓ Informação adicionada à memória.</div>}
                 {item.acao && <div style={styles.actionNotice}>✓ Pronto.</div>}
@@ -901,6 +901,45 @@ function EstadoAcaoGuiada({ pendente, concluida }) {
   )
 }
 
+function formatarTrechos(texto, chave) {
+  return String(texto || "").split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((trecho, indice) => {
+    if (trecho.startsWith("**") && trecho.endsWith("**")) {
+      return <strong key={`${chave}-forte-${indice}`}>{trecho.slice(2, -2)}</strong>
+    }
+    return trecho
+  })
+}
+
+function RespostaFormatada({ texto }) {
+  const linhas = String(texto || "").replace(/\r/g, "").split("\n")
+  const blocos = []
+  let lista = []
+
+  function concluirLista() {
+    if (!lista.length) return
+    const itens = lista
+    lista = []
+    blocos.push(<ul key={`lista-${blocos.length}`} style={styles.responseList}>{itens.map((item, indice) => <li key={`${item}-${indice}`}>{formatarTrechos(item, `lista-${indice}`)}</li>)}</ul>)
+  }
+
+  linhas.forEach((linha, indice) => {
+    const itemLista = linha.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/)
+    if (itemLista) {
+      lista.push(itemLista[1].trim())
+      return
+    }
+    concluirLista()
+    const limpa = linha.trim()
+    if (!limpa) return
+    const titulo = limpa.match(/^#{1,3}\s+(.+)$/)?.[1]
+    blocos.push(titulo
+      ? <strong key={`titulo-${indice}`} style={styles.responseTitle}>{formatarTrechos(titulo, `titulo-${indice}`)}</strong>
+      : <p key={`paragrafo-${indice}`} style={styles.messageText}>{formatarTrechos(limpa, `paragrafo-${indice}`)}</p>)
+  })
+  concluirLista()
+  return <div style={styles.responseBody}>{blocos}</div>
+}
+
 function nomeProvedor(provedor, modelo = "") {
   const nome = String(provedor || "").toLowerCase()
   if (nome === "openai") return "OpenAI online"
@@ -918,15 +957,15 @@ function formatarHora(data) {
 }
 
 const styles = {
-  page: { display: "flex", flexDirection: "column", gap: "14px" },
-  hero: { background: "linear-gradient(135deg,#061f47,#063875)", border: "1px solid rgba(0,168,255,.30)", borderRadius: "22px", padding: "22px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "15px", flexWrap: "wrap" },
+  page: { display: "flex", flexDirection: "column", gap: "12px", maxWidth: "1500px", margin: "0 auto", minHeight: "calc(100vh - 110px)" },
+  hero: { background: "#071f43", border: "1px solid rgba(255,255,255,.09)", borderRadius: "18px", padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "15px", flexWrap: "wrap" },
   badge: { color: "#37ff74", fontWeight: "bold", fontSize: "13px" },
-  title: { margin: "8px 0", fontSize: "30px" },
+  title: { margin: "6px 0", fontSize: "26px" },
   subtitle: { margin: 0, color: "#b8c7dc" },
   heroActions: { display: "flex", gap: "8px", flexWrap: "wrap" },
   newButton: { background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", border: 0, borderRadius: "10px", padding: "11px 15px", fontWeight: "bold", cursor: "pointer" },
   memoryButton: { background: "rgba(255,255,255,.08)", color: "#aaffc2", border: "1px solid rgba(55,255,116,.28)", borderRadius: "10px", padding: "11px 15px", cursor: "pointer" },
-  providerStatus: { borderRadius: "12px", padding: "11px 14px", display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", fontSize: "13px" },
+  providerStatus: { borderRadius: "12px", padding: "9px 14px", display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", fontSize: "12px" },
   providerOnline: { background: "rgba(55,255,116,.08)", border: "1px solid rgba(55,255,116,.25)", color: "#aaffc2" },
   providerOffline: { background: "rgba(255,184,77,.09)", border: "1px solid rgba(255,184,77,.28)", color: "#ffd298" },
   memoryPanel: { background: "#05244f", border: "1px solid rgba(55,255,116,.27)", borderRadius: "16px", padding: "15px" },
@@ -936,30 +975,33 @@ const styles = {
   memoryItem: { display: "flex", justifyContent: "space-between", gap: "12px", background: "rgba(255,255,255,.045)", border: "1px solid rgba(255,255,255,.09)", borderRadius: "10px", padding: "10px" },
   memoryScope: { color: "#66ff9b", fontSize: "10px", textTransform: "uppercase", fontWeight: "bold" },
   deleteMemory: { alignSelf: "center", background: "rgba(255,95,101,.10)", color: "#ffb5b8", border: "1px solid rgba(255,95,101,.25)", borderRadius: "8px", padding: "6px 9px", cursor: "pointer" },
-  workspace: { display: "grid", gap: "14px", alignItems: "start" },
-  sidebar: { background: "#041a3a", border: "1px solid rgba(255,255,255,.10)", borderRadius: "16px", padding: "12px", minHeight: "480px", maxHeight: "75vh", overflow: "hidden", display: "flex", flexDirection: "column", gap: "10px" },
+  workspace: { display: "grid", gap: "12px", alignItems: "stretch", minHeight: "68vh" },
+  sidebar: { background: "#03152f", border: "1px solid rgba(255,255,255,.09)", borderRadius: "18px", padding: "12px", minHeight: "560px", maxHeight: "76vh", overflow: "hidden", display: "flex", flexDirection: "column", gap: "10px" },
   sidebarNew: { background: "rgba(0,168,255,.13)", color: "#8bd7ff", border: "1px solid rgba(0,168,255,.30)", borderRadius: "10px", padding: "10px", cursor: "pointer", fontWeight: "bold" },
   sidebarTitle: { color: "#91a6bf", fontSize: "11px", textTransform: "uppercase", letterSpacing: ".06em" },
   conversationList: { display: "flex", flexDirection: "column", gap: "6px", overflowY: "auto" },
-  conversationItem: { width: "100%", display: "flex", justifyContent: "space-between", gap: "8px", textAlign: "left", background: "transparent", color: "#dce8f8", border: "1px solid transparent", borderRadius: "10px", padding: "10px", cursor: "pointer" },
+  conversationItem: { width: "100%", display: "flex", justifyContent: "space-between", gap: "8px", textAlign: "left", background: "transparent", color: "#dce8f8", border: "1px solid transparent", borderRadius: "12px", padding: "11px", cursor: "pointer" },
   conversationActive: { background: "rgba(0,168,255,.12)", borderColor: "rgba(0,168,255,.32)" },
   conversationInfo: { minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" },
   deleteConversation: { color: "#91a6bf", fontSize: "18px", lineHeight: 1 },
-  main: { minWidth: 0, display: "flex", flexDirection: "column", gap: "12px" },
-  context: { background: "rgba(255,255,255,.055)", border: "1px solid rgba(255,255,255,.10)", borderRadius: "16px", padding: "14px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: "12px", alignItems: "end" },
+  main: { minWidth: 0, display: "flex", flexDirection: "column", gap: "10px", background: "#041a3a", border: "1px solid rgba(255,255,255,.09)", borderRadius: "18px", padding: "12px" },
+  context: { background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.08)", borderRadius: "14px", padding: "11px 13px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: "10px", alignItems: "end" },
   label: { display: "block", color: "#a9b8cc", fontSize: "12px", marginBottom: "6px" },
   select: { width: "100%", background: "#061f47", color: "white", border: "1px solid rgba(255,255,255,.18)", borderRadius: "10px", padding: "11px" },
   input: { width: "100%", boxSizing: "border-box", background: "#061f47", color: "white", border: "1px solid rgba(255,255,255,.18)", borderRadius: "10px", padding: "11px" },
   contextText: { color: "#a9b8cc", fontSize: "12px", paddingBottom: "10px" },
   suggestions: { display: "flex", gap: "8px", flexWrap: "wrap" },
   suggestion: { background: "rgba(0,168,255,.10)", color: "#8bd7ff", border: "1px solid rgba(0,168,255,.28)", borderRadius: "999px", padding: "8px 12px", cursor: "pointer" },
-  chat: { background: "#041a3a", border: "1px solid rgba(255,255,255,.10)", borderRadius: "20px", padding: "16px", minHeight: "390px", maxHeight: "62vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px" },
-  message: { maxWidth: "84%", borderRadius: "16px", padding: "14px", border: "1px solid rgba(255,255,255,.10)" },
-  userMessage: { alignSelf: "flex-end", background: "#07539a" },
-  nexaMessage: { alignSelf: "flex-start", background: "#082b5d" },
+  chat: { background: "#041a3a", border: 0, borderRadius: "16px", padding: "18px clamp(14px,4vw,54px)", minHeight: "430px", maxHeight: "62vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "18px", scrollBehavior: "smooth" },
+  message: { width: "min(100%,820px)", boxSizing: "border-box", borderRadius: "18px", padding: "15px 17px", border: "1px solid transparent" },
+  userMessage: { alignSelf: "flex-end", width: "auto", maxWidth: "min(78%,720px)", background: "#0a5eaa", borderColor: "rgba(108,190,255,.22)" },
+  nexaMessage: { alignSelf: "center", background: "transparent", borderColor: "transparent", paddingLeft: "4px", paddingRight: "4px" },
   errorMessage: { borderColor: "rgba(255,95,101,.5)" },
   messageHeader: { display: "flex", justifyContent: "space-between", gap: "20px", color: "#a9b8cc", fontSize: "12px" },
-  messageText: { whiteSpace: "pre-wrap", lineHeight: 1.55, margin: "10px 0 0" },
+  responseBody: { display: "flex", flexDirection: "column", gap: "10px", marginTop: "9px" },
+  responseTitle: { display: "block", color: "#f5f9ff", fontSize: "16px", lineHeight: 1.45 },
+  responseList: { margin: "0", paddingLeft: "24px", color: "#eef5ff", lineHeight: 1.7, fontSize: "15px" },
+  messageText: { whiteSpace: "pre-wrap", lineHeight: 1.65, margin: 0, fontSize: "15px", overflowWrap: "anywhere" },
   fallbackNotice: { marginTop: "10px", color: "#ffd298", fontSize: "12px" },
   memoryNotice: { marginTop: "10px", color: "#aaffc2", fontSize: "12px", fontWeight: "bold" },
   actionNotice: { marginTop: "10px", color: "#aaffc2", fontSize: "12px", fontWeight: "bold" },
@@ -984,12 +1026,12 @@ const styles = {
   consultaDetalhe: { color: "#c6d5e8", fontSize: "11px", lineHeight: 1.4, overflowWrap: "anywhere" },
   consultaRodapeItem: { display: "flex", justifyContent: "space-between", gap: "10px", marginTop: "3px", color: "#91a6bf", fontSize: "10px" },
   consultaButton: { alignSelf: "flex-start", background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", border: 0, borderRadius: "9px", padding: "9px 13px", fontWeight: "bold", cursor: "pointer" },
-  typing: { color: "#8bd7ff", fontStyle: "italic" },
-  composer: { display: "grid", gridTemplateColumns: "auto minmax(0,1fr) auto", gap: "10px", alignItems: "stretch" },
-  attach: { background: "rgba(0,168,255,.10)", color: "#8bd7ff", border: "1px solid rgba(0,168,255,.28)", borderRadius: "14px", padding: "0 15px", fontWeight: "bold", cursor: "pointer" },
+  typing: { width: "min(100%,820px)", alignSelf: "center", color: "#8bd7ff", fontStyle: "italic", padding: "4px" },
+  composer: { width: "min(100%,860px)", boxSizing: "border-box", alignSelf: "center", display: "grid", gridTemplateColumns: "auto minmax(0,1fr) auto", gap: "9px", alignItems: "stretch", background: "#082650", border: "1px solid rgba(255,255,255,.14)", borderRadius: "24px", padding: "8px", boxShadow: "0 14px 34px rgba(0,0,0,.22)" },
+  attach: { background: "rgba(255,255,255,.06)", color: "#9edfff", border: "1px solid rgba(255,255,255,.10)", borderRadius: "17px", padding: "0 14px", fontWeight: "bold", cursor: "pointer" },
   downloadButton: { marginTop: "10px", background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", border: 0, borderRadius: "9px", padding: "9px 13px", fontWeight: "bold", cursor: "pointer" },
-  textarea: { resize: "vertical", minHeight: "78px", background: "#061f47", color: "white", border: "1px solid rgba(255,255,255,.18)", borderRadius: "14px", padding: "13px", fontFamily: "inherit" },
-  send: { background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", border: 0, borderRadius: "14px", padding: "0 24px", fontWeight: "bold", cursor: "pointer" },
+  textarea: { resize: "none", minHeight: "58px", maxHeight: "170px", background: "transparent", color: "white", border: 0, outline: "none", borderRadius: "14px", padding: "12px 6px", fontFamily: "inherit", fontSize: "14px", lineHeight: 1.5 },
+  send: { alignSelf: "center", minWidth: "82px", height: "46px", background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", border: 0, borderRadius: "16px", padding: "0 18px", fontWeight: "bold", cursor: "pointer" },
   error: { background: "rgba(255,95,101,.12)", border: "1px solid rgba(255,95,101,.35)", borderRadius: "12px", padding: "12px", color: "#ffb5b8" },
   emptyText: { color: "#8295ae", fontSize: "12px" },
 }
