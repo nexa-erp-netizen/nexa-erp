@@ -270,6 +270,19 @@ export async function analisarTelaComNexa({
   return resposta.data
 }
 
+export async function auditarTelaComNexa({ imagem, paginaAtual = "", contextoVisivel = "", auditoriaId = "" }) {
+  const form = new FormData()
+  form.append("imagem", imagem, `auditoria-${Date.now()}.jpg`)
+  form.append("paginaAtual", String(paginaAtual || ""))
+  form.append("contextoVisivel", String(contextoVisivel || "").slice(0, 10000))
+  form.append("auditoriaId", String(auditoriaId || ""))
+  const resposta = await api.post("/conversa/visao/auditar", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 100000,
+  })
+  return resposta.data
+}
+
 export async function registrarAnaliseProativaProduto({ paginaAtual = "", clienteId = null } = {}) {
   const resposta = await api.post("/melhorias-nexa/proativa", { paginaAtual, clienteId })
   return resposta.data

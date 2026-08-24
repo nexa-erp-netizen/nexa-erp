@@ -42,6 +42,7 @@ const ANALISAR_TELA_PATTERN = /\b(?:analis|avali|identifi|verifi|confir|erro|pro
 const PEDIDO_ANALISE_TELA_ATIVA_PATTERN = /\b(?:analis|avali|identifi|verifi|erro|problema|inconsist|melhoria|layout|design|apar[eê]ncia|opini[aã]o|parecer|sugest)\w*/i
 const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|pode|pode desativar|desative|desativar)[.!?]*\s*$/i
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:n[aã]o|continue|continuar|mantenha|deixe ativa)[.!?]*\s*$/i
+const PEDIDO_AUDITORIA_VISUAL_COMPLETA_PATTERN = /\b(?:auditoria|an[aá]lise|avalie|verifique)\b[\s\S]{0,60}\b(?:visual|layout|telas?)\b[\s\S]{0,60}\b(?:complet|sistema|todos? os m[oó]dulos|todas? as telas)\w*/i
 
 function corrigirComandoVisualLocal(valor) {
   return String(valor || "")
@@ -441,7 +442,10 @@ export default function ConversaNexa({ usuario, setPage }) {
     try {
       let resposta
       const pedidoVisual = ATIVAR_VISAO_PATTERN.test(perguntaInterpretada)
-      if (aguardandoDesativacaoTelaRef.current && CONFIRMACAO_SIM_PATTERN.test(pergunta)) {
+      if (PEDIDO_AUDITORIA_VISUAL_COMPLETA_PATTERN.test(perguntaInterpretada)) {
+        window.dispatchEvent(new CustomEvent("nexa:auditoria-visual-completa", { detail: { comando: pergunta } }))
+        resposta = { resposta: "Vou percorrer as telas do sistema e registrar as melhorias visuais. Acompanhe o andamento no painel flutuante da Nexa.", provedor: "sistema", respondidoEm: new Date().toISOString() }
+      } else if (aguardandoDesativacaoTelaRef.current && CONFIRMACAO_SIM_PATTERN.test(pergunta)) {
         visualizacaoTelaRef.current?.getTracks().forEach((track) => track.stop())
         visualizacaoTelaRef.current = null
         videoTelaRef.current = null

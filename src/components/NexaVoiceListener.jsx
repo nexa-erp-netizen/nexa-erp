@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { analisarDocumentoNexa, analisarTelaComNexa, abrirConversaNexa, abrirConversaRecenteNexa, baixarRelatorioNexa, conversarComNexa, registrarAnaliseProativaProduto } from "../services/conversaNexaService"
+import { analisarDocumentoNexa, analisarTelaComNexa, auditarTelaComNexa, abrirConversaNexa, abrirConversaRecenteNexa, baixarRelatorioNexa, conversarComNexa, registrarAnaliseProativaProduto } from "../services/conversaNexaService"
 import {
   sintetizarVozNeural,
   transcreverVozGroq,
@@ -43,6 +43,16 @@ const ATIVAR_VISAO_PATTERN = /\b(?:visualiz(?:a|e|ar)|visualis(?:a|e|ar)|analis(
 const DESATIVAR_VISAO_PATTERN = /\b(?:pare|parar|encerre|encerrar|desative|desativar|desligue|desligar)\b[\s\S]{0,30}\b(?:visualiza[cç][aã]o|vis[aã]o|tela)\b/i
 const ANALISAR_CONTEUDO_TELA_PATTERN = /\b(?:analis(?:a|e|ar)|identifi(?:ca|que|car)|confir(?:a|e|ar)|verifi(?:ca|que|car)|avali(?:a|e|ar)|ach(?:a|ou)|opini[aã]o|parecer|sugest[aã]o|ideia|erro|problema|inconsist[eê]ncia|melhoria|o\s+que\s+(?:tem|aparece|est[aá]\s+errado))\b/i
 const ANALISE_TELA_ESPECIFICA_PATTERN = /\b(?:cliente|pend[eê]ncia|obriga[cç][aã]o|pagamento|valor|saldo|status|lan[cç]amento|fiscal|financeir|honor[aá]rio|das|documento|layout|formato|design|apar[eê]ncia|organiza[cç][aã]o|bot(?:[aã]o|ões?)|menu|campo|texto|digita[cç][aã]o|visual|usabilidade|funcionamento|navega[cç][aã]o|completa|tudo)\b/i
+const PEDIDO_AUDITORIA_VISUAL_COMPLETA_PATTERN = /\b(?:auditoria|an[aá]lise|avalie|verifique)\b[\s\S]{0,60}\b(?:visual|layout|telas?)\b[\s\S]{0,60}\b(?:complet|sistema|todos? os m[oó]dulos|todas? as telas)\w*/i
+const PAGINAS_AUDITORIA_VISUAL = [
+  "Dashboard", "Notificações", "Escritório Digital", "Clientes", "Serviços", "Plano de Contas",
+  "Lançamentos Contábeis", "Conciliação Bancária", "Fiscal", "NF-e", "NFS-e", "Financeiro",
+  "Movimentos Clientes", "Pendências Clientes", "Acesso Rápido Fiscal", "Documentos Digitais",
+  "WhatsApp Inteligente", "Assistente do Dia", "Laboratório Tributário", "Certificados Digitais",
+  "Procurações e-CAC", "Identidade Digital", "Central e-CAC", "Memória da Nexa", "Segundo Contador",
+  "Consultora Tributária", "Radar Inteligente", "Relatórios", "Usuários", "Backup Sistema",
+  "Google Drive", "Sobre", "Calculadora IRPF MEI", "Agenda", "DRE Gerencial",
+]
 
 function corrigirComandoVisualLocal(valor) {
   return String(valor || "")
@@ -1142,6 +1152,66 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     return texto.slice(0, 14000)
   }, [])
 
+  const executarAuditoriaVisualCompleta = useCallback(async () => {
+    const paginaInicial = page || "Dashboard"
+    const auditoriaId = `visual-${Date.now()}`
+    const progressoId = `auditoria-progresso-${auditoriaId}`
+    const resultados = []
+    const falhas = []
+    if (!visualizacaoTelaRef.current?.active) await iniciarVisualizacaoTela()
+    aguardandoDesativacaoTelaRef.current = false
+    aguardandoFocoAnaliseTelaRef.current = false
+    setMensagensPainel((atual) => [...atual, {
+      id: progressoId,
+      autor: "Nexa",
+      texto: `Auditoria visual iniciada: 0 de ${PAGINAS_AUDITORIA_VISUAL.length} telas analisadas.`,
+      data: new Date().toISOString(),
+    }].slice(-30))
+
+    try {
+      for (let indice = 0; indice < PAGINAS_AUDITORIA_VISUAL.length; indice += 1) {
+        const pagina = PAGINAS_AUDITORIA_VISUAL[indice]
+        setPage(pagina)
+        setMensagensPainel((atual) => atual.map((item) => item.id === progressoId ? {
+          ...item,
+          texto: `Auditoria em andamento: ${indice + 1} de ${PAGINAS_AUDITORIA_VISUAL.length} — ${pagina}.`,
+        } : item))
+        await new Promise((resolve) => setTimeout(resolve, 850))
+        try {
+          const imagem = await capturarTelaAtual()
+          const contextoVisivel = String(document.querySelector("main")?.innerText || document.body?.innerText || "")
+            .replace(/(senha|password|token|api[ _-]?key|chave secreta)\s*[:=]?\s*\S+/gi, "$1: [PROTEGIDO]")
+            .slice(0, 10000)
+          resultados.push(await auditarTelaComNexa({ imagem, paginaAtual: pagina, contextoVisivel, auditoriaId }))
+        } catch (error) {
+          falhas.push({ pagina, erro: error.response?.data?.message || error.message || "Falha na análise" })
+        }
+      }
+    } finally {
+      setPage(paginaInicial)
+      encerrarVisualizacaoTela()
+    }
+
+    const achados = resultados.flatMap((item) => (item.achados || []).map((achado) => ({ ...achado, pagina: item.pagina })))
+    const peso = { Alta: 3, Média: 2, Baixa: 1 }
+    achados.sort((a, b) => (peso[b.prioridade] || 0) - (peso[a.prioridade] || 0))
+    const principais = achados.slice(0, 4).map((item) => `${item.pagina}: ${item.titulo}`).join("; ")
+    const texto = achados.length
+      ? `Auditoria concluída em ${resultados.length} telas. Registrei ${achados.length} melhoria(s) para sua aprovação.${principais ? ` Principais pontos: ${principais}.` : ""}`
+      : `Auditoria concluída em ${resultados.length} telas e não encontrei problema visual evidente.`
+    const complemento = falhas.length ? ` ${falhas.length} tela(s) não puderam ser analisadas e ficaram registradas para nova tentativa.` : ""
+    setMensagensPainel((atual) => atual.filter((item) => item.id !== progressoId))
+    return {
+      resposta: `${texto}${complemento}`,
+      fala: `Auditoria concluída. Analisei ${resultados.length} telas e registrei ${achados.length} melhorias.`,
+      provedor: resultados[0]?.provedor || "sistema",
+      modelo: resultados[0]?.modelo || "Nexa Auditor Visual 1.0",
+      auditoriaVisual: { id: auditoriaId, telasAnalisadas: resultados.length, melhorias: achados.length, falhas },
+      visualizacaoAtiva: false,
+      respondidoEm: new Date().toISOString(),
+    }
+  }, [capturarTelaAtual, encerrarVisualizacaoTela, iniciarVisualizacaoTela, page, setPage])
+
   useEffect(() => () => {
     const stream = visualizacaoTelaRef.current
     if (stream) stream.getTracks().forEach((track) => track.stop())
@@ -1195,7 +1265,9 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       const manterVisualizacao = aguardandoDesativacaoTelaRef.current && CONFIRMACAO_NAO_PATTERN.test(comando)
       const focoAnalisePendente = aguardandoFocoAnaliseTelaRef.current
 
-      if (DESATIVAR_VISAO_PATTERN.test(comandoInterpretado) || confirmarDesativacao) {
+      if (PEDIDO_AUDITORIA_VISUAL_COMPLETA_PATTERN.test(comandoInterpretado)) {
+        resposta = await executarAuditoriaVisualCompleta()
+      } else if (DESATIVAR_VISAO_PATTERN.test(comandoInterpretado) || confirmarDesativacao) {
         encerrarVisualizacaoTela()
         resposta = {
           resposta: "Visualização da tela desativada.",
@@ -1401,7 +1473,16 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       atualizarEstado("erro", mensagem)
       if (ativadaRef.current) agendarReinicio(1800)
     }
-  }, [agendarReinicio, atualizarEstado, capturarTelaAtual, carregarVocabulario, encerrarVisualizacaoTela, falarResposta, iniciarVisualizacaoTela, obterTextoVisivelSanitizado, page, pausarReconhecimento, renovarJanelaProtegida, setPage, voltarParaEscuta])
+  }, [agendarReinicio, atualizarEstado, capturarTelaAtual, carregarVocabulario, encerrarVisualizacaoTela, executarAuditoriaVisualCompleta, falarResposta, iniciarVisualizacaoTela, obterTextoVisivelSanitizado, page, pausarReconhecimento, renovarJanelaProtegida, setPage, voltarParaEscuta])
+
+  useEffect(() => {
+    const iniciarPelaConversaCompleta = (evento) => {
+      const comando = String(evento?.detail?.comando || "Nexa, faça uma auditoria visual completa do sistema. Não altere nada sem minha autorização.")
+      processarComando(comando, { origem: "texto", falar: false })
+    }
+    window.addEventListener("nexa:auditoria-visual-completa", iniciarPelaConversaCompleta)
+    return () => window.removeEventListener("nexa:auditoria-visual-completa", iniciarPelaConversaCompleta)
+  }, [processarComando])
 
   const enviarMensagemDigitada = useCallback(async () => {
     const texto = String(mensagemDigitada || "").trim()
