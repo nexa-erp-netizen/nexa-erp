@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.42.2",
-  build: "34202",
-  release: "API e Web alinhados",
+  version: "3.42.3",
+  build: "34203",
+  release: "Resposta natural concluída",
   date: "24/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.42.3", release: "Resposta natural concluída", date: "24/08/2026", items: ["Removido o complemento técnico automático", "OpenAI decide como explicar os fatos encontrados", "Contagens e nomes internos ficam fora da resposta comum", "Falha de consulta ainda é avisada sem esconder análise incompleta", "Detalhes técnicos permanecem disponíveis quando solicitados"] },
     { version: "3.42.2", release: "API e Web alinhados", date: "24/08/2026", items: ["Correção baseada nos projetos efetivamente publicados", "Web deixa de rotular toda resposta como Groq", "OpenAI mostrada conforme o provedor retornado pela API", "Nome do cliente separado do restante da pergunta", "API e Web passam a informar a mesma versão"] },
     { version: "3.42.1", release: "Cliente natural e provedor visível", date: "24/08/2026", items: ["Nome do cliente separado naturalmente do restante da pergunta", "Daiane e outros nomes parciais localizados corretamente", "Novo build força a atualização do Web", "OpenAI e Groq identificadas conforme o provedor real"] },
     { version: "3.42.0", release: "OpenAI integrada ao núcleo da Nexa", date: "24/08/2026", items: ["OpenAI identificada corretamente em cada resposta", "Groq exibida somente como reserva", "Respostas naturais e simples produzidas pela IA", "Dashboard inicia conversa geral sem herdar cliente anterior", "Histórico permanece disponível sem controlar o novo pedido", "Ferramentas do ERP continuam preparando correções auditáveis"] },
