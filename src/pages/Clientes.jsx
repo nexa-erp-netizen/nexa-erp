@@ -1280,8 +1280,6 @@ export default function Clientes({ setPage }) {
       {tela === "lista" && (
         <>
           <div style={topo}>
-            <h2>Clientes</h2>
-
             <button style={button} onClick={novoCliente}>
               Novo Cliente
             </button>
