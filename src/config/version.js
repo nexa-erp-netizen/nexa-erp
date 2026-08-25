@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.49.0",
-  build: "34900",
-  release: "Nexa Voice concluído com contingência inteligente",
+  version: "3.49.1",
+  build: "34901",
+  release: "Saudação e encerramento de voz corrigidos",
   date: "25/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.49.1", release: "Saudação e encerramento de voz corrigidos", date: "25/08/2026", items: ["Bom dia, Boa tarde e Nexa aceitam pontuação final", "Pontuação isolada nunca é enviada como pergunta", "O último cliente não é reutilizado por uma fala vazia", "Obrigado encerra a sessão antes do filtro de frases curtas", "Painel flutuante preservado"] },
     { version: "3.49.0", release: "Nexa Voice concluído com contingência inteligente", date: "25/08/2026", items: ["Conversa contínua sem repetir o nome da Nexa", "Escuta protegida contra ruído, eco e falas sobrepostas", "Vocabulário adaptativo mantido sob confirmação", "Groq permanece como transcrição principal gratuita", "OpenAI assume automaticamente quando o Groq estiver sem cota ou indisponível", "Interface informa o provedor real de transcrição", "API e Web sincronizadas"] },
     { version: "3.48.3", release: "Preparação separada da publicação", date: "24/08/2026", items: ["Não alterar durante a análise não bloqueia a preparação posterior", "Preparação cria somente branch e pull request separados", "Publicação continua exigindo autorização explícita do Administrador", "Motivos de recusa devem ser técnicos e relacionados ao código", "API e Web sincronizadas"] },
     { version: "3.48.2", release: "Correções pequenas diretamente no código", date: "24/08/2026", items: ["OpenAI exclusiva para preparar correções de código", "Alterações feitas por substituições pequenas e verificáveis", "Arquivos grandes não precisam mais ser devolvidos inteiros pela IA", "Respostas internas identificadas como Nexa Developer", "Groq permanece apenas como reserva da conversa", "Publicação continua bloqueada até autorização do Administrador", "API e Web sincronizadas"] },
