@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.48.0",
-  build: "34800",
-  release: "Modo Desenvolvedor completo e memória técnica",
+  version: "3.48.1",
+  build: "34801",
+  release: "Execução real dos planos do Modo Desenvolvedor",
   date: "24/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.48.1", release: "Execução real dos planos do Modo Desenvolvedor", date: "24/08/2026", items: ["Prepare sem publicar cria a correção corretamente", "Negação de publicação não bloqueia a preparação", "Consulta de status lê o plano real no banco e no GitHub", "Plano analisado informa claramente quando ainda não há arquivos alterados", "Publicação continua dependente da autorização explícita do Administrador", "API e Web sincronizadas"] },
     { version: "3.48.0", release: "Modo Desenvolvedor completo e memória técnica", date: "24/08/2026", items: ["Memória técnica permanente do projeto", "Análise de código registrada como plano", "Correção preparada a partir da conversa", "Branch e pull request separados da produção", "Testes automáticos obrigatórios no GitHub", "Publicação somente após autorização explícita do Administrador", "Validação da aplicação após publicar", "Proteção de autenticação, credenciais, banco, modelos, migrations e dependências", "API e Web sincronizadas"] },
     { version: "3.47.2", release: "Seleção correta do arquivo por módulo", date: "24/08/2026", items: ["Nome da tela solicitado recebe prioridade máxima", "Termos genéricos não desviam a análise para a conversa da Nexa", "Arquivos sem relação com o módulo ficam fora da análise", "Tela Clientes direcionada ao componente Clientes", "Análise permanece somente leitura", "API e Web sincronizadas"] },
     { version: "3.47.1", release: "Prioridade correta entre Código e Visão", date: "24/08/2026", items: ["Pedidos sobre API, Web, GitHub e arquivos seguem para o Modo Desenvolvedor", "Análise estrutural de layout consulta o código do projeto", "Visualização usada somente quando a tela atual é mencionada explicitamente", "Funciona na conversa completa e no painel flutuante", "Pergunta para desativar a visualização não aparece na análise de código", "API e Web sincronizadas"] },
