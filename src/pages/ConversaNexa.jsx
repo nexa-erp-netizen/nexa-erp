@@ -533,7 +533,7 @@ export default function ConversaNexa({ usuario, setPage }) {
         pontos: resposta.pontos || [],
         recomendacao: resposta.recomendacao || "",
         fundamentos: resposta.fundamentos || [],
-        provedor: resposta.provedor || "groq",
+        provedor: resposta.provedor || "sistema",
         modelo: resposta.modelo || "",
         fallback: Boolean(resposta.fallback),
         acao: resposta.acao || null,
