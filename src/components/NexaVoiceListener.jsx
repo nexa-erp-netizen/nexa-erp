@@ -22,8 +22,8 @@ const MICROPHONE_DEVICE_KEY = "nexaVoiceMicrophoneDeviceId"
 const FLOAT_POSITION_KEY = "nexaVoiceFloatPosition"
 const PROTECTED_LISTENING_KEY = "nexaProtectedListeningEnabled"
 const PROTECTED_SESSION_TIMEOUT_MS = 45000
-const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta|nessa)\b[\s,.:;-]*(.*)$/i
-const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.:;-]*(.*)$/i
+const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta|nessa)\b[\s,.!?;:-]*(.*)$/i
+const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.!?;:-]*(.*)$/i
 const END_SESSION_PATTERN = /^\s*(?:muito\s+)?obrigad[oa][.!?]*\s*$/i
 const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|exatamente|essa mesma|esse mesmo|pode ser|é esse|e esse|é essa|e essa)[.!?]*\s*$/i
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|outra)[.!?]*\s*$/i
@@ -163,7 +163,7 @@ function encerramentoTemVozConfiavel(metadados = {}) {
   const duracao = Number(metadados.duracao || 0)
   const pico = Number(metadados.pico || 0)
   const ruido = Number(metadados.ruido || 0.006)
-  return duracao >= 720 && pico >= Math.max(0.022, ruido * 3.0)
+  return duracao >= 450 && pico >= Math.max(0.016, ruido * 2.4)
 }
 
 function detectarAcaoLocalDeNavegacao(textoOriginal) {
@@ -1625,6 +1625,22 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       const texto = String(transcricao || "").trim()
       if (!texto || processandoRef.current || falandoRef.current) return
 
+      // Pontuação isolada pode ser produzida pelo transcritor no fim da
+      // saudação. Nunca deve virar comando nem reaproveitar o último cliente.
+      if (!normalizarComandoLocal(texto)) {
+        console.info("[Nexa Voice] Transcrição sem palavras descartada:", texto)
+        voltarParaEscuta()
+        return
+      }
+
+      // “Obrigado” encerra a sessão antes dos filtros de frase curta. Esses
+      // filtros existem para ruídos, mas não podem bloquear o comando oficial.
+      if ((sessaoAtivaRef.current || modoRef.current === "session") && END_SESSION_PATTERN.test(texto)) {
+        if (encerramentoTemVozConfiavel(metadados)) encerrarSessao()
+        else voltarParaEscuta()
+        return
+      }
+
       if (!falaTemQualidadeMinima(texto, metadados)) {
         console.info("[Nexa Voice] Transcrição descartada por áudio fraco:", texto, metadados)
         voltarParaEscuta()
@@ -1671,16 +1687,6 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           return
         }
 
-        if (END_SESSION_PATTERN.test(texto)) {
-          if (encerramentoTemVozConfiavel(metadados)) {
-            encerrarSessao()
-          } else {
-            console.info("[Nexa Voice] Encerramento descartado por falta de voz confiável.", metadados)
-            voltarParaEscuta()
-          }
-          return
-        }
-
         const palavrasProtegidas = normalizarComandoLocal(texto).split(" ").filter(Boolean)
         const fraseCurtaPermitida = Boolean(
           detectarAcaoLocalDeNavegacao(texto)
@@ -1709,7 +1715,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       renovarJanelaProtegida()
       tocarSinal(720, 90)
 
-      if (ativacao.comando) {
+      if (normalizarComandoLocal(ativacao.comando)) {
         processarComando(ativacao.comando)
         return
       }
