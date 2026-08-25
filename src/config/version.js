@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.47.1",
-  build: "34701",
-  release: "Prioridade correta entre Código e Visão",
+  version: "3.47.2",
+  build: "34702",
+  release: "Seleção correta do arquivo por módulo",
   date: "24/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.47.2", release: "Seleção correta do arquivo por módulo", date: "24/08/2026", items: ["Nome da tela solicitado recebe prioridade máxima", "Termos genéricos não desviam a análise para a conversa da Nexa", "Arquivos sem relação com o módulo ficam fora da análise", "Tela Clientes direcionada ao componente Clientes", "Análise permanece somente leitura", "API e Web sincronizadas"] },
     { version: "3.47.1", release: "Prioridade correta entre Código e Visão", date: "24/08/2026", items: ["Pedidos sobre API, Web, GitHub e arquivos seguem para o Modo Desenvolvedor", "Análise estrutural de layout consulta o código do projeto", "Visualização usada somente quando a tela atual é mencionada explicitamente", "Funciona na conversa completa e no painel flutuante", "Pergunta para desativar a visualização não aparece na análise de código", "API e Web sincronizadas"] },
     { version: "3.47.0", release: "Leitura real dos projetos pela Nexa", date: "24/08/2026", items: ["Acesso de leitura aos arquivos da API e Web pelo GitHub", "Confirmação real dos repositórios e arquivos disponíveis", "Análise de código por tela, módulo ou erro", "Modo somente leitura sem alteração automática", "Publicação continua protegida pela autorização do Administrador", "API e Web sincronizadas"] },
     { version: "3.46.0", release: "Conversa Nexa no formato ChatGPT", date: "24/08/2026", items: ["Tela de conversa ampla e centralizada", "Histórico lateral mais limpo", "Respostas da Nexa sem balão pesado", "Parágrafos, listas e destaques formatados", "Campo de mensagem no formato de assistente moderno", "Painel flutuante preservado sem alterações", "API e Web sincronizadas"] },
