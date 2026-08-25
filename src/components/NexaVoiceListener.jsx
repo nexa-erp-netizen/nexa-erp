@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { analisarDocumentoNexa, analisarTelaComNexa, auditarTelaComNexa, abrirConversaNexa, abrirConversaRecenteNexa, baixarRelatorioNexa, conversarComNexa, registrarAnaliseProativaProduto } from "../services/conversaNexaService"
 import {
   sintetizarVozNeural,
-  transcreverVozGroq,
+  transcreverVoz,
   verificarVozNeural,
 } from "../services/nexaVoiceTtsService"
 import {
@@ -364,7 +364,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     () => localStorage.getItem(SPOKEN_RESPONSES_ENABLED_KEY) === "true",
   )
   const [vozAtiva, setVozAtiva] = useState("Preparando voz da Nexa...")
-  const [transcricaoAtiva, setTranscricaoAtiva] = useState("Groq Whisper")
+  const [transcricaoAtiva, setTranscricaoAtiva] = useState("Transcrição da Nexa")
   const [expandido, setExpandido] = useState(false)
   const [totalVocabulario, setTotalVocabulario] = useState(0)
   const [historicoSalvo, setHistoricoSalvo] = useState(() => Boolean(obterContextoVoz().conversaId))
@@ -1729,7 +1729,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     atualizarEstado("transcrevendo", "Entendendo sua fala...")
 
     try {
-      const resultado = await transcreverVozGroq(blob, { prompt: montarPromptTranscricao() })
+      const resultado = await transcreverVoz(blob, { prompt: montarPromptTranscricao() })
       const texto = String(resultado.texto || "").trim()
       if (texto) {
         console.info("[Nexa Voice] Transcrição recebida:", texto)
@@ -1809,7 +1809,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       throw new Error("Este dispositivo não oferece gravação de áudio compatível.")
     }
     if (!transcricaoDisponivelRef.current) {
-      throw new Error("A transcrição Groq Whisper não está disponível na API.")
+      throw new Error("A transcrição de voz não está disponível na API.")
     }
 
     window.nexaDesktop?.nativeVoice?.stop?.().catch?.(() => {})
@@ -2025,8 +2025,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       vozNeuralNomeRef.current = status.vozNeural || "pt-BR-FranciscaNeural"
       transcricaoDisponivelRef.current = Boolean(status.transcricaoDisponivel)
       setTranscricaoAtiva(status.transcricaoDisponivel
-        ? `Groq Whisper — ${status.transcricaoModelo || "whisper-large-v3-turbo"}`
-        : "Groq Whisper indisponível")
+        ? `${status.transcricaoProvedor || "Transcrição da Nexa"}${status.transcricaoModelo ? ` — ${status.transcricaoModelo}` : ""}`
+        : "Transcrição indisponível")
 
       if (status.neuralDisponivel) {
         setVozAtiva("Nexa — voz neural")
@@ -2117,7 +2117,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       if (!transcricaoDisponivelRef.current) {
         const status = await verificarVozNeural()
         transcricaoDisponivelRef.current = Boolean(status.transcricaoDisponivel)
-        if (!transcricaoDisponivelRef.current) throw new Error("A transcrição Groq Whisper não está disponível na API.")
+        if (!transcricaoDisponivelRef.current) throw new Error("A transcrição de voz não está disponível na API.")
       }
 
       ativadaRef.current = true
@@ -2125,7 +2125,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       setSessaoAtiva(false)
       selecaoClientePendenteRef.current = null
       modoRef.current = "wake"
-      setEstado({ ativada: true, status: "iniciando", detalhe: "Preparando microfone e Groq Whisper..." })
+      setEstado({ ativada: true, status: "iniciando", detalhe: "Preparando o microfone da Nexa..." })
       await Promise.all([carregarVocabulario(), carregarClientesParaVoz()])
       await iniciarCapturaAudio()
     } catch (error) {
