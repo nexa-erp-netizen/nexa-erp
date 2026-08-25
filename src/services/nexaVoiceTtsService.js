@@ -9,8 +9,9 @@ export async function verificarVozNeural() {
       vozNeural: resposta.data?.vozNeural || "pt-BR-FranciscaNeural",
       fallback: resposta.data?.fallback || "Microsoft Maria (pt-BR)",
       transcricaoDisponivel: Boolean(resposta.data?.transcricaoDisponivel),
-      transcricaoProvedor: resposta.data?.transcricaoProvedor || "groq-whisper",
-      transcricaoModelo: resposta.data?.transcricaoModelo || "whisper-large-v3-turbo",
+      transcricaoProvedor: resposta.data?.transcricaoProvedor || "transcrição da API",
+      transcricaoModelo: resposta.data?.transcricaoModelo || "",
+      transcricaoReserva: resposta.data?.transcricaoReserva || null,
     }
   } catch {
     return {
@@ -19,8 +20,9 @@ export async function verificarVozNeural() {
       vozNeural: "pt-BR-FranciscaNeural",
       fallback: "Microsoft Maria (pt-BR)",
       transcricaoDisponivel: false,
-      transcricaoProvedor: "groq-whisper",
-      transcricaoModelo: "whisper-large-v3-turbo",
+      transcricaoProvedor: "indisponível",
+      transcricaoModelo: "",
+      transcricaoReserva: null,
     }
   }
 }
@@ -39,7 +41,7 @@ export async function sintetizarVozNeural(texto) {
   return resposta.data
 }
 
-export async function transcreverVozGroq(audioBlob, { prompt = "" } = {}) {
+export async function transcreverVoz(audioBlob, { prompt = "" } = {}) {
   if (!(audioBlob instanceof Blob) || !audioBlob.size) {
     throw new Error("Áudio vazio.")
   }
@@ -57,7 +59,10 @@ export async function transcreverVozGroq(audioBlob, { prompt = "" } = {}) {
 
   return {
     texto: String(resposta.data?.texto || "").trim(),
-    provedor: resposta.data?.provedor || "groq-whisper",
-    modelo: resposta.data?.modelo || "whisper-large-v3-turbo",
+    provedor: resposta.data?.provedor || "transcrição da API",
+    modelo: resposta.data?.modelo || "",
   }
 }
+
+// Compatibilidade temporária com componentes antigos.
+export const transcreverVozGroq = transcreverVoz
