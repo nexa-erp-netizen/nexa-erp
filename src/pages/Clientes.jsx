@@ -1717,19 +1717,6 @@ export default function Clientes({ setPage }) {
                 {clienteSelecionado.portalBloqueado === true ? "Desbloquear Portal" : "Bloquear Portal"}
               </button>
 
-              <WhatsAppMenu
-                cliente={clienteSelecionado}
-                contexto={{
-                  obrigacao: proximaObrigacaoFiscal?.obrigacao || "pendência",
-                  competencia: proximaObrigacaoFiscal?.competencia || "Não informada",
-                  vencimento: proximaObrigacaoFiscal?.vencimento || "",
-                  valor: proximaObrigacaoFiscal?.valor || "",
-                  status: proximaObrigacaoFiscal?.status || "",
-                  honorario: contextoHonorario,
-                }}
-                onRegister={registrarWhatsAppCliente}
-              />
-
               <button style={deleteButton} onClick={excluirCliente}>
                 Excluir
               </button>
