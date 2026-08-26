@@ -24,7 +24,7 @@ const PROTECTED_LISTENING_KEY = "nexaProtectedListeningEnabled"
 const PROTECTED_SESSION_TIMEOUT_MS = 45000
 const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta|nessa)\b[\s,.!?;:-]*(.*)$/i
 const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.!?;:-]*(.*)$/i
-const END_SESSION_PATTERN = /^\s*(?:muito\s+)?obrigad[oa][.!?]*\s*$/i
+const END_SESSION_PATTERN = /^\s*(?:(?:muito\s+)?obrigad[oa](?:\s*,?\s*nexa)?|(?:pode\s+)?encerr(?:e|ar)(?:\s+a\s+conversa)?)[.!?]*\s*$/i
 const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|exatamente|essa mesma|esse mesmo|pode ser|é esse|e esse|é essa|e essa)[.!?]*\s*$/i
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|outra)[.!?]*\s*$/i
 const CANCELAR_SELECAO_CLIENTE_PATTERN = /^\s*(?:cancela|cancelar|cancele|deixa|deixe|deixa pra la|deixa para la|esquece|esqueca|não quero|nao quero)[.!?]*\s*$/i
@@ -1636,8 +1636,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       // “Obrigado” encerra a sessão antes dos filtros de frase curta. Esses
       // filtros existem para ruídos, mas não podem bloquear o comando oficial.
       if ((sessaoAtivaRef.current || modoRef.current === "session") && END_SESSION_PATTERN.test(texto)) {
-        if (encerramentoTemVozConfiavel(metadados)) encerrarSessao()
-        else voltarParaEscuta()
+        encerrarSessao()
         return
       }
 
