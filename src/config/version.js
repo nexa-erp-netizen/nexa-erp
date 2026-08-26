@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.49.2",
-  build: "34902",
-  release: "Nexa Voice finalizada",
+  version: "3.49.3",
+  build: "34903",
+  release: "Encerramento de voz reforçado",
   date: "26/08/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.49.3", release: "Encerramento de voz reforçado", date: "26/08/2026", items: ["Palavras curtas são capturadas com mais sensibilidade durante a conversa", "Obrigado e Brigado são reconhecidos como encerramento", "Tempo de bloqueio após a fala da Nexa reduzido", "Prompt de transcrição prioriza os comandos de encerramento", "Proteção contra ruído continua ativa fora da sessão"] },
     { version: "3.49.2", release: "Nexa Voice finalizada", date: "26/08/2026", items: ["Obrigado e Obrigada encerram a conversa imediatamente", "Muito obrigado e Obrigado, Nexa também são reconhecidos", "Pode encerrar e Encerre a conversa finalizam a sessão", "Encerramento oficial não é bloqueado pelo filtro de volume", "Transcrição por voz preservada no serviço Web"] },
     { version: "3.49.1", release: "Saudação e encerramento de voz corrigidos", date: "25/08/2026", items: ["Bom dia, Boa tarde e Nexa aceitam pontuação final", "Pontuação isolada nunca é enviada como pergunta", "O último cliente não é reutilizado por uma fala vazia", "Obrigado encerra a sessão antes do filtro de frases curtas", "Painel flutuante preservado"] },
     { version: "3.49.0", release: "Nexa Voice concluído com contingência inteligente", date: "25/08/2026", items: ["Conversa contínua sem repetir o nome da Nexa", "Escuta protegida contra ruído, eco e falas sobrepostas", "Vocabulário adaptativo mantido sob confirmação", "Groq permanece como transcrição principal gratuita", "OpenAI assume automaticamente quando o Groq estiver sem cota ou indisponível", "Interface informa o provedor real de transcrição", "API e Web sincronizadas"] },

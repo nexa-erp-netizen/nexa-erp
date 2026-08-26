@@ -24,19 +24,19 @@ const PROTECTED_LISTENING_KEY = "nexaProtectedListeningEnabled"
 const PROTECTED_SESSION_TIMEOUT_MS = 45000
 const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta|nessa)\b[\s,.!?;:-]*(.*)$/i
 const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.!?;:-]*(.*)$/i
-const END_SESSION_PATTERN = /^\s*(?:(?:muito\s+)?obrigad[oa](?:\s*,?\s*nexa)?|(?:pode\s+)?encerr(?:e|ar)(?:\s+a\s+conversa)?)[.!?]*\s*$/i
+const END_SESSION_PATTERN = /^\s*(?:(?:muito\s+)?(?:o)?brigad[oa](?:\s*,?\s*nexa)?|(?:pode\s+)?encerr(?:e|ar)(?:\s+a\s+conversa)?)[.!?]*\s*$/i
 const CONFIRMACAO_SIM_PATTERN = /^\s*(?:sim|isso|correto|exatamente|essa mesma|esse mesmo|pode ser|é esse|e esse|é essa|e essa)[.!?]*\s*$/i
 const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|outra)[.!?]*\s*$/i
 const CANCELAR_SELECAO_CLIENTE_PATTERN = /^\s*(?:cancela|cancelar|cancele|deixa|deixe|deixa pra la|deixa para la|esquece|esqueca|não quero|nao quero)[.!?]*\s*$/i
 const TEMPO_MAXIMO_FALA_MS = 30000
 
-const SILENCIO_PARA_FINALIZAR_MS = 520
-const DURACAO_MINIMA_FALA_MS = 420
+const SILENCIO_PARA_FINALIZAR_MS = 420
+const DURACAO_MINIMA_FALA_MS = 300
 const DURACAO_MAXIMA_FALA_MS = 8500
-const TAMANHO_MINIMO_AUDIO = 900
+const TAMANHO_MINIMO_AUDIO = 450
 const TEMPO_CALIBRACAO_RUIDO_MS = 320
 const TEMPO_REARME_MICROFONE_MS = 380
-const TEMPO_BLOQUEIO_ECO_MS = 1050
+const TEMPO_BLOQUEIO_ECO_MS = 450
 const TEMPO_REARME_COMANDO_DIRETO_MS = 180
 const COMANDO_SITE_PATTERN = /\b(carteira(?:\s+de)?\s+trabalho(?:\s+digital)?|carteira\s+digital|ctps(?:\s+digital)?|e-?cac|simples\s+nacional|pgmei|nfs-?e|receita\s+federal|gov\.?\s*br)\b/i
 const ATIVAR_VISAO_PATTERN = /\b(?:visualiz(?:a|e|ar)|visualis(?:a|e|ar)|analis(?:a|e|ar)|vej(?:a|am)|ver|olh(?:a|e|ar)|enxerg(?:a|ue|ar))\b[\s\S]{0,55}\b(?:esta|essa|minha|a)?\s*tela\b|\b(?:visualiza[cç][aã]o|vis[aã]o)\s+(?:da\s+|desta\s+|dessa\s+)?tela\b|\b(?:ver|vendo|visualizar|visualisar|enxergar)\b[\s\S]{0,40}\bo\s+que\s+(?:eu\s+)?(?:estou|to|t[oô])\s+vendo\b|\best[aá]\b[\s\S]{0,20}\bvendo\b[\s\S]{0,25}\b(?:esta|essa|minha)?\s*tela\b/i
@@ -851,7 +851,7 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
     const contexto = obterContextoVoz()
 
     return [
-      "Nexa, bom dia, boa tarde, contador, contadora, contabilidade, MEI, empresário individual, sociedade limitada unipessoal, SLU, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, Carteira de Trabalho Digital, carteira digital, CTPS Digital, e-CAC, PGDAS-D, DCTFWeb, DAS, PGMEI, NFS-e, Receita Federal, gov.br, prioridades de hoje, relatório do dia, relatório para hoje, resumo de hoje, o que tenho para fazer hoje, iniciar meu dia, todas as pendências, mensagens de clientes, pedidos de ajuda, documentos aguardando análise, quem pagou hoje, pagamentos recebidos, pendências resolvidas.",
+      "Obrigado, obrigada, muito obrigado, obrigado Nexa, pode encerrar a conversa, encerre a conversa. Nexa, bom dia, boa tarde, contador, contadora, contabilidade, MEI, empresário individual, sociedade limitada unipessoal, SLU, Fiscal, Financeiro, Movimentações, Pendências, Contábil, DRE, lançamentos contábeis, documentos, certificados, Carteira de Trabalho Digital, carteira digital, CTPS Digital, e-CAC, PGDAS-D, DCTFWeb, DAS, PGMEI, NFS-e, Receita Federal, gov.br, prioridades de hoje, relatório do dia, relatório para hoje, resumo de hoje, o que tenho para fazer hoje, iniciar meu dia, todas as pendências, mensagens de clientes, pedidos de ajuda, documentos aguardando análise, quem pagou hoje, pagamentos recebidos, pendências resolvidas.",
       nomesClientes.length ? `Nomes de clientes do escritório: ${nomesClientes.join(", ")}.` : "",
       contexto.clienteNome ? `Cliente atual: ${contexto.clienteNome}.` : "",
       termos.length ? `Vocabulário aprendido: ${termos.join(", ")}.` : "",
@@ -1937,7 +1937,10 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           ruidoBaseRef.current = (ruidoBaseRef.current * 0.82) + (rms * 0.18)
           framesVozRef.current = 0
         } else if (!falaAtivaRef.current) {
-          const limiteInicio = Math.max(0.011, ruidoBaseRef.current * 2.55)
+          const sessaoEmCurso = sessaoAtivaRef.current || modoRef.current === "session"
+          const limiteInicio = sessaoEmCurso
+            ? Math.max(0.008, ruidoBaseRef.current * 1.9)
+            : Math.max(0.011, ruidoBaseRef.current * 2.55)
 
           if (rms < limiteInicio * 0.88) {
             ruidoBaseRef.current = (ruidoBaseRef.current * 0.97) + (rms * 0.03)
@@ -1946,7 +1949,8 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
           if (rms > limiteInicio) framesVozRef.current += 1
           else framesVozRef.current = 0
 
-          if (framesVozRef.current >= 2 && iniciarGravadorDaFala()) {
+          const framesNecessarios = sessaoEmCurso ? 1 : 2
+          if (framesVozRef.current >= framesNecessarios && iniciarGravadorDaFala()) {
             falaAtivaRef.current = true
             inicioFalaRef.current = agora
             ultimaVozRef.current = agora
