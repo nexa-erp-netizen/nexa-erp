@@ -36,6 +36,8 @@ export default function ConciliacaoBancaria({ setPage }) {
   const [planoLoteId, setPlanoLoteId] = useState("")
   const [filtroStatus, setFiltroStatus] = useState("Todos")
   const [filtroConferencia, setFiltroConferencia] = useState("Todos")
+  const [mostrarDetalhes, setMostrarDetalhes] = useState(false)
+  const [diaDetalhe, setDiaDetalhe] = useState("")
   const [processando, setProcessando] = useState(false)
   const [competencia, setCompetencia] = useState(new Date().toISOString().slice(0, 7))
   const [fechamentos, setFechamentos] = useState([])
@@ -394,11 +396,78 @@ export default function ConciliacaoBancaria({ setPage }) {
     [movimentosClienteBancariosCompetencia]
   )
 
-  const diferencaEntradas = resumoMovimentos.entradas - resumoClienteBancos.receitas
-  const diferencaSaidas = resumoMovimentos.saidas - resumoClienteBancos.despesas
+  const resumoBancoComparavel = useMemo(
+    () => movimentos
+      .filter(item => item.statusConciliacao !== "Ignorado")
+      .reduce((r, item) => {
+        const valor = Number(item.valor || 0)
+        if (item.natureza === "Entrada") r.entradas += valor
+        else r.saidas += valor
+        return r
+      }, { entradas: 0, saidas: 0 }),
+    [movimentos]
+  )
+
+  const diferencaEntradas = resumoBancoComparavel.entradas - resumoClienteBancos.receitas
+  const diferencaSaidas = resumoBancoComparavel.saidas - resumoClienteBancos.despesas
   const totaisBatem =
     Math.abs(diferencaEntradas) < 0.01 &&
     Math.abs(diferencaSaidas) < 0.01
+
+  const diasComDiferenca = useMemo(() => {
+    const mapa = new Map()
+
+    function obter(data) {
+      const chave = dataIso(data)
+      if (!mapa.has(chave)) {
+        mapa.set(chave, {
+          data: chave,
+          entradasBanco: 0,
+          receitasCliente: 0,
+          saidasBanco: 0,
+          despesasCliente: 0,
+        })
+      }
+      return mapa.get(chave)
+    }
+
+    movimentos
+      .filter(item => item.statusConciliacao !== "Ignorado")
+      .forEach(item => {
+        const dia = obter(item.data)
+        const valor = Number(item.valor || 0)
+        if (item.natureza === "Entrada") dia.entradasBanco += valor
+        else dia.saidasBanco += valor
+      })
+
+    movimentosClienteBancariosCompetencia.forEach(item => {
+      const dia = obter(item.data)
+      const valor = Number(item.valor || 0)
+      if (item.tipo === "Receita") dia.receitasCliente += valor
+      else if (item.tipo === "Despesa") dia.despesasCliente += valor
+    })
+
+    return [...mapa.values()]
+      .map(item => ({
+        ...item,
+        diferencaEntradas: item.entradasBanco - item.receitasCliente,
+        diferencaSaidas: item.saidasBanco - item.despesasCliente,
+      }))
+      .filter(item =>
+        Math.abs(item.diferencaEntradas) >= 0.01 ||
+        Math.abs(item.diferencaSaidas) >= 0.01
+      )
+      .sort((a, b) => String(a.data).localeCompare(String(b.data)))
+  }, [movimentos, movimentosClienteBancariosCompetencia])
+
+  const diferencaAbsTotal = useMemo(
+    () => diasComDiferenca.reduce(
+      (total, item) =>
+        total + Math.abs(item.diferencaEntradas) + Math.abs(item.diferencaSaidas),
+      0
+    ),
+    [diasComDiferenca]
+  )
 
   const resumoConferencia = useMemo(() => movimentos.reduce((r, movimento) => {
     const status = analiseConciliacao[movimento.id]?.status
@@ -421,12 +490,16 @@ export default function ConciliacaoBancaria({ setPage }) {
       lista = lista.filter(m => m.statusConciliacao === filtroStatus)
     }
 
+    if (diaDetalhe) {
+      lista = lista.filter(m => dataIso(m.data) === diaDetalhe)
+    }
+
     if (filtroConferencia !== "Todos") {
       lista = lista.filter(m => analiseConciliacao[m.id]?.status === filtroConferencia)
     }
 
     return lista
-  }, [movimentos, filtroStatus, filtroConferencia, analiseConciliacao])
+  }, [movimentos, filtroStatus, filtroConferencia, analiseConciliacao, diaDetalhe])
 
   const fechamentoAtual = useMemo(
     () => fechamentos.find(f => f.competencia === competencia && f.status === "Fechado"),
@@ -445,6 +518,17 @@ export default function ConciliacaoBancaria({ setPage }) {
     return natureza === "Entrada"
       ? texto.includes("credor") || texto.includes("receita") || texto.includes("fatur")
       : texto.includes("devedor") || texto.includes("despesa") || texto.includes("custo") || texto.includes("taxa") || texto.includes("imposto")
+  }
+
+  function abrirDetalhesDia(data) {
+    setDiaDetalhe(data)
+    setMostrarDetalhes(true)
+    setFiltroStatus("Todos")
+    setFiltroConferencia("Todos")
+    setSelecionados([])
+    setTimeout(() => {
+      document.getElementById("nexa-detalhes-conciliacao")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 50)
   }
 
   function alternarSelecao(id) {
@@ -473,9 +557,10 @@ export default function ConciliacaoBancaria({ setPage }) {
       const dados = r.data || {}
       alert(
         `Conferência automática concluída.\n\n` +
-        `${dados.exatos || 0} por correspondência exata • ` +
-        `${dados.agrupados || 0} por total diário.\n` +
-        `Agora a Nexa mostra somente o que realmente precisa de atenção.`
+        `${dados.exatos || 0} correspondência(s) exata(s) • ` +
+        `${dados.agrupados || 0} movimento(s) conciliado(s) por agrupamento.\n` +
+        `${dados.diasComDiferenca || 0} dia(s) ainda possuem diferença.\n\n` +
+        `A Nexa deixa na tela somente os dias que realmente precisam de atenção.`
       )
     } catch (e) {
       alert(e.response?.data?.message || "Erro na conciliação automática")
@@ -556,9 +641,9 @@ export default function ConciliacaoBancaria({ setPage }) {
   }
 
   async function concluirMes() {
-    if (faltamConcluir) {
-      setFiltroStatus("A concluir")
-      return
+    if (diasComDiferenca.length) {
+      setMostrarDetalhes(false)
+      return alert(`Ainda existem ${diasComDiferenca.length} dia(s) com diferença. Revise apenas esses dias antes de concluir o mês.`)
     }
     if (!movimentos.length) return alert("Não existem movimentos nesta competência.")
     if (!confirm(`Concluir a competência ${competenciaBr(competencia)}?`)) return
@@ -743,29 +828,29 @@ export default function ConciliacaoBancaria({ setPage }) {
               <Resumo t="Entradas" v={moeda(resumoMovimentos.entradas)} cor="#42f5a7" />
               <Resumo t="Saídas" v={moeda(resumoMovimentos.saidas)} cor="#ff7d88" />
               <Resumo t="Movimento líquido" v={moeda(resumoMovimentos.entradas - resumoMovimentos.saidas)} cor="#53c9ff" />
-              <Resumo t="Batendo" v={resumoConferencia.batendo} cor="#73ffd4" />
-              <Resumo t="Faltando" v={resumoConferencia.faltando} cor="#ffd45b" />
-              <Resumo t="Revisar" v={resumoConferencia.revisar} cor="#ffbf69" />
-              <Resumo t="Divergências" v={resumoConferencia.divergencias} cor="#ff7d88" />
+              <Resumo t="Conciliados" v={resumoMovimentos.conciliados} cor="#73ffd4" />
+              <Resumo t="Dias c/ diferença" v={diasComDiferenca.length} cor="#ffd45b" />
+              <Resumo t="Dif. entradas" v={moeda(diferencaEntradas)} cor={Math.abs(diferencaEntradas) < 0.01 ? "#73ffd4" : "#ffbf69"} />
+              <Resumo t="Dif. saídas" v={moeda(diferencaSaidas)} cor={Math.abs(diferencaSaidas) < 0.01 ? "#73ffd4" : "#ff7d88"} />
             </div>
 
             <div style={totaisBatem ? s.autoOk : s.autoBox}>
               <div style={s.autoInfo}>
                 <strong>Conferência automática da Nexa</strong>
                 <span>
-                  Entradas do extrato: <b>{moeda(resumoMovimentos.entradas)}</b> •
+                  Entradas conciliáveis: <b>{moeda(resumoBancoComparavel.entradas)}</b> •
                   Receitas em Bancos: <b>{moeda(resumoClienteBancos.receitas)}</b> •
                   Diferença: <b>{moeda(diferencaEntradas)}</b>
                 </span>
                 <span>
-                  Saídas do extrato: <b>{moeda(resumoMovimentos.saidas)}</b> •
+                  Saídas conciliáveis: <b>{moeda(resumoBancoComparavel.saidas)}</b> •
                   Despesas em Bancos: <b>{moeda(resumoClienteBancos.despesas)}</b> •
                   Diferença: <b>{moeda(diferencaSaidas)}</b>
                 </span>
                 <small>
                   {totaisBatem
-                    ? "✅ Os totais bancários do mês batem."
-                    : "A Nexa resolve o que for seguro e deixa somente as diferenças para revisão."}
+                    ? "✅ Os totais bancários conciliáveis do mês batem. Você não precisa conferir linha por linha."
+                    : `A Nexa encontrou ${diasComDiferenca.length} dia(s) com diferença. Revise somente esses dias.`}
                 </small>
               </div>
               {!fechamentoAtual && movimentos.length > 0 && (
@@ -779,12 +864,61 @@ export default function ConciliacaoBancaria({ setPage }) {
               )}
             </div>
 
+            <div style={s.diffBox}>
+              <div style={s.diffHeader}>
+                <div>
+                  <strong>Diferenças que realmente precisam de atenção</strong>
+                  <small style={s.block}>
+                    A Nexa compara o total do banco com os lançamentos bancários do cliente por dia.
+                    Correspondências 1↔1, vários↔1 e 1↔vários são tratadas automaticamente.
+                  </small>
+                </div>
+                <span style={diasComDiferenca.length ? s.diffCountWarn : s.diffCountOk}>
+                  {diasComDiferenca.length ? `${diasComDiferenca.length} dia(s)` : "Tudo bateu"}
+                </span>
+              </div>
+
+              {diasComDiferenca.length === 0 ? (
+                <div style={s.diffSuccess}>
+                  ✅ Nenhuma diferença diária. O mês está pronto para fechamento, salvo itens justificados/ignorados.
+                </div>
+              ) : (
+                <div style={s.diffList}>
+                  {diasComDiferenca.map(item => (
+                    <div key={item.data} style={s.diffDay}>
+                      <div style={s.diffDate}>{dataBr(item.data)}</div>
+                      <div style={s.diffValues}>
+                        {Math.abs(item.diferencaEntradas) >= 0.01 && (
+                          <span>
+                            Entradas: banco {moeda(item.entradasBanco)} × cliente {moeda(item.receitasCliente)}
+                            {" "}→ <b>{rotuloDiferenca(item.diferencaEntradas)}</b>
+                          </span>
+                        )}
+                        {Math.abs(item.diferencaSaidas) >= 0.01 && (
+                          <span>
+                            Saídas: banco {moeda(item.saidasBanco)} × cliente {moeda(item.despesasCliente)}
+                            {" "}→ <b>{rotuloDiferenca(item.diferencaSaidas)}</b>
+                          </span>
+                        )}
+                      </div>
+                      <button style={s.small} onClick={() => abrirDetalhesDia(item.data)}>Ver este dia</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {diasComDiferenca.length > 0 && (
+                <div style={s.diffFooter}>
+                  Diferença absoluta a revisar: <strong>{moeda(diferencaAbsTotal)}</strong>
+                </div>
+              )}
+            </div>
+
             <div style={s.legend}>
-              <span><b style={{ color: "#73ffd4" }}>● Verde</b> — mesma natureza, data e valor; quando existem movimentos repetidos, a Nexa faz pareamento 1↔1 pela quantidade.</span>
-              <span><b style={{ color: "#ffd45b" }}>● Amarelo</b> — lançamento ausente ou possível diferença de compensação/agrupamento.</span>
-              <span><b style={{ color: "#ff7d88" }}>● Vermelho</b> — mais de uma correspondência ou lançamento já gerado pela conciliação; revisar possível duplicidade.</span>
+              <span><b>Fluxo simplificado:</b> a Nexa resolve automaticamente o que bate e mostra somente os dias com diferença.</span>
+              <span><b>Agrupamentos:</b> vários movimentos do banco podem corresponder a um lançamento do cliente, e um movimento do banco pode corresponder a vários lançamentos.</span>
               <span><b>Regra de segurança:</b> importar extrato não cria Receita ou Despesa em Movimentos Clientes.</span>
-              <span><b>Caixa fica fora:</b> a conciliação usa apenas lançamentos bancários do cliente.</span>
+              <span><b>Caixa fica fora:</b> a conciliação usa apenas lançamentos bancários do cliente. Itens “Ignorados” são diferenças justificadas.</span>
             </div>
 
             <div style={fechamentoAtual ? s.closeDone : s.closeBox}>
@@ -793,22 +927,41 @@ export default function ConciliacaoBancaria({ setPage }) {
                 <span style={s.closeText}>
                   {fechamentoAtual
                     ? `Saldo final: ${moeda(fechamentoAtual.saldoFinal)}`
-                    : faltamConcluir
-                      ? `Faltam ${faltamConcluir} movimento(s) para concluir este mês.`
+                    : diasComDiferenca.length
+                      ? `${diasComDiferenca.length} dia(s) com diferença para revisar. Não é necessário conferir cada linha do extrato.`
                       : movimentos.length
-                        ? "Tudo conferido. O mês já pode ser concluído."
+                        ? "Os totais diários batem ou foram justificados. O mês já pode ser concluído."
                         : "Nenhum movimento nesta competência."}
                 </span>
               </div>
               <div style={s.actions}>
-                {!fechamentoAtual && faltamConcluir > 0 && <button style={s.secondary} onClick={() => setFiltroStatus("A concluir")}>Ver pendentes</button>}
-                {!fechamentoAtual && <button style={{ ...s.primary, ...(processando || faltamConcluir > 0 || !movimentos.length ? s.disabled : {}) }} disabled={processando || faltamConcluir > 0 || !movimentos.length} onClick={concluirMes}>Concluir mês</button>}
+                {!fechamentoAtual && diasComDiferenca.length > 0 && <button style={s.secondary} onClick={() => setMostrarDetalhes(false)}>Ver diferenças</button>}
+                {!fechamentoAtual && <button style={{ ...s.primary, ...(processando || diasComDiferenca.length > 0 || !movimentos.length ? s.disabled : {}) }} disabled={processando || diasComDiferenca.length > 0 || !movimentos.length} onClick={concluirMes}>Concluir mês</button>}
                 {fechamentoAtual && <button style={s.small} onClick={() => baixarRelatorio(fechamentoAtual)}>Baixar PDF</button>}
               </div>
             </div>
 
             {movimentos.length > 0 && (
-              <div style={s.batch}>
+              <div style={{ marginTop: 14 }}>
+                <button
+                  style={s.detailsToggle}
+                  onClick={() => {
+                    setMostrarDetalhes(v => !v)
+                    if (mostrarDetalhes) setDiaDetalhe("")
+                  }}
+                >
+                  {mostrarDetalhes ? "Ocultar detalhes das linhas" : "Ver detalhes das linhas"}
+                </button>
+              </div>
+            )}
+
+            {mostrarDetalhes && movimentos.length > 0 && (
+              <div id="nexa-detalhes-conciliacao" style={s.batch}>
+                {diaDetalhe && (
+                  <button style={s.dayFilter} onClick={() => setDiaDetalhe("")}>
+                    📅 {dataBr(diaDetalhe)} ×
+                  </button>
+                )}
                 <select style={s.input} value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
                   <option>Todos</option><option>A concluir</option><option>Pendente</option><option>Classificado</option><option>Conciliado</option><option>Ignorado</option><option>Lançado</option>
                 </select>
@@ -957,6 +1110,14 @@ function badgeConferencia(status) {
   return { display: "inline-block", padding: "5px 8px", borderRadius: 999, background: "#624d1c", color: "#ffe49a", fontWeight: 800, fontSize: 11 }
 }
 
+function rotuloDiferenca(valor) {
+  const numero = Number(valor || 0)
+  if (Math.abs(numero) < 0.01) return "bateu"
+  return numero > 0
+    ? `faltam ${moeda(numero)} nos lançamentos do cliente`
+    : `cliente lançou ${moeda(Math.abs(numero))} a mais`
+}
+
 function Campo({ t, children }) { return <label style={s.label}>{t}{children}</label> }
 function Resumo({ t, v, cor }) { return <div style={s.summaryItem}><span>{t}</span><strong style={{ color: cor }}>{v}</strong></div> }
 function movimentoClienteEhBancario(item) {
@@ -1012,6 +1173,18 @@ const s = {
   success: { display: "flex", flexDirection: "column", gap: 5, marginTop: 15, padding: 14, borderRadius: 12, background: "#0c5c50", color: "#caffee" },
   summary: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 18 },
   summaryItem: { display: "flex", flexDirection: "column", gap: 6, padding: 14, background: "#071f43", borderRadius: 12 },
+  diffBox: { padding: 14, marginBottom: 14, borderRadius: 12, background: "#071f43", border: "1px solid #22558d" },
+  diffHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 10, color: "#e8f4ff" },
+  diffCountWarn: { padding: "6px 10px", borderRadius: 999, background: "#6b4d09", color: "#ffe08a", fontWeight: 900, fontSize: 12 },
+  diffCountOk: { padding: "6px 10px", borderRadius: 999, background: "#0c604f", color: "#caffef", fontWeight: 900, fontSize: 12 },
+  diffList: { display: "grid", gap: 8 },
+  diffDay: { display: "grid", gridTemplateColumns: "100px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: 10, borderRadius: 10, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,196,72,.22)" },
+  diffDate: { color: "#fff", fontWeight: 900, whiteSpace: "nowrap" },
+  diffValues: { display: "grid", gap: 4, color: "#c9ddf2", fontSize: 12 },
+  diffFooter: { marginTop: 10, textAlign: "right", color: "#ffd98c", fontSize: 12 },
+  diffSuccess: { padding: 12, borderRadius: 10, background: "rgba(30,190,135,.12)", color: "#bfffe9", fontWeight: 700 },
+  detailsToggle: { border: "1px solid #2d6ea8", borderRadius: 9, padding: "9px 13px", background: "#0a2a52", color: "#d8ebff", fontWeight: 800, cursor: "pointer" },
+  dayFilter: { border: "1px solid #ffc648", borderRadius: 8, padding: "8px 10px", background: "#6b4d09", color: "#fff3c4", fontWeight: 800, cursor: "pointer" },
   autoBox: { display: "flex", justifyContent: "space-between", gap: 18, alignItems: "center", flexWrap: "wrap", padding: 14, marginBottom: 14, borderRadius: 12, background: "#0d2b52", border: "1px solid #34649a" },
   autoOk: { display: "flex", justifyContent: "space-between", gap: 18, alignItems: "center", flexWrap: "wrap", padding: 14, marginBottom: 14, borderRadius: 12, background: "#0b3d3a", border: "1px solid #2aa883" },
   autoInfo: { display: "grid", gap: 5, color: "#d7e9fb", fontSize: 12 },
