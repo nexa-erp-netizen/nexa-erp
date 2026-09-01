@@ -227,6 +227,7 @@ export default function ConciliacaoBancaria({ setPage }) {
     const resultado = {}
 
     const movimentosBancoElegiveis = movimentos.filter(m => !m.lancamentoContabilId)
+    const movimentosClienteBancarios = movimentosCliente.filter(movimentoClienteEhBancario)
 
     function chaveExataBanco(movimento) {
       const naturezaEsperada = movimento.natureza === "Entrada" ? "Receita" : "Despesa"
@@ -246,7 +247,7 @@ export default function ConciliacaoBancaria({ setPage }) {
     })
 
     const gruposCliente = new Map()
-    movimentosCliente.forEach(item => {
+    movimentosClienteBancarios.forEach(item => {
       const chave = chaveExataCliente(item)
       const lista = gruposCliente.get(chave) || []
       lista.push(item)
@@ -260,6 +261,21 @@ export default function ConciliacaoBancaria({ setPage }) {
       const naturezaEsperada = movimento.natureza === "Entrada" ? "Receita" : "Despesa"
       const valorBanco = valorComparavel(movimento.valor)
       const dataBanco = dataIso(movimento.data)
+
+      if (
+        movimento.statusConciliacao === "Conciliado" &&
+        String(movimento.observacoes || "").startsWith("Nexa Auto •")
+      ) {
+        const agrupado = String(movimento.observacoes || "").includes("agrupamento diário")
+        resultado[movimento.id] = {
+          status: "BATENDO",
+          titulo: agrupado ? "Conciliado por total diário" : "Conciliado automaticamente",
+          detalhe: agrupado
+            ? "O total bancário do dia bateu com o total dos lançamentos bancários do cliente."
+            : "Mesma data, natureza e valor em Movimentos Clientes.",
+        }
+        return
+      }
 
       if (movimento.lancamentoContabilId) {
         resultado[movimento.id] = {
@@ -319,7 +335,7 @@ export default function ConciliacaoBancaria({ setPage }) {
         return
       }
 
-      const candidatosTipo = movimentosCliente.filter(item =>
+      const candidatosTipo = movimentosClienteBancarios.filter(item =>
         String(item.tipo || "") === naturezaEsperada
       )
 
@@ -359,6 +375,30 @@ export default function ConciliacaoBancaria({ setPage }) {
     else r.saidas += valor
     return r
   }, { entradas: 0, saidas: 0 }), [movimentos])
+
+  const movimentosClienteBancariosCompetencia = useMemo(
+    () => movimentosCliente.filter(item =>
+      movimentoClienteEhBancario(item) &&
+      dataIso(item.data).startsWith(`${competencia}-`)
+    ),
+    [movimentosCliente, competencia]
+  )
+
+  const resumoClienteBancos = useMemo(
+    () => movimentosClienteBancariosCompetencia.reduce((r, item) => {
+      const valor = Number(item.valor || 0)
+      if (item.tipo === "Receita") r.receitas += valor
+      else if (item.tipo === "Despesa") r.despesas += valor
+      return r
+    }, { receitas: 0, despesas: 0 }),
+    [movimentosClienteBancariosCompetencia]
+  )
+
+  const diferencaEntradas = resumoMovimentos.entradas - resumoClienteBancos.receitas
+  const diferencaSaidas = resumoMovimentos.saidas - resumoClienteBancos.despesas
+  const totaisBatem =
+    Math.abs(diferencaEntradas) < 0.01 &&
+    Math.abs(diferencaSaidas) < 0.01
 
   const resumoConferencia = useMemo(() => movimentos.reduce((r, movimento) => {
     const status = analiseConciliacao[movimento.id]?.status
@@ -415,6 +455,35 @@ export default function ConciliacaoBancaria({ setPage }) {
     setSelecionados(movimentosVisiveis.filter(m => !m.lancamentoContabilId).map(m => m.id))
   }
 
+  async function conciliarAutomaticamente() {
+    if (!contaExtratoId) return alert("Selecione uma conta bancária.")
+
+    setProcessando(true)
+    try {
+      const r = await api.post("/extratos-bancarios/movimentos/conciliar-automatico", {
+        contaBancariaId: contaExtratoId,
+        competencia,
+      })
+
+      await carregarExtratos()
+      setFiltroStatus("A concluir")
+      setFiltroConferencia("Todos")
+      setSelecionados([])
+
+      const dados = r.data || {}
+      alert(
+        `Conferência automática concluída.\n\n` +
+        `${dados.exatos || 0} por correspondência exata • ` +
+        `${dados.agrupados || 0} por total diário.\n` +
+        `Agora a Nexa mostra somente o que realmente precisa de atenção.`
+      )
+    } catch (e) {
+      alert(e.response?.data?.message || "Erro na conciliação automática")
+    } finally {
+      setProcessando(false)
+    }
+  }
+
   async function classificarUm(movimento, status) {
     const planoContaId = classificacoes[movimento.id]
 
@@ -422,7 +491,7 @@ export default function ConciliacaoBancaria({ setPage }) {
       return alert("Este movimento ainda não bate com um lançamento único em Movimentos Clientes. Corrija ou lance o movimento do cliente e depois clique em Atualizar conferência.")
     }
 
-    if (["Classificado", "Conciliado"].includes(status) && !planoContaId) {
+    if (status === "Classificado" && !planoContaId) {
       return alert("Selecione a conta contábil deste movimento")
     }
 
@@ -450,7 +519,7 @@ export default function ConciliacaoBancaria({ setPage }) {
       }
     }
 
-    if (["Classificado", "Conciliado"].includes(status) && !planoLoteId) {
+    if (status === "Classificado" && !planoLoteId) {
       return alert("Selecione uma conta contábil para o lote")
     }
 
@@ -663,7 +732,7 @@ export default function ConciliacaoBancaria({ setPage }) {
             <div style={s.titleRow}>
               <div>
                 <h3 style={s.h3}>Movimentos importados</h3>
-                <p style={s.p}>A Nexa compara cada linha com Movimentos Clientes. Verde bateu; amarelo requer atenção; vermelho indica divergência.</p>
+                <p style={s.p}>A Nexa confere automaticamente o extrato e deixa para você somente as exceções.</p>
               </div>
               <label style={{ ...s.label, margin: 0, minWidth: 190 }}>Competência
                 <input type="month" style={s.input} value={competencia} onChange={e => { setCompetencia(e.target.value); setFiltroStatus("Todos"); setFiltroConferencia("Todos") }} />
@@ -680,11 +749,42 @@ export default function ConciliacaoBancaria({ setPage }) {
               <Resumo t="Divergências" v={resumoConferencia.divergencias} cor="#ff7d88" />
             </div>
 
+            <div style={totaisBatem ? s.autoOk : s.autoBox}>
+              <div style={s.autoInfo}>
+                <strong>Conferência automática da Nexa</strong>
+                <span>
+                  Entradas do extrato: <b>{moeda(resumoMovimentos.entradas)}</b> •
+                  Receitas em Bancos: <b>{moeda(resumoClienteBancos.receitas)}</b> •
+                  Diferença: <b>{moeda(diferencaEntradas)}</b>
+                </span>
+                <span>
+                  Saídas do extrato: <b>{moeda(resumoMovimentos.saidas)}</b> •
+                  Despesas em Bancos: <b>{moeda(resumoClienteBancos.despesas)}</b> •
+                  Diferença: <b>{moeda(diferencaSaidas)}</b>
+                </span>
+                <small>
+                  {totaisBatem
+                    ? "✅ Os totais bancários do mês batem."
+                    : "A Nexa resolve o que for seguro e deixa somente as diferenças para revisão."}
+                </small>
+              </div>
+              {!fechamentoAtual && movimentos.length > 0 && (
+                <button
+                  style={{ ...s.autoButton, ...(processando ? s.disabled : {}) }}
+                  disabled={processando}
+                  onClick={conciliarAutomaticamente}
+                >
+                  {processando ? "Conferindo..." : "✨ Conferir automaticamente"}
+                </button>
+              )}
+            </div>
+
             <div style={s.legend}>
               <span><b style={{ color: "#73ffd4" }}>● Verde</b> — mesma natureza, data e valor; quando existem movimentos repetidos, a Nexa faz pareamento 1↔1 pela quantidade.</span>
               <span><b style={{ color: "#ffd45b" }}>● Amarelo</b> — lançamento ausente ou possível diferença de compensação/agrupamento.</span>
               <span><b style={{ color: "#ff7d88" }}>● Vermelho</b> — mais de uma correspondência ou lançamento já gerado pela conciliação; revisar possível duplicidade.</span>
               <span><b>Regra de segurança:</b> importar extrato não cria Receita ou Despesa em Movimentos Clientes.</span>
+              <span><b>Caixa fica fora:</b> a conciliação usa apenas lançamentos bancários do cliente.</span>
             </div>
 
             <div style={fechamentoAtual ? s.closeDone : s.closeBox}>
@@ -859,6 +959,24 @@ function badgeConferencia(status) {
 
 function Campo({ t, children }) { return <label style={s.label}>{t}{children}</label> }
 function Resumo({ t, v, cor }) { return <div style={s.summaryItem}><span>{t}</span><strong style={{ color: cor }}>{v}</strong></div> }
+function movimentoClienteEhBancario(item) {
+  const plano = String(item?.planoContaNome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+
+  // Se existe Plano de Contas, ele prevalece. Caixa fica fora.
+  if (plano) return plano.includes("banco")
+
+  const forma = `${item?.formaPagamento || ""} ${item?.forma || ""}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+
+  return /pix|cartao|transferencia|ted|doc|debito|credito|banco/.test(forma)
+}
+
 function moeda(v) { return Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) }
 function moedaCampo(v) { return moeda(v) }
 function formatarMoedaDigitada(v) { const d = String(v || "").replace(/\D/g, ""); return d ? (Number(d) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "" }
@@ -894,6 +1012,10 @@ const s = {
   success: { display: "flex", flexDirection: "column", gap: 5, marginTop: 15, padding: 14, borderRadius: 12, background: "#0c5c50", color: "#caffee" },
   summary: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 18 },
   summaryItem: { display: "flex", flexDirection: "column", gap: 6, padding: 14, background: "#071f43", borderRadius: 12 },
+  autoBox: { display: "flex", justifyContent: "space-between", gap: 18, alignItems: "center", flexWrap: "wrap", padding: 14, marginBottom: 14, borderRadius: 12, background: "#0d2b52", border: "1px solid #34649a" },
+  autoOk: { display: "flex", justifyContent: "space-between", gap: 18, alignItems: "center", flexWrap: "wrap", padding: 14, marginBottom: 14, borderRadius: 12, background: "#0b3d3a", border: "1px solid #2aa883" },
+  autoInfo: { display: "grid", gap: 5, color: "#d7e9fb", fontSize: 12 },
+  autoButton: { border: "1px solid #5df0c8", borderRadius: 10, padding: "11px 16px", background: "#0a7568", color: "#fff", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" },
   legend: { display: "grid", gap: 7, padding: 14, marginBottom: 16, borderRadius: 12, background: "#071f43", border: "1px solid #22558d", color: "#bcd8f5", fontSize: 12 },
   entrada: { padding: "4px 8px", borderRadius: 999, background: "#145c4a", color: "#6cffc5" },
   saida: { padding: "4px 8px", borderRadius: 999, background: "#652c3b", color: "#ffabb2" },
