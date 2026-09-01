@@ -1,6 +1,6 @@
-﻿const NEXA_VERSION = {
+const NEXA_VERSION = {
   version: "3.49.4",
-  build: "34903",
+  build: "34904",
   release: "Encerramento de voz reforÃ§ado",
   date: "26/08/2026",
   status: "ProduÃ§Ã£o",

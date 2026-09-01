@@ -469,6 +469,24 @@ export default function ConciliacaoBancaria({ setPage }) {
     [diasComDiferenca]
   )
 
+  const TOLERANCIA_VISUAL = 0.10
+
+  const diasComDiferencaRelevante = useMemo(
+    () => diasComDiferenca.filter(item =>
+      Math.abs(item.diferencaEntradas) > TOLERANCIA_VISUAL ||
+      Math.abs(item.diferencaSaidas) > TOLERANCIA_VISUAL
+    ),
+    [diasComDiferenca]
+  )
+
+  const pequenasDiferencas = useMemo(
+    () => diasComDiferenca.filter(item =>
+      Math.abs(item.diferencaEntradas) <= TOLERANCIA_VISUAL &&
+      Math.abs(item.diferencaSaidas) <= TOLERANCIA_VISUAL
+    ),
+    [diasComDiferenca]
+  )
+
   const resumoConferencia = useMemo(() => movimentos.reduce((r, movimento) => {
     const status = analiseConciliacao[movimento.id]?.status
     if (status === "BATENDO") r.batendo += 1
@@ -557,10 +575,11 @@ export default function ConciliacaoBancaria({ setPage }) {
       const dados = r.data || {}
       alert(
         `Conferência automática concluída.\n\n` +
-        `${dados.exatos || 0} correspondência(s) exata(s) • ` +
-        `${dados.agrupados || 0} movimento(s) conciliado(s) por agrupamento.\n` +
-        `${dados.diasComDiferenca || 0} dia(s) ainda possuem diferença.\n\n` +
-        `A Nexa deixa na tela somente os dias que realmente precisam de atenção.`
+        `${dados.exatos || 0} exata(s) • ` +
+        `${dados.agrupados || 0} por agrupamento • ` +
+        `${dados.compensados || 0} por compensação entre datas próximas.\n` +
+        `${dados.gruposPendentes || 0} grupo(s) ainda precisam de atenção.\n\n` +
+        `A Nexa deixa na tela somente as exceções reais.`
       )
     } catch (e) {
       alert(e.response?.data?.message || "Erro na conciliação automática")
@@ -641,9 +660,9 @@ export default function ConciliacaoBancaria({ setPage }) {
   }
 
   async function concluirMes() {
-    if (diasComDiferenca.length) {
+    if (diasComDiferencaRelevante.length) {
       setMostrarDetalhes(false)
-      return alert(`Ainda existem ${diasComDiferenca.length} dia(s) com diferença. Revise apenas esses dias antes de concluir o mês.`)
+      return alert(`Ainda existem ${diasComDiferencaRelevante.length} dia(s) com diferença relevante. Revise apenas esses dias antes de concluir o mês.`)
     }
     if (!movimentos.length) return alert("Não existem movimentos nesta competência.")
     if (!confirm(`Concluir a competência ${competenciaBr(competencia)}?`)) return
@@ -828,8 +847,8 @@ export default function ConciliacaoBancaria({ setPage }) {
               <Resumo t="Entradas" v={moeda(resumoMovimentos.entradas)} cor="#42f5a7" />
               <Resumo t="Saídas" v={moeda(resumoMovimentos.saidas)} cor="#ff7d88" />
               <Resumo t="Movimento líquido" v={moeda(resumoMovimentos.entradas - resumoMovimentos.saidas)} cor="#53c9ff" />
-              <Resumo t="Conciliados" v={resumoMovimentos.conciliados} cor="#73ffd4" />
-              <Resumo t="Dias c/ diferença" v={diasComDiferenca.length} cor="#ffd45b" />
+              <Resumo t="Conciliados" v={movimentos.filter(m => m.statusConciliacao === "Conciliado").length} cor="#73ffd4" />
+              <Resumo t="Dias c/ diferença" v={diasComDiferencaRelevante.length} cor="#ffd45b" />
               <Resumo t="Dif. entradas" v={moeda(diferencaEntradas)} cor={Math.abs(diferencaEntradas) < 0.01 ? "#73ffd4" : "#ffbf69"} />
               <Resumo t="Dif. saídas" v={moeda(diferencaSaidas)} cor={Math.abs(diferencaSaidas) < 0.01 ? "#73ffd4" : "#ff7d88"} />
             </div>
@@ -870,21 +889,21 @@ export default function ConciliacaoBancaria({ setPage }) {
                   <strong>Diferenças que realmente precisam de atenção</strong>
                   <small style={s.block}>
                     A Nexa compara o total do banco com os lançamentos bancários do cliente por dia.
-                    Correspondências 1↔1, vários↔1 e 1↔vários são tratadas automaticamente.
+                    Correspondências 1↔1, vários↔1 e 1↔vários são tratadas automaticamente, inclusive com compensação de até 3 dias.
                   </small>
                 </div>
-                <span style={diasComDiferenca.length ? s.diffCountWarn : s.diffCountOk}>
-                  {diasComDiferenca.length ? `${diasComDiferenca.length} dia(s)` : "Tudo bateu"}
+                <span style={diasComDiferencaRelevante.length ? s.diffCountWarn : s.diffCountOk}>
+                  {diasComDiferencaRelevante.length ? `${diasComDiferencaRelevante.length} dia(s)` : "Tudo bateu"}
                 </span>
               </div>
 
-              {diasComDiferenca.length === 0 ? (
+              {diasComDiferencaRelevante.length === 0 ? (
                 <div style={s.diffSuccess}>
                   ✅ Nenhuma diferença diária. O mês está pronto para fechamento, salvo itens justificados/ignorados.
                 </div>
               ) : (
                 <div style={s.diffList}>
-                  {diasComDiferenca.map(item => (
+                  {diasComDiferencaRelevante.map(item => (
                     <div key={item.data} style={s.diffDay}>
                       <div style={s.diffDate}>{dataBr(item.data)}</div>
                       <div style={s.diffValues}>
@@ -907,16 +926,27 @@ export default function ConciliacaoBancaria({ setPage }) {
                 </div>
               )}
 
-              {diasComDiferenca.length > 0 && (
+              {diasComDiferencaRelevante.length > 0 && (
                 <div style={s.diffFooter}>
-                  Diferença absoluta a revisar: <strong>{moeda(diferencaAbsTotal)}</strong>
+                  Diferença absoluta a revisar: <strong>{moeda(
+                    diasComDiferencaRelevante.reduce(
+                      (total, item) => total + Math.abs(item.diferencaEntradas) + Math.abs(item.diferencaSaidas),
+                      0
+                    )
+                  )}</strong>
+                </div>
+              )}
+
+              {pequenasDiferencas.length > 0 && (
+                <div style={s.microDiff}>
+                  ℹ️ {pequenasDiferencas.length} diferença(s) de até {moeda(TOLERANCIA_VISUAL)} não bloqueiam a revisão principal.
                 </div>
               )}
             </div>
 
             <div style={s.legend}>
               <span><b>Fluxo simplificado:</b> a Nexa resolve automaticamente o que bate e mostra somente os dias com diferença.</span>
-              <span><b>Agrupamentos:</b> vários movimentos do banco podem corresponder a um lançamento do cliente, e um movimento do banco pode corresponder a vários lançamentos.</span>
+              <span><b>Agrupamentos:</b> vários movimentos do banco podem corresponder a um lançamento do cliente, e um movimento do banco pode corresponder a vários lançamentos, com janela de compensação de até 3 dias.</span>
               <span><b>Regra de segurança:</b> importar extrato não cria Receita ou Despesa em Movimentos Clientes.</span>
               <span><b>Caixa fica fora:</b> a conciliação usa apenas lançamentos bancários do cliente. Itens “Ignorados” são diferenças justificadas.</span>
             </div>
@@ -927,16 +957,16 @@ export default function ConciliacaoBancaria({ setPage }) {
                 <span style={s.closeText}>
                   {fechamentoAtual
                     ? `Saldo final: ${moeda(fechamentoAtual.saldoFinal)}`
-                    : diasComDiferenca.length
-                      ? `${diasComDiferenca.length} dia(s) com diferença para revisar. Não é necessário conferir cada linha do extrato.`
+                    : diasComDiferencaRelevante.length
+                      ? `${diasComDiferencaRelevante.length} dia(s) com diferença relevante para revisar. Não é necessário conferir cada linha do extrato.`
                       : movimentos.length
                         ? "Os totais diários batem ou foram justificados. O mês já pode ser concluído."
                         : "Nenhum movimento nesta competência."}
                 </span>
               </div>
               <div style={s.actions}>
-                {!fechamentoAtual && diasComDiferenca.length > 0 && <button style={s.secondary} onClick={() => setMostrarDetalhes(false)}>Ver diferenças</button>}
-                {!fechamentoAtual && <button style={{ ...s.primary, ...(processando || diasComDiferenca.length > 0 || !movimentos.length ? s.disabled : {}) }} disabled={processando || diasComDiferenca.length > 0 || !movimentos.length} onClick={concluirMes}>Concluir mês</button>}
+                {!fechamentoAtual && diasComDiferencaRelevante.length > 0 && <button style={s.secondary} onClick={() => setMostrarDetalhes(false)}>Ver diferenças</button>}
+                {!fechamentoAtual && <button style={{ ...s.primary, ...(processando || diasComDiferencaRelevante.length > 0 || !movimentos.length ? s.disabled : {}) }} disabled={processando || diasComDiferencaRelevante.length > 0 || !movimentos.length} onClick={concluirMes}>Concluir mês</button>}
                 {fechamentoAtual && <button style={s.small} onClick={() => baixarRelatorio(fechamentoAtual)}>Baixar PDF</button>}
               </div>
             </div>
@@ -1182,6 +1212,7 @@ const s = {
   diffDate: { color: "#fff", fontWeight: 900, whiteSpace: "nowrap" },
   diffValues: { display: "grid", gap: 4, color: "#c9ddf2", fontSize: 12 },
   diffFooter: { marginTop: 10, textAlign: "right", color: "#ffd98c", fontSize: 12 },
+  microDiff: { marginTop: 10, padding: 9, borderRadius: 9, background: "rgba(80,170,255,.08)", color: "#b8d9f7", fontSize: 11 },
   diffSuccess: { padding: 12, borderRadius: 10, background: "rgba(30,190,135,.12)", color: "#bfffe9", fontWeight: 700 },
   detailsToggle: { border: "1px solid #2d6ea8", borderRadius: 9, padding: "9px 13px", background: "#0a2a52", color: "#d8ebff", fontWeight: 800, cursor: "pointer" },
   dayFilter: { border: "1px solid #ffc648", borderRadius: 8, padding: "8px 10px", background: "#6b4d09", color: "#fff3c4", fontWeight: 800, cursor: "pointer" },
