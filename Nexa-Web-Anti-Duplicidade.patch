@@ -1,0 +1,171 @@
+diff --git a/src/pages/MovimentosCliente.jsx b/src/pages/MovimentosCliente.jsx
+--- a/src/pages/MovimentosCliente.jsx
++++ b/src/pages/MovimentosCliente.jsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useMemo, useState } from "react"
++import { useEffect, useMemo, useRef, useState } from "react"
+ import api from "../services/api"
+ import {
+   FaTrash,
+@@ -31,6 +31,12 @@ export default function MovimentosCliente() {
+     linhaVazia(),
+     linhaVazia(),
+   ])
++  const [salvando, setSalvando] = useState(false)
++  const salvandoRef = useRef(false)
++  const envioPendenteRef = useRef({
++    assinatura: "",
++    chave: "",
++  })
+
+   useEffect(() => {
+     const clienteVoz = localStorage.getItem("nexaFiltroMovimentosCliente") || ""
+@@ -175,8 +181,54 @@ export default function MovimentosCliente() {
+     })
+   }
+
++  function gerarChaveIdempotencia() {
++    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
++      return crypto.randomUUID()
++    }
++
++    return `nexa-${Date.now()}-${Math.random().toString(36).slice(2)}`
++  }
++
++  function assinaturaDoEnvio(movimentos) {
++    return JSON.stringify(
++      movimentos.map((item) => ({
++        cliente: item.cliente || "",
++        tipo: item.tipo || "",
++        data: item.data || "",
++        planoContaId: item.planoContaId || null,
++        planoContaNome: item.planoContaNome || "",
++        forma: item.forma || "",
++        formaPagamento: item.formaPagamento || "",
++        descricao: item.descricao || "",
++        valor: Number(item.valor || 0),
++      }))
++    )
++  }
++
++  function obterChaveIdempotencia(movimentos) {
++    const assinatura = assinaturaDoEnvio(movimentos)
++    const pendente = envioPendenteRef.current
++
++    if (pendente.assinatura === assinatura && pendente.chave) {
++      return pendente.chave
++    }
++
++    const chave = gerarChaveIdempotencia()
++
++    envioPendenteRef.current = {
++      assinatura,
++      chave,
++    }
++
++    return chave
++  }
++
+   async function salvarLancamentos() {
++    if (salvandoRef.current) return
++
++    salvandoRef.current = true
++    setSalvando(true)
++
+     try {
+       const linhaComDataInvalida = linhas.findIndex((linha) => linha.data && !dataMovimentoValida(linha.data))
+       if (linhaComDataInvalida >= 0) {
+@@ -218,10 +270,32 @@ export default function MovimentosCliente() {
+       }
+
+       if (novosMovimentos.length > 0) {
+-        await api.post("/movimentos-cliente/massa", {
+-          movimentos: novosMovimentos,
+-        })
++        const chaveIdempotencia = obterChaveIdempotencia(novosMovimentos)
++
++        const resposta = await api.post(
++          "/movimentos-cliente/massa",
++          {
++            movimentos: novosMovimentos,
++            chaveIdempotencia,
++          },
++          {
++            headers: {
++              "X-Idempotency-Key": chaveIdempotencia,
++            },
++          }
++        )
++
++        if (resposta.data?.duplicadoEvitado === true) {
++          console.warn("Nexa evitou um reenvio duplicado deste lote.")
++        }
+       }
+
++      envioPendenteRef.current = {
++        assinatura: "",
++        chave: "",
++      }
++
+       setLinhas([
+         linhaVazia(),
+         linhaVazia(),
+@@ -235,7 +309,17 @@ export default function MovimentosCliente() {
+       alert("Lançamentos salvos com sucesso.")
+     } catch (erro) {
+       console.error("Erro ao salvar lançamentos:", erro)
+-      alert("Erro ao salvar lançamentos.")
++      const mensagem = erro?.response?.data?.message
++
++      if (erro?.response?.data?.duplicadoEvitado) {
++        alert(mensagem || "A Nexa bloqueou um envio repetido para evitar lançamentos duplicados.")
++      } else {
++        alert(
++          mensagem ||
++          "Erro ao salvar lançamentos. Você pode tentar novamente; a Nexa reutilizará a mesma identificação do envio para evitar duplicidade."
++        )
++      }
++    } finally {
++      salvandoRef.current = false
++      setSalvando(false)
+     }
+   }
+
+@@ -465,6 +549,16 @@ export default function MovimentosCliente() {
+           color: #00112b;
+         }
+
++        .mv-btn:disabled {
++          opacity: .55;
++          cursor: not-allowed;
++        }
++
++        .mv-btn-saving {
++          filter: saturate(.65);
++        }
++
+         .mv-filter-box {
+           display: flex;
+           align-items: center;
+@@ -735,6 +829,7 @@ export default function MovimentosCliente() {
+               type="button"
+               className="mv-btn mv-btn-add"
+               onClick={adicionarLinha}
++              disabled={salvando}
+             >
+               + Adicionar linha
+             </button>
+@@ -742,10 +837,12 @@ export default function MovimentosCliente() {
+             <button
+               type="button"
+-              className="mv-btn mv-btn-save"
++              className={`mv-btn mv-btn-save ${salvando ? "mv-btn-saving" : ""}`}
+               onClick={salvarLancamentos}
++              disabled={salvando}
++              aria-busy={salvando}
+             >
+-              Salvar Lançamentos
++              {salvando ? "Salvando..." : "Salvar Lançamentos"}
+             </button>
+           </div>
+         </div>
