@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.49.7",
-  build: "34907",
-  release: "Calculadora flutuante e conciliação reforçada",
+  version: "3.49.8",
+  build: "34908",
+  release: "DRE consistente com Lançamentos Contábeis",
   date: "02/09/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.49.8", release: "DRE consistente com Lançamentos Contábeis", date: "02/09/2026", items: ["DRE usa a mesma normalização de cliente da tela de Lançamentos Contábeis", "Acentos, espaços extras e diferenças entre maiúsculas/minúsculas não separam mais a mesma empresa", "Receita, Crédito e Entrada são tratados de forma consistente como receitas", "Demais naturezas compatíveis permanecem tratadas como despesas, seguindo a regra já usada nos Lançamentos Contábeis", "Competência considera somente datas válidas no padrão dos lançamentos", "Filtro Todas as empresas corrigido", "Nenhum lançamento existente é alterado ou excluído", "Versões Web e API sincronizadas em 3.49.8"] },
     { version: "3.49.7", release: "Calculadora flutuante e conciliação reforçada", date: "02/09/2026", items: ["Calculadora comum disponível em painel flutuante nas telas do escritório", "Painel da calculadora pode ser arrastado e mantém a posição escolhida", "Operações básicas, percentual, troca de sinal, apagar e suporte ao teclado", "Saldo inicial do mês derivado do saldo final do OFX quando disponível, evitando usar base cadastrada no meio do mês como abertura", "Seleção inteligente da conciliação ignora possíveis correspondências, agrupamentos e taxas", "Confirmação adicional antes de lançar manualmente linhas com risco de correspondência", "Proteções de duplicidade e conciliação mensal das versões anteriores preservadas"] },
     { version: "3.49.6", release: "Conciliação bancária com saldo e lançamentos assistidos", date: "01/09/2026", items: ["Saldo inicial, movimentação e saldo final do banco separados do resultado dos Movimentos Clientes", "Saldo final informado pelo OFX exibido quando disponível", "Diferença entre variação bancária e lançamentos em Bancos explicada na própria conciliação", "Investigação permite selecionar vários movimentos do extrato e criar lançamentos individuais em lote", "Seleção em lote bloqueada quando o total excede a diferença para evitar lançamentos a mais", "Caixa permanece fora da conciliação bancária", "Correções de duplicidade da v3.49.5 preservadas"] },
     { version: "3.49.5", release: "Proteção contra duplicidade de movimentos", date: "01/09/2026", items: ["Duplo clique e reenvio técnico protegidos por idempotência", "Aviso antes de salvar lançamento semelhante com opção de continuar", "Consulta de possíveis duplicados no escritório", "Limpeza segura mantendo um registro e removendo somente duplicados confirmados", "Movimento e lançamento contábil preservados em transação"] },

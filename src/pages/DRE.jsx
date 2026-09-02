@@ -48,12 +48,50 @@ export default function DRE() {
     })
   }
 
+  function dataLancamentoValida(valor) {
+    const achou = String(valor || "").match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!achou) return false
+
+    const ano = Number(achou[1])
+    const mes = Number(achou[2])
+    const dia = Number(achou[3])
+    const limiteAno = new Date().getFullYear() + 1
+    const data = new Date(Date.UTC(ano, mes - 1, dia))
+
+    return ano >= 1900 && ano <= limiteAno
+      && data.getUTCFullYear() === ano
+      && data.getUTCMonth() === mes - 1
+      && data.getUTCDate() === dia
+  }
+
   function obterCompetencia(data) {
-    if (!data) return "Sem data"
+    if (!dataLancamentoValida(data)) return "Sem data"
 
     const d = new Date(data + "T00:00:00")
-
     return `${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+  }
+
+  function normalizarNome(valor) {
+    return String(valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase()
+  }
+
+  function tipoNormalizado(tipo) {
+    const texto = normalizarNome(tipo)
+
+    if (
+      texto === "receita" ||
+      texto === "credito" ||
+      texto === "entrada"
+    ) {
+      return "receita"
+    }
+
+    return "despesa"
   }
 
   function agruparPorPlano(lista) {
@@ -74,12 +112,19 @@ export default function DRE() {
   }
 
   const empresas = useMemo(() => {
+    const porNomeNormalizado = new Map()
+
+    movimentos.forEach((item) => {
+      const nomeOriginal = String(item.cliente || "").trim()
+      const chave = normalizarNome(nomeOriginal)
+      if (!chave || porNomeNormalizado.has(chave)) return
+      porNomeNormalizado.set(chave, nomeOriginal)
+    })
+
     return [
       "Todas",
-      ...new Set(
-        movimentos
-          .map((item) => item.cliente)
-          .filter(Boolean)
+      ...Array.from(porNomeNormalizado.values()).sort((a, b) =>
+        a.localeCompare(b, "pt-BR", { sensitivity: "base" })
       ),
     ]
   }, [movimentos])
@@ -96,10 +141,15 @@ export default function DRE() {
   }, [movimentos])
 
   const movimentosFiltrados = useMemo(() => {
+    const empresaNormalizada = normalizarNome(empresaSelecionada)
+
     return movimentos.filter((item) => {
+      if (!dataLancamentoValida(item.data)) return false
+
       const empresaOk =
+        empresaSelecionada === "Todas" ||
         empresaSelecionada === "" ||
-        item.cliente === empresaSelecionada
+        normalizarNome(item.cliente) === empresaNormalizada
 
       const competenciaOk =
         competenciaSelecionada === "Todas" ||
@@ -111,11 +161,11 @@ export default function DRE() {
 
   const dados = useMemo(() => {
     const receitasLista = movimentosFiltrados.filter(
-      (item) => String(item.tipo || "").toLowerCase() === "receita"
+      (item) => tipoNormalizado(item.tipo) === "receita"
     )
 
     const despesasLista = movimentosFiltrados.filter(
-      (item) => String(item.tipo || "").toLowerCase() === "despesa"
+      (item) => tipoNormalizado(item.tipo) === "despesa"
     )
 
     const receitas = receitasLista.reduce(
