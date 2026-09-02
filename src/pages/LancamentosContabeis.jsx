@@ -22,7 +22,7 @@ export default function LancamentosContabeis() {
     data: "",
     categoria: "",
     planoConta: "",
-    origem: "manual",
+    origem: "Escritório",
   })
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export default function LancamentosContabeis() {
         data: "",
         categoria: "",
         planoConta: "",
-        origem: "manual",
+        origem: "Escritório",
       }))
       localStorage.removeItem("nexaFiltroLancamentosCliente")
     }
@@ -262,6 +262,22 @@ export default function LancamentosContabeis() {
       .toLowerCase()
   }
 
+  function origemExibida(lancamento) {
+    const origem = normalizarNome(lancamento?.origem)
+
+    if (origem === "cliente") return "Cliente"
+    if (origem === "escritorio") return "Escritório"
+
+    // Registros anteriores à v3.49.9 não possuíam o campo origem.
+    // Quando há vínculo com MovimentoCliente, o lançamento veio do
+    // fluxo de Movimentos; os demais eram lançamentos diretos do escritório.
+    if (/^movimento-cliente:\d+$/i.test(String(lancamento?.observacao || ""))) {
+      return "Cliente"
+    }
+
+    return "Escritório"
+  }
+
   function origemFinanceira(lancamento) {
     const plano = normalizarNome(lancamento?.planoConta || lancamento?.categoria)
     if (plano.includes("caixa")) return "caixa"
@@ -367,7 +383,7 @@ export default function LancamentosContabeis() {
       data: form.data,
       categoria: form.planoConta || form.categoria,
       planoConta: form.planoConta || form.categoria,
-      origem: "manual",
+      origem: "Escritório",
     }
 
     try {
@@ -402,7 +418,7 @@ export default function LancamentosContabeis() {
       data: "",
       categoria: "",
       planoConta: "",
-      origem: "manual",
+      origem: "Escritório",
     })
   }
 
@@ -419,7 +435,7 @@ export default function LancamentosContabeis() {
       data: lancamento.data || "",
       categoria: lancamento.planoConta || lancamento.categoria || "",
       planoConta: lancamento.planoConta || lancamento.categoria || "",
-      origem: lancamento.origem || "manual",
+      origem: origemExibida(lancamento),
     })
 
     window.scrollTo({
@@ -936,7 +952,7 @@ export default function LancamentosContabeis() {
             onChange={(e) =>
               setForm({
                 ...form,
-                origem: "manual",
+                origem: "Escritório",
                 servicoId: "",
                 descricao: e.target.value,
               })
@@ -1223,7 +1239,7 @@ export default function LancamentosContabeis() {
                   <td>{quantidadeSegura(lancamento.quantidade)}</td>
                   <td>{formatarMoeda(valorUnitarioLancamento(lancamento))}</td>
                   <td><strong>{formatarMoeda(lancamento.valor)}</strong></td>
-                  <td>{lancamento.origem || "manual"}</td>
+                  <td>{origemExibida(lancamento)}</td>
                   <td>
                     <div className="lc-actions">
                       <button
