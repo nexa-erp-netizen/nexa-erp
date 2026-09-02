@@ -42,11 +42,17 @@ export default function ConciliacaoBancaria({ setPage }) {
   const [processando, setProcessando] = useState(false)
   const [competencia, setCompetencia] = useState(new Date().toISOString().slice(0, 7))
   const [fechamentos, setFechamentos] = useState([])
+  const [formasPagamento, setFormasPagamento] = useState([])
+  const [diagnosticoSaldo, setDiagnosticoSaldo] = useState(null)
+  const [selecionadosInvestigacao, setSelecionadosInvestigacao] = useState([])
+  const [planoInvestigacaoId, setPlanoInvestigacaoId] = useState("")
+  const [formaInvestigacao, setFormaInvestigacao] = useState("")
   const periodoAutomaticoAplicadoRef = useRef("")
 
   useEffect(() => {
     api.get("/clientes").then(r => setClientes(r.data || [])).catch(() => setClientes([]))
     api.get("/plano-contas").then(r => setPlanoContas(r.data || [])).catch(() => setPlanoContas([]))
+    api.get("/formas-pagamento").then(r => setFormasPagamento(r.data || [])).catch(() => setFormasPagamento([]))
   }, [])
 
   useEffect(() => {
@@ -66,12 +72,30 @@ export default function ConciliacaoBancaria({ setPage }) {
       setImportacoes([])
       setFechamentos([])
       setMovimentosCliente([])
+      setDiagnosticoSaldo(null)
     }
   }, [contaExtratoId, competencia])
 
   useEffect(() => {
     periodoAutomaticoAplicadoRef.current = ""
   }, [contaExtratoId])
+
+  useEffect(() => {
+    setSelecionadosInvestigacao([])
+    if (!investigacao) return
+
+    const planoBanco = planoContas.find(plano => {
+      const nome = `${plano?.nome || ""} ${plano?.descricao || ""} ${plano?.conta || ""}`
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+      return nome.includes("banco")
+    })
+    if (planoBanco) setPlanoInvestigacaoId(String(planoBanco.id))
+
+    const formaPix = formasPagamento.find(forma =>
+      String(forma?.nome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === "pix"
+    )
+    if (formaPix) setFormaInvestigacao(formaPix.nome)
+  }, [investigacao, planoContas, formasPagamento])
 
   async function carregar() {
     try {
@@ -139,7 +163,7 @@ export default function ConciliacaoBancaria({ setPage }) {
       const [ano, mes] = competencia.split("-").map(Number)
       const fim = `${competencia}-${String(new Date(ano, mes, 0).getDate()).padStart(2, "0")}`
 
-      const [m, i, f, mc] = await Promise.all([
+      const [m, i, f, mc, ds] = await Promise.all([
         api.get("/extratos-bancarios/movimentos", {
           params: {
             contaBancariaId: contaExtratoId,
@@ -157,6 +181,9 @@ export default function ConciliacaoBancaria({ setPage }) {
         api.get("/movimentos-cliente", {
           params: { clienteId, _t: semCache },
         }),
+        api.get("/extratos-bancarios/diagnostico-saldo", {
+          params: { contaBancariaId: contaExtratoId, competencia, _t: semCache },
+        }).catch(() => ({ data: null })),
       ])
 
       const lista = m.data || []
@@ -165,6 +192,7 @@ export default function ConciliacaoBancaria({ setPage }) {
       setImportacoes(listaImportacoes)
       setFechamentos(f.data || [])
       setMovimentosCliente(Array.isArray(mc.data) ? mc.data : [])
+      setDiagnosticoSaldo(ds?.data || null)
       setClassificacoes(Object.fromEntries(lista.map(item => [item.id, item.planoContaId || ""])))
       setSelecionados(atual => atual.filter(id => lista.some(item => item.id === id)))
 
@@ -409,6 +437,38 @@ export default function ConciliacaoBancaria({ setPage }) {
     [movimentos]
   )
 
+  const contaExtrato = useMemo(
+    () => contas.find(item => String(item.id) === String(contaExtratoId)) || null,
+    [contas, contaExtratoId]
+  )
+
+  const importacaoCompetenciaAtual = useMemo(
+    () => importacoes.find(item =>
+      String(item?.dataFim || item?.dataInicio || "").slice(0, 7) === competencia &&
+      item?.saldoInformado !== null &&
+      item?.saldoInformado !== undefined
+    ) || null,
+    [importacoes, competencia]
+  )
+
+  const saldoInicialBancoMes = diagnosticoSaldo?.saldoAnterior !== null &&
+    diagnosticoSaldo?.saldoAnterior !== undefined
+    ? Number(diagnosticoSaldo.saldoAnterior)
+    : null
+
+  const variacaoBancoMes = resumoMovimentos.entradas - resumoMovimentos.saidas
+  const saldoFinalBancoCalculado = saldoInicialBancoMes === null
+    ? null
+    : saldoInicialBancoMes + variacaoBancoMes
+  const saldoFinalBancoInformado = importacaoCompetenciaAtual
+    ? Number(importacaoCompetenciaAtual.saldoInformado)
+    : null
+  const resultadoClienteBancos = resumoClienteBancos.receitas - resumoClienteBancos.despesas
+  const diferencaVariacaoBancoCliente = variacaoBancoMes - resultadoClienteBancos
+  const diferencaSaldoOfx = saldoFinalBancoCalculado !== null && saldoFinalBancoInformado !== null
+    ? saldoFinalBancoInformado - saldoFinalBancoCalculado
+    : null
+
   const diferencaEntradas = resumoBancoComparavel.entradas - resumoClienteBancos.receitas
   const diferencaSaidas = resumoBancoComparavel.saidas - resumoClienteBancos.despesas
   const TOLERANCIA_FECHAMENTO = 0.10
@@ -440,6 +500,28 @@ export default function ConciliacaoBancaria({ setPage }) {
   const clienteAindaSemCorrespondencia = useMemo(
     () => movimentosClienteBancariosCompetencia.filter(item => !idsClienteConciliados.has(Number(item.id))),
     [movimentosClienteBancariosCompetencia, idsClienteConciliados]
+  )
+
+  const itensBancoInvestigacao = useMemo(
+    () => investigacao
+      ? bancoAindaSemCorrespondencia.filter(item => item.natureza === investigacao)
+      : [],
+    [bancoAindaSemCorrespondencia, investigacao]
+  )
+
+  const totalBancoInvestigacao = useMemo(
+    () => itensBancoInvestigacao.reduce((total, item) => total + Number(item.valor || 0), 0),
+    [itensBancoInvestigacao]
+  )
+
+  const itensSelecionadosInvestigacao = useMemo(
+    () => itensBancoInvestigacao.filter(item => selecionadosInvestigacao.includes(item.id)),
+    [itensBancoInvestigacao, selecionadosInvestigacao]
+  )
+
+  const totalSelecionadoInvestigacao = useMemo(
+    () => itensSelecionadosInvestigacao.reduce((total, item) => total + Number(item.valor || 0), 0),
+    [itensSelecionadosInvestigacao]
   )
 
   const diasComDiferenca = useMemo(() => {
@@ -583,6 +665,115 @@ export default function ConciliacaoBancaria({ setPage }) {
 
   function selecionarVisiveis() {
     setSelecionados(movimentosVisiveis.filter(m => !m.lancamentoContabilId).map(m => m.id))
+  }
+
+  function alternarSelecaoInvestigacao(id) {
+    setSelecionadosInvestigacao(atual =>
+      atual.includes(id) ? atual.filter(item => item !== id) : [...atual, id]
+    )
+  }
+
+  function selecionarTodosInvestigacao() {
+    const ids = itensBancoInvestigacao.map(item => item.id)
+    const todosSelecionados = ids.length > 0 && ids.every(id => selecionadosInvestigacao.includes(id))
+    setSelecionadosInvestigacao(todosSelecionados ? [] : ids)
+  }
+
+  async function lancarSelecionadosInvestigacao() {
+    if (!itensSelecionadosInvestigacao.length) {
+      return alert("Selecione pelo menos um movimento do extrato.")
+    }
+
+    const diferencaAtual = investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas
+    if (diferencaAtual <= TOLERANCIA_FECHAMENTO) {
+      return alert("Não há diferença positiva para lançar nesta investigação.")
+    }
+
+    if (totalSelecionadoInvestigacao - diferencaAtual > TOLERANCIA_FECHAMENTO) {
+      return alert(
+        `O total selecionado (${moeda(totalSelecionadoInvestigacao)}) é maior que a diferença do mês (${moeda(diferencaAtual)}).\n\n` +
+        "Revise a seleção para não criar lançamentos a mais."
+      )
+    }
+
+    if (!planoInvestigacaoId) {
+      return alert("Selecione o Plano de contas para os lançamentos.")
+    }
+
+    if (!formaInvestigacao) {
+      return alert("Selecione a Forma de pagamento.")
+    }
+
+    const plano = planoContas.find(item => String(item.id) === String(planoInvestigacaoId))
+    const planoContaNome = plano?.nome || plano?.descricao || plano?.conta || ""
+    if (!planoContaNome) return alert("Plano de contas inválido.")
+
+    const planoNormalizado = planoContaNome
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    if (!planoNormalizado.includes("banco")) {
+      return alert('Para a conciliação, selecione o plano "Bancos". Lançamentos em Caixa não entram na conferência bancária.')
+    }
+
+    const tipo = investigacao === "Entrada" ? "Receita" : "Despesa"
+    const movimentosParaCriar = itensSelecionadosInvestigacao.map(item => ({
+      cliente: cliente?.nome || undefined,
+      tipo,
+      data: dataIso(item.data),
+      planoContaId: Number(planoInvestigacaoId),
+      planoContaNome,
+      forma: formaInvestigacao,
+      formaPagamento: formaInvestigacao,
+      descricao: item.descricao || (tipo === "Receita" ? "Recebimento bancário" : "Pagamento bancário"),
+      valor: Number(item.valor || 0),
+      comprovante: "",
+      status: "Pendente",
+    }))
+
+    const complemento = totalSelecionadoInvestigacao < diferencaAtual - TOLERANCIA_FECHAMENTO
+      ? `\n\nApós este lote ainda restará aproximadamente ${moeda(diferencaAtual - totalSelecionadoInvestigacao)} para revisar.`
+      : ""
+
+    if (!confirm(
+      `Criar ${movimentosParaCriar.length} lançamento(s) individual(is) em Movimentos Clientes?\n\n` +
+      `Tipo: ${tipo}\nPlano: ${planoContaNome}\nForma: ${formaInvestigacao}\n` +
+      `Total selecionado: ${moeda(totalSelecionadoInvestigacao)}\n\n` +
+      "A Nexa manterá a data, descrição e valor de cada linha do extrato." +
+      complemento
+    )) return
+
+    const chaveIdempotencia = [
+      "conciliacao",
+      contaExtratoId,
+      competencia,
+      tipo,
+      ...itensSelecionadosInvestigacao.map(item => item.id).sort((a, b) => Number(a) - Number(b)),
+    ].join(":")
+
+    setProcessando(true)
+    try {
+      const resposta = await api.post("/movimentos-cliente/massa", {
+        movimentos: movimentosParaCriar,
+        chaveIdempotencia,
+      })
+
+      await api.post("/extratos-bancarios/movimentos/conciliar-automatico", {
+        contaBancariaId: contaExtratoId,
+        competencia,
+      })
+
+      setSelecionadosInvestigacao([])
+      await carregarExtratos()
+
+      alert(
+        resposta.data?.duplicadoEvitado
+          ? "Este mesmo lote já havia sido recebido. Nenhum lançamento foi duplicado."
+          : `${movimentosParaCriar.length} lançamento(s) criado(s) e a conferência foi atualizada.`
+      )
+    } catch (e) {
+      alert(e.response?.data?.message || "Erro ao lançar os movimentos selecionados.")
+    } finally {
+      setProcessando(false)
+    }
   }
 
   async function conciliarAutomaticamente() {
@@ -875,7 +1066,7 @@ export default function ConciliacaoBancaria({ setPage }) {
 
             <div style={s.simpleStatus}>
               <div>
-                <strong>{totaisBatem ? "✅ Conciliação do mês conferida" : "Conciliação do mês"}</strong>
+                <strong style={{ display: "block", marginBottom: 4 }}>{totaisBatem ? "✅ Conciliação do mês conferida" : "Conciliação do mês"}</strong>
                 <span>
                   {totaisBatem
                     ? "Entradas e Saídas estão conferidas. Não é necessário conciliar linha por linha."
@@ -891,6 +1082,71 @@ export default function ConciliacaoBancaria({ setPage }) {
                   {processando ? "Atualizando..." : "Atualizar conferência"}
                 </button>
               )}
+            </div>
+
+            <div style={s.balanceBox}>
+              <div style={s.balanceHeader}>
+                <div>
+                  <strong style={{ display: "block", marginBottom: 4 }}>Saldo bancário do mês</strong>
+                  <span>O saldo da conta é separado do resultado dos Movimentos Clientes.</span>
+                </div>
+                <span style={s.balanceTag}>{contaExtrato?.bancoNome || "Conta bancária"}</span>
+              </div>
+
+              <div style={s.balanceGrid}>
+                <div style={s.balanceCard}>
+                  <span>Saldo inicial do banco</span>
+                  <strong>{saldoInicialBancoMes === null ? "Não calculado" : moeda(saldoInicialBancoMes)}</strong>
+                  <small>
+                    {diagnosticoSaldo?.dataSaldoInicial
+                      ? `Base cadastrada em ${dataBr(diagnosticoSaldo.dataSaldoInicial)}`
+                      : "Cadastre saldo inicial e data-base da conta para formar o saldo corretamente."}
+                  </small>
+                </div>
+
+                <div style={s.balanceCard}>
+                  <span>Movimentação do extrato</span>
+                  <strong style={{ color: variacaoBancoMes >= 0 ? "#42f5a7" : "#ff9ba4" }}>
+                    {variacaoBancoMes >= 0 ? "+ " : "- "}{moeda(Math.abs(variacaoBancoMes))}
+                  </strong>
+                  <small>{moeda(resumoMovimentos.entradas)} entradas • {moeda(resumoMovimentos.saidas)} saídas</small>
+                </div>
+
+                <div style={s.balanceCard}>
+                  <span>Saldo final calculado</span>
+                  <strong>{saldoFinalBancoCalculado === null ? "Não calculado" : moeda(saldoFinalBancoCalculado)}</strong>
+                  <small>Saldo inicial + movimentação integral do extrato.</small>
+                </div>
+
+                <div style={s.balanceCard}>
+                  <span>Saldo final informado pelo banco</span>
+                  <strong>{saldoFinalBancoInformado === null ? "Não disponível no arquivo" : moeda(saldoFinalBancoInformado)}</strong>
+                  <small>
+                    {saldoFinalBancoInformado === null
+                      ? "CSV normalmente não informa saldo final; OFX pode informar."
+                      : diferencaSaldoOfx !== null && Math.abs(diferencaSaldoOfx) > TOLERANCIA_FECHAMENTO
+                        ? `Diferença para o saldo calculado: ${moeda(diferencaSaldoOfx)}`
+                        : "Saldo informado pelo OFX compatível com o cálculo."}
+                  </small>
+                </div>
+              </div>
+
+              <div style={s.clientBalanceLine}>
+                <div style={s.balanceCard}>
+                  <span>Movimentos Clientes — somente Bancos</span>
+                  <strong style={{ color: resultadoClienteBancos >= 0 ? "#42f5a7" : "#ff9ba4" }}>
+                    {resultadoClienteBancos >= 0 ? "+ " : "- "}{moeda(Math.abs(resultadoClienteBancos))}
+                  </strong>
+                  <small>{moeda(resumoClienteBancos.receitas)} receitas • {moeda(resumoClienteBancos.despesas)} despesas</small>
+                </div>
+                <div style={s.balanceCard}>
+                  <span>Diferença da movimentação bancária</span>
+                  <strong style={{ color: Math.abs(diferencaVariacaoBancoCliente) <= TOLERANCIA_FECHAMENTO ? "#73ffd4" : "#ffbf69" }}>
+                    {moeda(diferencaVariacaoBancoCliente)}
+                  </strong>
+                  <small>Isso explica por que saldo bancário e resultado dos lançamentos podem parecer diferentes. Caixa não entra aqui.</small>
+                </div>
+              </div>
             </div>
 
             <div style={s.reconGrid}>
@@ -951,7 +1207,7 @@ export default function ConciliacaoBancaria({ setPage }) {
               <div style={s.investigationBox}>
                 <div style={s.investigationHeader}>
                   <div>
-                    <strong>Investigar {investigacao === "Entrada" ? "entradas" : "saídas"}</strong>
+                    <strong style={{ display: "block", marginBottom: 4 }}>Investigar {investigacao === "Entrada" ? "entradas" : "saídas"}</strong>
                     <span>
                       {investigacao === "Entrada"
                         ? diferencaEntradas > 0
@@ -968,20 +1224,86 @@ export default function ConciliacaoBancaria({ setPage }) {
                 {(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas) > 0 ? (
                   <>
                     <div style={s.investigationTip}>
-                      Abaixo estão movimentos do extrato ainda sem correspondência automática. Se forem Receita/Despesa real, confira o lançamento em Movimentos Clientes. Se não fizerem parte da conciliação, use <b>Justificar</b>.
+                      Abaixo estão movimentos do extrato ainda sem correspondência automática. Se forem Receita/Despesa real, você pode selecionar e criar os lançamentos em lote. Cada linha será salva separadamente, mantendo data, descrição e valor. Se não fizerem parte da conciliação, use <b>Justificar</b>.
                     </div>
+
+                    <div style={s.investigationSummary}>
+                      <div>
+                        <strong>{itensBancoInvestigacao.length} linha(s) sem correspondência</strong>
+                        <span>Total das linhas: {moeda(totalBancoInvestigacao)} • Diferença do mês: {moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}</span>
+                      </div>
+                      <button style={s.secondary} disabled={processando || !itensBancoInvestigacao.length} onClick={selecionarTodosInvestigacao}>
+                        {itensBancoInvestigacao.length > 0 && itensBancoInvestigacao.every(item => selecionadosInvestigacao.includes(item.id))
+                          ? "Desmarcar todos"
+                          : "Selecionar todos"}
+                      </button>
+                    </div>
+
+                    {selecionadosInvestigacao.length > 0 && (
+                      <div style={s.batchLaunchBox}>
+                        <div style={s.batchLaunchHeader}>
+                          <strong>Selecionados: {itensSelecionadosInvestigacao.length} • {moeda(totalSelecionadoInvestigacao)}</strong>
+                          <span>
+                            {(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas) - totalSelecionadoInvestigacao >= -TOLERANCIA_FECHAMENTO
+                              ? `Restará ${moeda(Math.max(0, (investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas) - totalSelecionadoInvestigacao))}`
+                              : "Seleção maior que a diferença"}
+                          </span>
+                        </div>
+                        <div style={s.batchLaunchControls}>
+                          <label style={s.label}>Plano de contas
+                            <select style={s.input} value={planoInvestigacaoId} onChange={e => setPlanoInvestigacaoId(e.target.value)}>
+                              <option value="">Selecione</option>
+                              {planoContas.map(plano => (
+                                <option key={plano.id} value={plano.id}>{plano.nome || plano.descricao || plano.conta}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label style={s.label}>Forma de pagamento
+                            <select style={s.input} value={formaInvestigacao} onChange={e => setFormaInvestigacao(e.target.value)}>
+                              <option value="">Selecione</option>
+                              {formasPagamento.filter(forma => forma.ativo !== false).map(forma => (
+                                <option key={forma.id} value={forma.nome}>{forma.nome}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <button
+                            style={{
+                              ...s.primary,
+                              ...(
+                                processando ||
+                                totalSelecionadoInvestigacao - (investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas) > TOLERANCIA_FECHAMENTO
+                                  ? s.disabled
+                                  : {}
+                              ),
+                            }}
+                            disabled={
+                              processando ||
+                              totalSelecionadoInvestigacao - (investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas) > TOLERANCIA_FECHAMENTO
+                            }
+                            onClick={lancarSelecionadosInvestigacao}
+                          >
+                            {processando ? "Lançando..." : "Lançar selecionados"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div style={s.investigationList}>
-                      {bancoAindaSemCorrespondencia
-                        .filter(item => item.natureza === investigacao)
-                        .slice(0, 30)
-                        .map(item => (
-                          <div key={item.id} style={s.investigationItem}>
-                            <span><b>{dataBr(item.data)}</b> • {item.descricao || "Sem descrição"}</span>
-                            <strong style={{ color: investigacao === "Entrada" ? "#42f5a7" : "#ff9ba4" }}>{moeda(item.valor)}</strong>
-                            <button style={s.justifyButton} disabled={processando} onClick={() => classificarUm(item, "Ignorado")}>Justificar</button>
-                          </div>
-                        ))}
-                      {bancoAindaSemCorrespondencia.filter(item => item.natureza === investigacao).length === 0 && (
+                      {itensBancoInvestigacao.map(item => (
+                        <div key={item.id} style={s.investigationItemSelectable}>
+                          <input
+                            type="checkbox"
+                            checked={selecionadosInvestigacao.includes(item.id)}
+                            disabled={processando}
+                            onChange={() => alternarSelecaoInvestigacao(item.id)}
+                            aria-label={`Selecionar movimento ${item.id}`}
+                          />
+                          <span><b>{dataBr(item.data)}</b> • {item.descricao || "Sem descrição"}</span>
+                          <strong style={{ color: investigacao === "Entrada" ? "#42f5a7" : "#ff9ba4" }}>{moeda(item.valor)}</strong>
+                          <button style={s.justifyButton} disabled={processando} onClick={() => classificarUm(item, "Ignorado")}>Justificar</button>
+                        </div>
+                      ))}
+                      {itensBancoInvestigacao.length === 0 && (
                         <div style={s.empty}>Não há linhas bancárias pendentes dessa natureza. Atualize a conferência ou revise os lançamentos do cliente.</div>
                       )}
                     </div>
@@ -1236,6 +1558,17 @@ const s = {
   investigationItem: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", alignItems: "center", gap: 12, padding: 10, borderRadius: 10, background: "#071f43", border: "1px solid rgba(255,255,255,.06)", color: "#d8e7f5" },
   justifyButton: { border: "1px solid #ffc658", borderRadius: 8, padding: "7px 10px", background: "#60470d", color: "#fff2bd", fontWeight: 800, cursor: "pointer" },
   reviewTag: { display: "inline-block", padding: "5px 8px", borderRadius: 999, background: "#234b72", color: "#bfe3ff", fontSize: 10, fontWeight: 800, whiteSpace: "nowrap" },
+  balanceBox: { padding: 16, marginBottom: 14, borderRadius: 14, background: "#081f43", border: "1px solid #2c6195" },
+  balanceHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 12, color: "#e8f4ff" },
+  balanceTag: { padding: "5px 9px", borderRadius: 999, background: "#154d70", color: "#bfeaff", fontSize: 11, fontWeight: 900 },
+  balanceGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10 },
+  balanceCard: { display: "grid", gap: 5, padding: 12, borderRadius: 11, background: "#061a38", border: "1px solid rgba(255,255,255,.07)", color: "#c9ddf2" },
+  clientBalanceLine: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 10, marginTop: 10 },
+  investigationSummary: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", padding: 11, marginBottom: 10, borderRadius: 10, background: "#0b315a", color: "#d9ecff" },
+  batchLaunchBox: { padding: 12, marginBottom: 10, borderRadius: 11, background: "#0b3a49", border: "1px solid #268c82" },
+  batchLaunchHeader: { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 10, color: "#cffff2" },
+  batchLaunchControls: { display: "grid", gridTemplateColumns: "minmax(180px,1fr) minmax(180px,1fr) auto", gap: 10, alignItems: "end" },
+  investigationItemSelectable: { display: "grid", gridTemplateColumns: "auto minmax(0,1fr) auto auto", alignItems: "center", gap: 12, padding: 10, borderRadius: 10, background: "#071f43", border: "1px solid rgba(255,255,255,.06)", color: "#d8e7f5" },
   closeReady: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap", padding: 16, marginBottom: 16, borderRadius: 13, background: "#0b4a3e", border: "1px solid #29c98d" },
   auditBox: { marginTop: 16, padding: 12, borderRadius: 12, background: "#071f43", border: "1px solid #1b4774" },
   auditSummary: { cursor: "pointer", color: "#9ebbd8", fontWeight: 800, fontSize: 12 },
