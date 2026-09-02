@@ -386,7 +386,7 @@ export default function ConciliacaoBancaria({ setPage }) {
       }
 
       const descricao = String(movimento.descricao || "").toLowerCase()
-      const pareceCartao = /cart[aã]o|stone|cielo|rede|pagseguro|mercado pago|sumup|getnet|maquininha/.test(descricao)
+      const pareceCartao = /cart[aã]o|stone|cielo|rede|pagseguro|pagbank|mercado pago|sumup|getnet|infinitepay|infinite pay|\bton\b|maquininha/.test(descricao)
 
       resultado[movimento.id] = {
         status: "FALTANDO",
@@ -451,18 +451,28 @@ export default function ConciliacaoBancaria({ setPage }) {
     [importacoes, competencia]
   )
 
-  const saldoInicialBancoMes = diagnosticoSaldo?.saldoAnterior !== null &&
-    diagnosticoSaldo?.saldoAnterior !== undefined
-    ? Number(diagnosticoSaldo.saldoAnterior)
-    : null
-
   const variacaoBancoMes = resumoMovimentos.entradas - resumoMovimentos.saidas
-  const saldoFinalBancoCalculado = saldoInicialBancoMes === null
-    ? null
-    : saldoInicialBancoMes + variacaoBancoMes
   const saldoFinalBancoInformado = importacaoCompetenciaAtual
     ? Number(importacaoCompetenciaAtual.saldoInformado)
     : null
+  const saldoInicialBancoCadastrado = diagnosticoSaldo?.saldoAnterior !== null &&
+    diagnosticoSaldo?.saldoAnterior !== undefined
+    ? Number(diagnosticoSaldo.saldoAnterior)
+    : null
+  // Quando o OFX informa o saldo final do mês, ele é a referência mais forte
+  // para reconstruir o saldo de abertura. Isso evita tratar uma base cadastrada
+  // no meio do mês como se fosse o saldo de 01/MM.
+  const saldoInicialBancoDerivadoOfx = saldoFinalBancoInformado !== null &&
+    Number.isFinite(saldoFinalBancoInformado)
+    ? saldoFinalBancoInformado - variacaoBancoMes
+    : null
+  const saldoInicialBancoMes = saldoInicialBancoDerivadoOfx !== null
+    ? saldoInicialBancoDerivadoOfx
+    : saldoInicialBancoCadastrado
+  const saldoInicialBancoOrigem = saldoInicialBancoDerivadoOfx !== null ? "OFX" : "Cadastro"
+  const saldoFinalBancoCalculado = saldoInicialBancoMes === null
+    ? null
+    : saldoInicialBancoMes + variacaoBancoMes
   const resultadoClienteBancos = resumoClienteBancos.receitas - resumoClienteBancos.despesas
   const diferencaVariacaoBancoCliente = variacaoBancoMes - resultadoClienteBancos
   const diferencaSaldoOfx = saldoFinalBancoCalculado !== null && saldoFinalBancoInformado !== null
@@ -513,6 +523,20 @@ export default function ConciliacaoBancaria({ setPage }) {
     () => itensBancoInvestigacao.reduce((total, item) => total + Number(item.valor || 0), 0),
     [itensBancoInvestigacao]
   )
+
+  const itensBancoInvestigacaoSelecaoSegura = useMemo(
+    () => itensBancoInvestigacao.filter(item => {
+      const analise = analiseConciliacao[item.id] || {}
+      return analise.status === "FALTANDO" && analise.titulo === "Sem lançamento correspondente"
+    }),
+    [itensBancoInvestigacao, analiseConciliacao]
+  )
+
+  const totalBancoInvestigacaoSelecaoSegura = useMemo(
+    () => itensBancoInvestigacaoSelecaoSegura.reduce((total, item) => total + Number(item.valor || 0), 0),
+    [itensBancoInvestigacaoSelecaoSegura]
+  )
+
 
   const itensSelecionadosInvestigacao = useMemo(
     () => itensBancoInvestigacao.filter(item => selecionadosInvestigacao.includes(item.id)),
@@ -679,6 +703,101 @@ export default function ConciliacaoBancaria({ setPage }) {
     setSelecionadosInvestigacao(todosSelecionados ? [] : ids)
   }
 
+  function selecionarSomenteDiferencaInvestigacao() {
+    const diferencaAtual = investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas
+    const alvoCentavos = Math.round(Number(diferencaAtual || 0) * 100)
+
+    if (alvoCentavos <= Math.round(TOLERANCIA_FECHAMENTO * 100)) {
+      return alert("Não há diferença positiva para selecionar.")
+    }
+
+    const candidatos = itensBancoInvestigacaoSelecaoSegura
+      .map(item => ({
+        id: item.id,
+        centavos: Math.round(Number(item.valor || 0) * 100),
+      }))
+      .filter(item => item.centavos > 0 && item.centavos <= alvoCentavos)
+
+    if (!candidatos.length) {
+      return alert("Não há linhas classificadas como faltantes seguros para esta diferença. Revise as possíveis correspondências manualmente.")
+    }
+
+    // Soma de subconjunto em centavos. A Nexa procura primeiro uma combinação
+    // exata e, se ela não existir, usa a melhor aproximação sem ultrapassar
+    // a diferença. O limite de estados evita travar o navegador em extratos
+    // excepcionalmente grandes.
+    const estados = new Map([[0, null]])
+    const LIMITE_ESTADOS = 250000
+    let encontrouExato = false
+    let interrompidoPorLimite = false
+
+    busca:
+    for (const candidato of candidatos) {
+      const somasExistentes = Array.from(estados.keys())
+
+      for (const soma of somasExistentes) {
+        const novaSoma = soma + candidato.centavos
+        if (novaSoma > alvoCentavos || estados.has(novaSoma)) continue
+
+        estados.set(novaSoma, {
+          anterior: soma,
+          id: candidato.id,
+        })
+
+        if (novaSoma === alvoCentavos) {
+          encontrouExato = true
+          break busca
+        }
+      }
+
+      if (estados.size > LIMITE_ESTADOS) {
+        interrompidoPorLimite = true
+        break
+      }
+    }
+
+    let melhorSoma = encontrouExato ? alvoCentavos : 0
+    if (!encontrouExato) {
+      for (const soma of estados.keys()) {
+        if (soma <= alvoCentavos && soma > melhorSoma) melhorSoma = soma
+      }
+    }
+
+    if (melhorSoma <= 0) {
+      return alert("A Nexa não encontrou uma combinação segura para esta diferença.")
+    }
+
+    const ids = []
+    let cursor = melhorSoma
+
+    while (cursor > 0) {
+      const passo = estados.get(cursor)
+      if (!passo) break
+      ids.push(passo.id)
+      cursor = passo.anterior
+    }
+
+    setSelecionadosInvestigacao(ids)
+
+    const totalEncontrado = melhorSoma / 100
+    const restante = Math.max(0, diferencaAtual - totalEncontrado)
+
+    if (Math.abs(totalEncontrado - diferencaAtual) <= TOLERANCIA_FECHAMENTO) {
+      alert(
+        `Seleção inteligente concluída.\n\n` +
+        `${ids.length} linha(s) somam exatamente ${moeda(totalEncontrado)}.\n\n` +
+        "A seleção automática ignorou possíveis correspondências e agrupamentos/taxas. Revise as linhas antes de clicar em Lançar selecionados."
+      )
+      return
+    }
+
+    alert(
+      `Não foi encontrada uma combinação exata${interrompidoPorLimite ? " dentro do limite de cálculo" : ""}.\n\n` +
+      `A Nexa selecionou ${ids.length} linha(s), totalizando ${moeda(totalEncontrado)}, sem ultrapassar a diferença.\n` +
+      `Ainda restará ${moeda(restante)} para revisão manual.`
+    )
+  }
+
   async function lancarSelecionadosInvestigacao() {
     if (!itensSelecionadosInvestigacao.length) {
       return alert("Selecione pelo menos um movimento do extrato.")
@@ -695,6 +814,15 @@ export default function ConciliacaoBancaria({ setPage }) {
         "Revise a seleção para não criar lançamentos a mais."
       )
     }
+
+    const itensComRisco = itensSelecionadosInvestigacao.filter(item => {
+      const analise = analiseConciliacao[item.id] || {}
+      return analise.status !== "FALTANDO" || analise.titulo !== "Sem lançamento correspondente"
+    })
+    if (itensComRisco.length > 0 && !confirm(
+      `${itensComRisco.length} linha(s) selecionada(s) têm possível correspondência, agrupamento ou outra condição de revisão.\n\n` +
+      "Elas podem já existir em Movimentos Clientes. Deseja continuar mesmo assim?"
+    )) return
 
     if (!planoInvestigacaoId) {
       return alert("Selecione o Plano de contas para os lançamentos.")
@@ -1098,9 +1226,11 @@ export default function ConciliacaoBancaria({ setPage }) {
                   <span>Saldo inicial do banco</span>
                   <strong>{saldoInicialBancoMes === null ? "Não calculado" : moeda(saldoInicialBancoMes)}</strong>
                   <small>
-                    {diagnosticoSaldo?.dataSaldoInicial
-                      ? `Base cadastrada em ${dataBr(diagnosticoSaldo.dataSaldoInicial)}`
-                      : "Cadastre saldo inicial e data-base da conta para formar o saldo corretamente."}
+                    {saldoInicialBancoOrigem === "OFX"
+                      ? `Calculado pelo saldo final do OFX menos a movimentação do mês.${diagnosticoSaldo?.dataSaldoInicial ? ` Base manual de ${moeda(saldoInicialBancoCadastrado)} em ${dataBr(diagnosticoSaldo.dataSaldoInicial)} preservada apenas como referência.` : ""}`
+                      : diagnosticoSaldo?.dataSaldoInicial
+                        ? `Base cadastrada em ${dataBr(diagnosticoSaldo.dataSaldoInicial)}`
+                        : "Cadastre saldo inicial e data-base da conta para formar o saldo corretamente."}
                   </small>
                 </div>
 
@@ -1224,19 +1354,32 @@ export default function ConciliacaoBancaria({ setPage }) {
                 {(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas) > 0 ? (
                   <>
                     <div style={s.investigationTip}>
-                      Abaixo estão movimentos do extrato ainda sem correspondência automática. Se forem Receita/Despesa real, você pode selecionar e criar os lançamentos em lote. Cada linha será salva separadamente, mantendo data, descrição e valor. Se não fizerem parte da conciliação, use <b>Justificar</b>.
+                      Abaixo estão movimentos do extrato ainda sem correspondência automática. Use <b>Selecionar só o que falta</b>: a Nexa considera automaticamente apenas linhas classificadas como faltantes seguros e ignora possíveis correspondências, agrupamentos e taxas. Revise antes de lançar. Cada linha será salva separadamente, mantendo data, descrição e valor. Se não fizerem parte da conciliação, use <b>Justificar</b>.
                     </div>
 
                     <div style={s.investigationSummary}>
                       <div>
                         <strong>{itensBancoInvestigacao.length} linha(s) sem correspondência</strong>
-                        <span>Total das linhas: {moeda(totalBancoInvestigacao)} • Diferença do mês: {moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}</span>
+                        <span>Total das linhas: {moeda(totalBancoInvestigacao)} • Seleção segura: {itensBancoInvestigacaoSelecaoSegura.length} linha(s) / {moeda(totalBancoInvestigacaoSelecaoSegura)} • Diferença do mês: {moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}</span>
                       </div>
-                      <button style={s.secondary} disabled={processando || !itensBancoInvestigacao.length} onClick={selecionarTodosInvestigacao}>
-                        {itensBancoInvestigacao.length > 0 && itensBancoInvestigacao.every(item => selecionadosInvestigacao.includes(item.id))
-                          ? "Desmarcar todos"
-                          : "Selecionar todos"}
-                      </button>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <button
+                          style={s.primary}
+                          disabled={
+                            processando ||
+                            !itensBancoInvestigacao.length ||
+                            (investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas) <= TOLERANCIA_FECHAMENTO
+                          }
+                          onClick={selecionarSomenteDiferencaInvestigacao}
+                        >
+                          Selecionar só o que falta • {moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}
+                        </button>
+                        <button style={s.secondary} disabled={processando || !itensBancoInvestigacao.length} onClick={selecionarTodosInvestigacao}>
+                          {itensBancoInvestigacao.length > 0 && itensBancoInvestigacao.every(item => selecionadosInvestigacao.includes(item.id))
+                            ? "Desmarcar todos"
+                            : "Selecionar todos"}
+                        </button>
+                      </div>
                     </div>
 
                     {selecionadosInvestigacao.length > 0 && (
