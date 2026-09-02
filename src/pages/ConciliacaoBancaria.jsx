@@ -47,6 +47,7 @@ export default function ConciliacaoBancaria({ setPage }) {
   const [selecionadosInvestigacao, setSelecionadosInvestigacao] = useState([])
   const [planoInvestigacaoId, setPlanoInvestigacaoId] = useState("")
   const [formaInvestigacao, setFormaInvestigacao] = useState("")
+  const [mostrarAnaliseRestante, setMostrarAnaliseRestante] = useState(false)
   const periodoAutomaticoAplicadoRef = useRef("")
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export default function ConciliacaoBancaria({ setPage }) {
 
   useEffect(() => {
     setSelecionadosInvestigacao([])
+    setMostrarAnaliseRestante(false)
     if (!investigacao) return
 
     const planoBanco = planoContas.find(plano => {
@@ -548,6 +550,126 @@ export default function ConciliacaoBancaria({ setPage }) {
     [itensSelecionadosInvestigacao]
   )
 
+  const diferencaInvestigacaoAtual = investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas
+  const restanteInvestigacao = Math.max(0, diferencaInvestigacaoAtual - totalSelecionadoInvestigacao)
+
+  const analiseRestanteInvestigacao = useMemo(() => {
+    if (!investigacao || restanteInvestigacao <= TOLERANCIA_FECHAMENTO) {
+      return {
+        linhasRevisao: [],
+        candidatosTaxa: [],
+        linhasSegurasProximas: [],
+        combinacaoRevisaoExata: [],
+      }
+    }
+
+    const naoSelecionados = itensBancoInvestigacao.filter(
+      item => !selecionadosInvestigacao.includes(item.id)
+    )
+
+    const linhasRevisao = naoSelecionados
+      .map(item => ({
+        item,
+        analise: analiseConciliacao[item.id] || {},
+      }))
+      .filter(({ analise }) =>
+        analise.status !== "FALTANDO" ||
+        analise.titulo !== "Sem lançamento correspondente"
+      )
+
+    const naturezaEsperada = investigacao === "Entrada" ? "Receita" : "Despesa"
+    const clientesMesmoTipo = movimentosClienteBancariosCompetencia.filter(
+      item => String(item.tipo || "") === naturezaEsperada
+    )
+
+    const candidatosTaxa = []
+    for (const { item, analise } of linhasRevisao) {
+      if (!["Revisar agrupamento/taxa", "Possível correspondência"].includes(analise.titulo)) continue
+
+      for (const clienteMov of clientesMesmoTipo) {
+        const distancia = diferencaDias(dataIso(item.data), dataIso(clienteMov.data))
+        if (distancia === null || distancia > 3) continue
+
+        const valorBanco = Number(item.valor || 0)
+        const valorCliente = Number(clienteMov.valor || 0)
+        const diferencaValores = Math.abs(valorCliente - valorBanco)
+
+        if (diferencaValores <= 0.01) continue
+        if (diferencaValores > Math.max(5, restanteInvestigacao + 1)) continue
+
+        candidatosTaxa.push({
+          banco: item,
+          cliente: clienteMov,
+          analise,
+          diferencaValores,
+          distanciaRestante: Math.abs(diferencaValores - restanteInvestigacao),
+        })
+      }
+    }
+
+    candidatosTaxa.sort((a, b) =>
+      a.distanciaRestante - b.distanciaRestante
+    )
+
+    const linhasSegurasProximas = naoSelecionados
+      .map(item => ({
+        item,
+        analise: analiseConciliacao[item.id] || {},
+        distanciaValor: Math.abs(Number(item.valor || 0) - restanteInvestigacao),
+      }))
+      .filter(({ analise }) =>
+        analise.status === "FALTANDO" &&
+        analise.titulo === "Sem lançamento correspondente"
+      )
+      .sort((a, b) => a.distanciaValor - b.distanciaValor)
+      .slice(0, 5)
+
+    // Diagnóstico apenas: procura combinação exata entre linhas que ficaram
+    // em revisão. Elas nunca são selecionadas automaticamente.
+    const alvoCentavos = Math.round(restanteInvestigacao * 100)
+    const candidatosRevisao = linhasRevisao
+      .map(({ item }) => ({
+        id: item.id,
+        centavos: Math.round(Number(item.valor || 0) * 100),
+      }))
+      .filter(item => item.centavos > 0 && item.centavos <= alvoCentavos)
+
+    const estados = new Map([[0, null]])
+    for (const candidato of candidatosRevisao) {
+      for (const soma of Array.from(estados.keys())) {
+        const novaSoma = soma + candidato.centavos
+        if (novaSoma > alvoCentavos || estados.has(novaSoma)) continue
+        estados.set(novaSoma, { anterior: soma, id: candidato.id })
+      }
+      if (estados.has(alvoCentavos)) break
+    }
+
+    const combinacaoRevisaoExata = []
+    if (estados.has(alvoCentavos)) {
+      let cursor = alvoCentavos
+      while (cursor > 0) {
+        const passo = estados.get(cursor)
+        if (!passo) break
+        combinacaoRevisaoExata.push(passo.id)
+        cursor = passo.anterior
+      }
+    }
+
+    return {
+      linhasRevisao,
+      candidatosTaxa: candidatosTaxa.slice(0, 5),
+      linhasSegurasProximas,
+      combinacaoRevisaoExata,
+    }
+  }, [
+    investigacao,
+    restanteInvestigacao,
+    itensBancoInvestigacao,
+    selecionadosInvestigacao,
+    analiseConciliacao,
+    movimentosClienteBancariosCompetencia,
+  ])
+
   const diasComDiferenca = useMemo(() => {
     const mapa = new Map()
 
@@ -692,12 +814,14 @@ export default function ConciliacaoBancaria({ setPage }) {
   }
 
   function alternarSelecaoInvestigacao(id) {
+    setMostrarAnaliseRestante(false)
     setSelecionadosInvestigacao(atual =>
       atual.includes(id) ? atual.filter(item => item !== id) : [...atual, id]
     )
   }
 
   function selecionarTodosInvestigacao() {
+    setMostrarAnaliseRestante(false)
     const ids = itensBancoInvestigacao.map(item => item.id)
     const todosSelecionados = ids.length > 0 && ids.every(id => selecionadosInvestigacao.includes(id))
     setSelecionadosInvestigacao(todosSelecionados ? [] : ids)
@@ -778,6 +902,7 @@ export default function ConciliacaoBancaria({ setPage }) {
     }
 
     setSelecionadosInvestigacao(ids)
+    setMostrarAnaliseRestante(false)
 
     const totalEncontrado = melhorSoma / 100
     const restante = Math.max(0, diferencaAtual - totalEncontrado)
@@ -1360,7 +1485,7 @@ export default function ConciliacaoBancaria({ setPage }) {
                     <div style={s.investigationSummary}>
                       <div>
                         <strong>{itensBancoInvestigacao.length} linha(s) sem correspondência</strong>
-                        <span>Total das linhas: {moeda(totalBancoInvestigacao)} • Seleção segura: {itensBancoInvestigacaoSelecaoSegura.length} linha(s) / {moeda(totalBancoInvestigacaoSelecaoSegura)} • Diferença do mês: {moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}</span>
+                        <span style={{ display: "block", marginTop: 4 }}>Total das linhas: {moeda(totalBancoInvestigacao)} • Seleção segura: {itensBancoInvestigacaoSelecaoSegura.length} linha(s) / {moeda(totalBancoInvestigacaoSelecaoSegura)} • Diferença do mês: {moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}</span>
                       </div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                         <button
@@ -1428,6 +1553,77 @@ export default function ConciliacaoBancaria({ setPage }) {
                             {processando ? "Lançando..." : "Lançar selecionados"}
                           </button>
                         </div>
+                      </div>
+                    )}
+
+                    {selecionadosInvestigacao.length > 0 && restanteInvestigacao > TOLERANCIA_FECHAMENTO && (
+                      <div style={{ marginBottom: 12 }}>
+                        <button
+                          style={s.secondary}
+                          type="button"
+                          onClick={() => setMostrarAnaliseRestante(atual => !atual)}
+                        >
+                          {mostrarAnaliseRestante
+                            ? "Fechar análise do restante"
+                            : `Analisar diferença restante • ${moeda(restanteInvestigacao)}`}
+                        </button>
+                      </div>
+                    )}
+
+                    {mostrarAnaliseRestante && restanteInvestigacao > TOLERANCIA_FECHAMENTO && (
+                      <div style={{ ...s.investigationTip, marginBottom: 12, border: "1px solid rgba(255, 196, 64, .45)" }}>
+                        <strong style={{ display: "block", marginBottom: 6 }}>
+                          Análise da diferença restante • {moeda(restanteInvestigacao)}
+                        </strong>
+
+                        {analiseRestanteInvestigacao.combinacaoRevisaoExata.length > 0 ? (
+                          <div style={{ marginBottom: 8 }}>
+                            A Nexa encontrou uma combinação exata entre <b>{analiseRestanteInvestigacao.combinacaoRevisaoExata.length} linha(s) que estavam em revisão</b>.
+                            Ela não será selecionada automaticamente, porque pode envolver correspondência, agrupamento ou taxa.
+                          </div>
+                        ) : (
+                          <div style={{ marginBottom: 8 }}>
+                            Nenhuma combinação segura explica exatamente esse restante. <b>Não crie um lançamento separado de {moeda(restanteInvestigacao)}</b> sem identificar a origem.
+                            O valor pode estar ligado a taxa, arredondamento, diferença de compensação ou a uma linha que ficou em revisão.
+                          </div>
+                        )}
+
+                        {analiseRestanteInvestigacao.candidatosTaxa.length > 0 && (
+                          <div style={{ marginTop: 10 }}>
+                            <strong style={{ display: "block", marginBottom: 6 }}>Possíveis taxas/diferenças próximas</strong>
+                            {analiseRestanteInvestigacao.candidatosTaxa.map((candidato, indice) => (
+                              <div key={`${candidato.banco.id}-${candidato.cliente.id}-${indice}`} style={{ marginBottom: 5 }}>
+                                {dataBr(candidato.banco.data)} • {candidato.banco.descricao || "Movimento bancário"}:
+                                {" "}banco {moeda(candidato.banco.valor)} × cliente {moeda(candidato.cliente.valor)} →
+                                {" "}diferença {moeda(candidato.diferencaValores)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {analiseRestanteInvestigacao.linhasRevisao.length > 0 && (
+                          <div style={{ marginTop: 10 }}>
+                            <strong style={{ display: "block", marginBottom: 6 }}>
+                              Linhas não selecionadas que exigem revisão: {analiseRestanteInvestigacao.linhasRevisao.length}
+                            </strong>
+                            {analiseRestanteInvestigacao.linhasRevisao.slice(0, 6).map(({ item, analise }) => (
+                              <div key={item.id} style={{ marginBottom: 5 }}>
+                                {dataBr(item.data)} • {item.descricao || "Movimento"} • {moeda(item.valor)} — {analise.titulo || "Revisar"}
+                              </div>
+                            ))}
+                            {analiseRestanteInvestigacao.linhasRevisao.length > 6 && (
+                              <div>+ {analiseRestanteInvestigacao.linhasRevisao.length - 6} linha(s) em revisão abaixo.</div>
+                            )}
+                          </div>
+                        )}
+
+                        {analiseRestanteInvestigacao.candidatosTaxa.length === 0 &&
+                          analiseRestanteInvestigacao.combinacaoRevisaoExata.length === 0 && (
+                            <div style={{ marginTop: 10 }}>
+                              A Nexa não encontrou, entre as linhas em revisão, uma explicação matemática direta para {moeda(restanteInvestigacao)}.
+                              Revise especialmente agrupamentos de cartão/adquirente e diferenças de taxa antes de lançar o lote.
+                            </div>
+                          )}
                       </div>
                     )}
 
