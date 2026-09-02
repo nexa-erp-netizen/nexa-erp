@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import api from "../services/api"
 import {
   FaTrash,
@@ -36,6 +36,18 @@ export default function MovimentosCliente() {
     linhaVazia(),
     linhaVazia(),
   ])
+  const [salvando, setSalvando] = useState(false)
+  const salvandoRef = useRef(false)
+  const envioPendenteRef = useRef({
+    assinatura: "",
+    chave: "",
+  })
+  const [avisoDuplicado, setAvisoDuplicado] = useState(null)
+  const resolverAvisoDuplicadoRef = useRef(null)
+  const [duplicadosAbertos, setDuplicadosAbertos] = useState(false)
+  const [gruposDuplicados, setGruposDuplicados] = useState([])
+  const [carregandoDuplicados, setCarregandoDuplicados] = useState(false)
+  const [removendoDuplicados, setRemovendoDuplicados] = useState(false)
 
   useEffect(() => {
     const clienteVoz = localStorage.getItem("nexaFiltroMovimentosCliente") || ""
@@ -187,13 +199,238 @@ export default function MovimentosCliente() {
     })
   }
 
-  async function salvarLancamentos() {
+  function gerarChaveIdempotencia() {
+    if (
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+    ) {
+      return crypto.randomUUID()
+    }
+
+    return `nexa-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  }
+
+  function assinaturaDoEnvio(movimentosParaSalvar) {
+    return JSON.stringify(
+      movimentosParaSalvar.map((item) => ({
+        cliente: item.cliente || "",
+        tipo: item.tipo || "",
+        data: item.data || "",
+        planoContaId: item.planoContaId || null,
+        planoContaNome: item.planoContaNome || "",
+        forma: item.forma || "",
+        formaPagamento: item.formaPagamento || "",
+        descricao: item.descricao || "",
+        valor: Number(item.valor || 0),
+      }))
+    )
+  }
+
+  function obterChaveIdempotencia(movimentosParaSalvar) {
+    const assinatura = assinaturaDoEnvio(movimentosParaSalvar)
+    const pendente = envioPendenteRef.current
+
+    if (pendente.assinatura === assinatura && pendente.chave) {
+      return pendente.chave
+    }
+
+    const chave = gerarChaveIdempotencia()
+
+    envioPendenteRef.current = {
+      assinatura,
+      chave,
+    }
+
+    return chave
+  }
+
+  function confirmarPossivelDuplicado(duplicado) {
+    return new Promise((resolve) => {
+      resolverAvisoDuplicadoRef.current = resolve
+      setAvisoDuplicado(duplicado)
+    })
+  }
+
+  function responderAvisoDuplicado(continuar) {
+    const resolver = resolverAvisoDuplicadoRef.current
+
+    resolverAvisoDuplicadoRef.current = null
+    setAvisoDuplicado(null)
+
+    if (resolver) resolver(continuar)
+  }
+
+  function normalizarComparacao(valor) {
+    return String(valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase()
+  }
+
+  function mesmaAssinaturaMovimento(a, b) {
+    const clienteA = normalizarComparacao(a?.cliente || clienteSelecionado)
+    const clienteB = normalizarComparacao(b?.cliente || clienteSelecionado)
+
+    const planoAId = String(a?.planoContaId || "")
+    const planoBId = String(b?.planoContaId || "")
+    const planoIgual = planoAId && planoBId
+      ? planoAId === planoBId
+      : normalizarComparacao(a?.planoContaNome) ===
+        normalizarComparacao(b?.planoContaNome)
+
+    return (
+      (!clienteA || !clienteB || clienteA === clienteB) &&
+      String(a?.data || "") === String(b?.data || "") &&
+      String(a?.tipo || "") === String(b?.tipo || "") &&
+      planoIgual &&
+      normalizarComparacao(a?.descricao) ===
+        normalizarComparacao(b?.descricao) &&
+      Math.abs(valorSeguro(a?.valor) - valorSeguro(b?.valor)) < 0.005 &&
+      normalizarComparacao(a?.forma || a?.formaPagamento) ===
+        normalizarComparacao(b?.forma || b?.formaPagamento)
+    )
+  }
+
+  async function verificarPossiveisDuplicados(novosMovimentos) {
+    if (!novosMovimentos.length) return true
+
+    const jaConferidos = []
+
+    for (let indice = 0; indice < novosMovimentos.length; indice += 1) {
+      const novo = novosMovimentos[indice]
+
+      const existenteSalvo = movimentos.find((item) =>
+        mesmaAssinaturaMovimento(novo, item)
+      )
+
+      const existenteNoLote = jaConferidos.find((item) =>
+        mesmaAssinaturaMovimento(novo, item)
+      )
+
+      const existente = existenteSalvo || existenteNoLote
+
+      if (existente) {
+        const continuar = await confirmarPossivelDuplicado({
+          indice,
+          novo,
+          existente,
+          quantidadeExistentes: existenteSalvo ? 1 : 0,
+          repetidoNoMesmoLote: Boolean(existenteNoLote),
+        })
+
+        if (!continuar) return false
+      }
+
+      jaConferidos.push(novo)
+    }
+
+    return true
+  }
+
+  function competenciaParaApi() {
+    if (!competencia || !/^\d{4}-\d{2}$/.test(competencia)) return ""
+
+    const [ano, mes] = competencia.split("-")
+    return `${mes}/${ano}`
+  }
+
+  async function carregarPossiveisDuplicados(abrir = true) {
+    if (abrir) setDuplicadosAbertos(true)
+    setCarregandoDuplicados(true)
+
     try {
-      const linhaComDataInvalida = linhas.findIndex((linha) => linha.data && !dataMovimentoValida(linha.data))
+      const resposta = await api.get("/movimentos-cliente/duplicados", {
+        params: {
+          ...(clienteSelecionado ? { cliente: clienteSelecionado } : {}),
+          ...(competenciaParaApi()
+            ? { competencia: competenciaParaApi() }
+            : {}),
+        },
+      })
+
+      setGruposDuplicados(
+        Array.isArray(resposta.data?.grupos)
+          ? resposta.data.grupos
+          : []
+      )
+    } catch (error) {
+      console.error("ERRO AO LOCALIZAR DUPLICADOS:", error)
+      alert(
+        error?.response?.data?.message ||
+        "Erro ao localizar possíveis duplicados."
+      )
+      if (abrir) setDuplicadosAbertos(false)
+    } finally {
+      setCarregandoDuplicados(false)
+    }
+  }
+
+  async function removerGrupoDuplicado(grupo) {
+    const idsExcluir = Array.isArray(grupo?.excluirSugeridosIds)
+      ? grupo.excluirSugeridosIds
+      : []
+    const manterId = Number(grupo?.manterSugeridoId)
+
+    if (!Number.isInteger(manterId) || idsExcluir.length === 0) return
+
+    const confirmar = window.confirm(
+      `Será mantido 1 lançamento e removido(s) ${idsExcluir.length} ` +
+      `duplicado(s) de "${grupo.descricao || "lançamento"}". Continuar?`
+    )
+
+    if (!confirmar) return
+
+    setRemovendoDuplicados(true)
+
+    try {
+      const resposta = await api.post(
+        "/movimentos-cliente/duplicados/remover",
+        {
+          confirmar: true,
+          manterId,
+          idsExcluir,
+        }
+      )
+
+      await carregarMovimentos(clienteSelecionado)
+      await carregarPossiveisDuplicados(false)
+
+      alert(
+        resposta.data?.message ||
+        "Duplicados removidos com sucesso."
+      )
+    } catch (error) {
+      console.error("ERRO AO REMOVER DUPLICADOS:", error)
+      alert(
+        error?.response?.data?.message ||
+        "Erro ao remover os duplicados confirmados."
+      )
+    } finally {
+      setRemovendoDuplicados(false)
+    }
+  }
+
+  async function salvarLancamentos() {
+    if (salvandoRef.current) return
+
+    salvandoRef.current = true
+    setSalvando(true)
+
+    try {
+      const linhaComDataInvalida = linhas.findIndex(
+        (linha) => linha.data && !dataMovimentoValida(linha.data)
+      )
+
       if (linhaComDataInvalida >= 0) {
-        alert(`A data da linha ${linhaComDataInvalida + 1} é inválida. Confira principalmente o ano.`)
+        alert(
+          `A data da linha ${linhaComDataInvalida + 1} é inválida. ` +
+          "Confira principalmente o ano."
+        )
         return
       }
+
       const linhasValidas = linhas.filter(
         (linha) =>
           linha.data &&
@@ -207,6 +444,7 @@ export default function MovimentosCliente() {
       }
 
       const novosMovimentos = []
+      const edicoes = []
 
       for (const linha of linhasValidas) {
         const dados = {
@@ -224,16 +462,49 @@ export default function MovimentosCliente() {
         }
 
         if (linha.editandoId) {
-          await api.put(`/movimentos-cliente/${linha.editandoId}`, dados)
+          edicoes.push({
+            id: linha.editandoId,
+            dados,
+          })
         } else {
           novosMovimentos.push(dados)
         }
       }
 
+      const podeContinuar = await verificarPossiveisDuplicados(
+        novosMovimentos
+      )
+
+      if (!podeContinuar) return
+
+      for (const edicao of edicoes) {
+        await api.put(
+          `/movimentos-cliente/${edicao.id}`,
+          edicao.dados
+        )
+      }
+
+      let duplicadoEvitado = false
+
       if (novosMovimentos.length > 0) {
-        await api.post("/movimentos-cliente/massa", {
-          movimentos: novosMovimentos,
-        })
+        const chaveIdempotencia =
+          obterChaveIdempotencia(novosMovimentos)
+
+        const resposta = await api.post(
+          "/movimentos-cliente/massa",
+          {
+            movimentos: novosMovimentos,
+            chaveIdempotencia,
+          }
+        )
+
+        duplicadoEvitado =
+          resposta.data?.duplicadoEvitado === true
+      }
+
+      envioPendenteRef.current = {
+        assinatura: "",
+        chave: "",
       }
 
       setLinhas([
@@ -245,10 +516,44 @@ export default function MovimentosCliente() {
       ])
 
       await carregarMovimentos(clienteSelecionado)
-      alert("Lançamentos salvos com sucesso.")
+
+      if (duplicadoEvitado) {
+        alert(
+          "Envio confirmado. A Nexa reconheceu uma repetição técnica " +
+          "e evitou gravar o mesmo lote novamente."
+        )
+      } else {
+        alert("Lançamentos salvos com sucesso.")
+      }
     } catch (erro) {
       console.error("Erro ao salvar lançamentos:", erro)
-      alert("Erro ao salvar lançamentos.")
+
+      const mensagem = erro?.response?.data?.message
+
+      if (erro?.response?.data?.duplicadoEvitado) {
+        alert(
+          mensagem ||
+          "A Nexa bloqueou um reenvio técnico para evitar duplicidade."
+        )
+      } else {
+        const detalheTecnico = erro?.response
+          ? ` (HTTP ${erro.response.status})`
+          : erro?.code === "ECONNABORTED"
+            ? " (tempo limite da API)"
+            : erro?.message === "Network Error"
+              ? " (falha de comunicação com a API)"
+              : ""
+
+        alert(
+          (mensagem ||
+            "Erro ao salvar lançamentos. Você pode tentar novamente; " +
+            "a Nexa reutilizará a identificação do envio para evitar duplicidade.") +
+          detalheTecnico
+        )
+      }
+    } finally {
+      salvandoRef.current = false
+      setSalvando(false)
     }
   }
 
@@ -559,6 +864,155 @@ export default function MovimentosCliente() {
         .mv-btn-save {
           background: linear-gradient(90deg,#17b8ff,#32f06d);
           color: #00112b;
+        }
+
+        .mv-btn:disabled {
+          opacity: .55;
+          cursor: not-allowed;
+        }
+
+        .mv-btn-saving {
+          filter: saturate(.65);
+        }
+
+        .mv-duplicate-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          background: rgba(0, 8, 24, .78);
+          backdrop-filter: blur(4px);
+        }
+
+        .mv-duplicate-modal {
+          width: min(560px, 100%);
+          background: #071f43;
+          border: 1px solid rgba(107,216,255,.35);
+          border-radius: 20px;
+          box-shadow: 0 24px 80px rgba(0,0,0,.45);
+          padding: 22px;
+        }
+
+        .mv-duplicate-title {
+          color: #ffd166;
+          font-size: 21px;
+          font-weight: 900;
+          margin-bottom: 14px;
+        }
+
+        .mv-duplicate-text {
+          color: #d8e7f5;
+          line-height: 1.55;
+          margin-bottom: 12px;
+        }
+
+        .mv-duplicate-highlight {
+          padding: 14px;
+          margin: 14px 0;
+          border-radius: 12px;
+          background: #0b2855;
+          border: 1px solid rgba(255,209,102,.28);
+          color: white;
+          font-weight: 800;
+          line-height: 1.45;
+        }
+
+        .mv-duplicate-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+          margin-top: 18px;
+        }
+
+        .mv-btn-no {
+          background: #263c5d;
+          color: white;
+        }
+
+        .mv-btn-yes {
+          background: linear-gradient(90deg,#17b8ff,#32f06d);
+          color: #00112b;
+        }
+
+        .mv-duplicates-modal {
+          width: min(720px, 100%);
+          max-height: 84vh;
+          overflow-y: auto;
+        }
+
+        .mv-duplicates-list {
+          display: grid;
+          gap: 12px;
+          margin-top: 16px;
+        }
+
+        .mv-duplicate-group {
+          padding: 14px;
+          border-radius: 14px;
+          background: #0b2855;
+          border: 1px solid rgba(255,255,255,.10);
+        }
+
+        .mv-duplicate-group-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 12px;
+        }
+
+        .mv-duplicate-group-title {
+          color: white;
+          font-weight: 900;
+          line-height: 1.4;
+        }
+
+        .mv-duplicate-meta {
+          margin-top: 6px;
+          color: #aec4df;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .mv-duplicate-badge {
+          padding: 5px 9px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 900;
+          white-space: nowrap;
+          background: #6a4e08;
+          color: #ffe69c;
+        }
+
+        .mv-duplicate-badge.high {
+          background: #0b5c49;
+          color: #9effdf;
+        }
+
+        .mv-duplicate-records {
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 1px solid rgba(255,255,255,.08);
+          display: grid;
+          gap: 5px;
+          color: #c9d7e8;
+          font-size: 12px;
+        }
+
+        .mv-btn-remove-duplicates {
+          width: 100%;
+          margin-top: 12px;
+          background: #a2364a;
+          color: white;
+        }
+
+        .mv-duplicates-summary {
+          color: #d8e7f5;
+          line-height: 1.5;
+          margin-top: 6px;
         }
 
         .mv-filter-box {
@@ -912,16 +1366,19 @@ export default function MovimentosCliente() {
               type="button"
               className="mv-btn mv-btn-add"
               onClick={adicionarLinha}
+              disabled={salvando}
             >
               + Adicionar linha
             </button>
 
             <button
               type="button"
-              className="mv-btn mv-btn-save"
+              className={`mv-btn mv-btn-save ${salvando ? "mv-btn-saving" : ""}`}
               onClick={salvarLancamentos}
+              disabled={salvando}
+              aria-busy={salvando}
             >
-              Salvar Lançamentos
+              {salvando ? "Salvando..." : "Salvar Lançamentos"}
             </button>
           </div>
         </div>
@@ -949,6 +1406,7 @@ export default function MovimentosCliente() {
                       min="1900-01-01"
                       max={`${new Date().getFullYear() + 1}-12-31`}
                       value={linha.data}
+                      disabled={salvando}
                       onChange={(e) =>
                         atualizarLinha(index, "data", e.target.value)
                       }
@@ -959,6 +1417,7 @@ export default function MovimentosCliente() {
                     <select
                       className="mv-select"
                       value={linha.tipo}
+                      disabled={salvando}
                       onChange={(e) =>
                         atualizarLinha(index, "tipo", e.target.value)
                       }
@@ -972,6 +1431,7 @@ export default function MovimentosCliente() {
                     <select
                       className="mv-select"
                       value={linha.planoContaId}
+                      disabled={salvando}
                       onChange={(e) =>
                         atualizarLinha(index, "planoContaId", e.target.value)
                       }
@@ -990,6 +1450,7 @@ export default function MovimentosCliente() {
                     <select
                       className="mv-select"
                       value={linha.forma}
+                      disabled={salvando}
                       onChange={(e) =>
                         atualizarLinha(index, "forma", e.target.value)
                       }
@@ -1011,6 +1472,7 @@ export default function MovimentosCliente() {
                       className="mv-input"
                       placeholder="Ex: venda balcão, aluguel, energia..."
                       value={linha.descricao}
+                      disabled={salvando}
                       onChange={(e) =>
                         atualizarLinha(index, "descricao", e.target.value)
                       }
@@ -1022,6 +1484,7 @@ export default function MovimentosCliente() {
                       className="mv-input valor-input"
                       placeholder="0,00"
                       value={linha.valor}
+                      disabled={salvando}
                       onChange={(e) =>
                         atualizarLinha(index, "valor", e.target.value)
                       }
@@ -1056,6 +1519,18 @@ export default function MovimentosCliente() {
                 onClick={competenciaAtual}
               >
                 Mês atual
+              </button>
+
+
+              <button
+                type="button"
+                className="mv-btn mv-btn-add"
+                onClick={() => carregarPossiveisDuplicados(true)}
+                disabled={carregandoDuplicados || removendoDuplicados}
+              >
+                {carregandoDuplicados
+                  ? "Procurando..."
+                  : "Possíveis duplicados"}
               </button>
             </div>
           </div>
@@ -1151,6 +1626,172 @@ export default function MovimentosCliente() {
           </table>
         </div>
       </div>
+
+      {duplicadosAbertos && (
+        <div className="mv-duplicate-overlay">
+          <div
+            className="mv-duplicate-modal mv-duplicates-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mv-duplicates-title"
+          >
+            <div className="mv-card-header">
+              <div>
+                <div
+                  className="mv-card-title"
+                  id="mv-duplicates-title"
+                >
+                  Possíveis duplicados
+                </div>
+                <div className="mv-duplicates-summary">
+                  {clienteSelecionado
+                    ? `${clienteSelecionado} • ${competenciaParaApi() || "todas as competências"}`
+                    : competenciaParaApi() || "Todas as competências"}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="mv-btn mv-btn-add"
+                onClick={() => setDuplicadosAbertos(false)}
+                disabled={removendoDuplicados}
+              >
+                Fechar
+              </button>
+            </div>
+
+            {carregandoDuplicados ? (
+              <div className="mv-duplicate-text">
+                Procurando possíveis duplicados...
+              </div>
+            ) : gruposDuplicados.length === 0 ? (
+              <div className="mv-duplicate-text">
+                Nenhum possível duplicado foi encontrado nesta competência.
+              </div>
+            ) : (
+              <div className="mv-duplicates-list">
+                {gruposDuplicados.map((grupo, index) => (
+                  <div
+                    className="mv-duplicate-group"
+                    key={`${grupo.manterSugeridoId}-${index}`}
+                  >
+                    <div className="mv-duplicate-group-head">
+                      <div>
+                        <div className="mv-duplicate-group-title">
+                          {formatarData(grupo.data)} — {grupo.descricao || "-"}
+                        </div>
+                        <div className="mv-duplicate-meta">
+                          {grupo.tipo || "-"} • {grupo.planoContaNome || "Sem plano"} •{" "}
+                          {grupo.formaPagamento || "Sem forma"} •{" "}
+                          {formatarMoeda(grupo.valorUnitario)}
+                          <br />
+                          {grupo.quantidade} registros iguais • possível excesso:{" "}
+                          {formatarMoeda(grupo.valorPossivelmenteDuplicado)}
+                        </div>
+                      </div>
+
+                      <span
+                        className={`mv-duplicate-badge ${
+                          grupo.confianca === "Alta" ? "high" : ""
+                        }`}
+                      >
+                        {grupo.confianca === "Alta"
+                          ? "Alta chance"
+                          : "Revisar"}
+                      </span>
+                    </div>
+
+                    <div className="mv-duplicate-records">
+                      {(Array.isArray(grupo.movimentos)
+                        ? grupo.movimentos
+                        : []
+                      ).map((item) => (
+                        <div key={item.id}>
+                          ID {item.id}
+                          {item.createdAt
+                            ? ` • criado em ${new Date(item.createdAt).toLocaleString("pt-BR")}`
+                            : ""}
+                          {Number(item.id) === Number(grupo.manterSugeridoId)
+                            ? " • manter"
+                            : " • possível duplicado"}
+                        </div>
+                      ))}
+                    </div>
+
+                    {grupo.confianca === "Alta" ? (
+                      <button
+                        type="button"
+                        className="mv-btn mv-btn-remove-duplicates"
+                        onClick={() => removerGrupoDuplicado(grupo)}
+                        disabled={removendoDuplicados}
+                      >
+                        {removendoDuplicados
+                          ? "Removendo..."
+                          : `Manter 1 e remover ${grupo.excluirSugeridosIds?.length || 0} duplicado(s)`}
+                      </button>
+                    ) : (
+                      <div className="mv-duplicate-meta">
+                        Este grupo precisa de revisão. Nada será removido em lote.
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {avisoDuplicado && (
+        <div className="mv-duplicate-overlay">
+          <div
+            className="mv-duplicate-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mv-duplicate-title"
+          >
+            <div
+              className="mv-duplicate-title"
+              id="mv-duplicate-title"
+            >
+              ⚠️ Possível lançamento duplicado
+            </div>
+
+            <div className="mv-duplicate-text">
+              Já existe um lançamento semelhante:
+            </div>
+
+            <div className="mv-duplicate-highlight">
+              {formatarData(avisoDuplicado.novo?.data)} —{" "}
+              {avisoDuplicado.novo?.descricao || "-"} —{" "}
+              {avisoDuplicado.novo?.tipo || "-"} —{" "}
+              {formatarMoeda(avisoDuplicado.novo?.valor)}
+            </div>
+
+            <div className="mv-duplicate-text">
+              Deseja salvar mesmo assim?
+            </div>
+
+            <div className="mv-duplicate-actions">
+              <button
+                type="button"
+                className="mv-btn mv-btn-no"
+                onClick={() => responderAvisoDuplicado(false)}
+              >
+                Não
+              </button>
+
+              <button
+                type="button"
+                className="mv-btn mv-btn-yes"
+                onClick={() => responderAvisoDuplicado(true)}
+              >
+                Sim, salvar mesmo assim
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

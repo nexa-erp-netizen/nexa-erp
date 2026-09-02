@@ -38,6 +38,7 @@ export default function ConciliacaoBancaria({ setPage }) {
   const [filtroConferencia, setFiltroConferencia] = useState("Todos")
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false)
   const [diaDetalhe, setDiaDetalhe] = useState("")
+  const [investigacao, setInvestigacao] = useState("")
   const [processando, setProcessando] = useState(false)
   const [competencia, setCompetencia] = useState(new Date().toISOString().slice(0, 7))
   const [fechamentos, setFechamentos] = useState([])
@@ -410,9 +411,36 @@ export default function ConciliacaoBancaria({ setPage }) {
 
   const diferencaEntradas = resumoBancoComparavel.entradas - resumoClienteBancos.receitas
   const diferencaSaidas = resumoBancoComparavel.saidas - resumoClienteBancos.despesas
-  const totaisBatem =
-    Math.abs(diferencaEntradas) < 0.01 &&
-    Math.abs(diferencaSaidas) < 0.01
+  const TOLERANCIA_FECHAMENTO = 0.10
+  const entradasBatem = Math.abs(diferencaEntradas) <= TOLERANCIA_FECHAMENTO
+  const saidasBatem = Math.abs(diferencaSaidas) <= TOLERANCIA_FECHAMENTO
+  const totaisBatem = entradasBatem && saidasBatem
+
+  const idsClienteConciliados = useMemo(() => {
+    const ids = new Set()
+    movimentos
+      .filter(item => item.statusConciliacao === "Conciliado")
+      .forEach(item => {
+        const texto = String(item.observacoes || "")
+        for (const encontrado of texto.matchAll(/#(\d+)/g)) {
+          ids.add(Number(encontrado[1]))
+        }
+      })
+    return ids
+  }, [movimentos])
+
+  const bancoAindaSemCorrespondencia = useMemo(
+    () => movimentos.filter(item =>
+      !item.lancamentoContabilId &&
+      !["Conciliado", "Ignorado", "Lançado"].includes(item.statusConciliacao)
+    ),
+    [movimentos]
+  )
+
+  const clienteAindaSemCorrespondencia = useMemo(
+    () => movimentosClienteBancariosCompetencia.filter(item => !idsClienteConciliados.has(Number(item.id))),
+    [movimentosClienteBancariosCompetencia, idsClienteConciliados]
+  )
 
   const diasComDiferenca = useMemo(() => {
     const mapa = new Map()
@@ -572,14 +600,8 @@ export default function ConciliacaoBancaria({ setPage }) {
       setFiltroConferencia("Todos")
       setSelecionados([])
 
-      const dados = r.data || {}
       alert(
-        `Conferência automática concluída.\n\n` +
-        `${dados.exatos || 0} exata(s) • ` +
-        `${dados.agrupados || 0} por agrupamento • ` +
-        `${dados.compensados || 0} por compensação entre datas próximas.\n` +
-        `${dados.gruposPendentes || 0} grupo(s) ainda precisam de atenção.\n\n` +
-        `A Nexa deixa na tela somente as exceções reais.`
+        "Conferência atualizada.\n\nA Nexa analisou as correspondências em segundo plano. Para fechar o mês, você só precisa resolver as diferenças totais de Entradas e Saídas."
       )
     } catch (e) {
       alert(e.response?.data?.message || "Erro na conciliação automática")
@@ -590,6 +612,10 @@ export default function ConciliacaoBancaria({ setPage }) {
 
   async function classificarUm(movimento, status) {
     const planoContaId = classificacoes[movimento.id]
+
+    if (status === "Ignorado" && !confirm(
+      `Justificar este movimento de ${moeda(movimento.valor)}?\n\nUse somente quando ele não deve ser comparado com Receita/Despesa do cliente, como transferência, estorno ou outra exceção legítima.`
+    )) return
 
     if (status === "Conciliado" && analiseConciliacao[movimento.id]?.status !== "BATENDO") {
       return alert("Este movimento ainda não bate com um lançamento único em Movimentos Clientes. Corrija ou lance o movimento do cliente e depois clique em Atualizar conferência.")
@@ -660,9 +686,13 @@ export default function ConciliacaoBancaria({ setPage }) {
   }
 
   async function concluirMes() {
-    if (diasComDiferencaRelevante.length) {
-      setMostrarDetalhes(false)
-      return alert(`Ainda existem ${diasComDiferencaRelevante.length} dia(s) com diferença relevante. Revise apenas esses dias antes de concluir o mês.`)
+    if (!totaisBatem) {
+      return alert(
+        `Ainda existem diferenças no mês.\n\n` +
+        `Entradas: ${moeda(diferencaEntradas)}\n` +
+        `Saídas: ${moeda(diferencaSaidas)}\n\n` +
+        `Resolva ou justifique somente essas diferenças antes de concluir.`
+      )
     }
     if (!movimentos.length) return alert("Não existem movimentos nesta competência.")
     if (!confirm(`Concluir a competência ${competenciaBr(competencia)}?`)) return
@@ -835,248 +865,234 @@ export default function ConciliacaoBancaria({ setPage }) {
           <div style={s.card}>
             <div style={s.titleRow}>
               <div>
-                <h3 style={s.h3}>Movimentos importados</h3>
-                <p style={s.p}>A Nexa confere automaticamente o extrato e deixa para você somente as exceções.</p>
+                <h3 style={s.h3}>Conciliação do mês</h3>
+                <p style={s.p}>Compare os totais do banco com os Movimentos Clientes. A Nexa cuida das correspondências em segundo plano.</p>
               </div>
               <label style={{ ...s.label, margin: 0, minWidth: 190 }}>Competência
-                <input type="month" style={s.input} value={competencia} onChange={e => { setCompetencia(e.target.value); setFiltroStatus("Todos"); setFiltroConferencia("Todos") }} />
+                <input type="month" style={s.input} value={competencia} onChange={e => { setCompetencia(e.target.value); setFiltroStatus("Todos"); setFiltroConferencia("Todos"); setInvestigacao("") }} />
               </label>
             </div>
 
-            <div style={s.summary}>
-              <Resumo t="Entradas" v={moeda(resumoMovimentos.entradas)} cor="#42f5a7" />
-              <Resumo t="Saídas" v={moeda(resumoMovimentos.saidas)} cor="#ff7d88" />
-              <Resumo t="Movimento líquido" v={moeda(resumoMovimentos.entradas - resumoMovimentos.saidas)} cor="#53c9ff" />
-              <Resumo t="Conciliados" v={movimentos.filter(m => m.statusConciliacao === "Conciliado").length} cor="#73ffd4" />
-              <Resumo t="Dias c/ diferença" v={diasComDiferencaRelevante.length} cor="#ffd45b" />
-              <Resumo t="Dif. entradas" v={moeda(diferencaEntradas)} cor={Math.abs(diferencaEntradas) < 0.01 ? "#73ffd4" : "#ffbf69"} />
-              <Resumo t="Dif. saídas" v={moeda(diferencaSaidas)} cor={Math.abs(diferencaSaidas) < 0.01 ? "#73ffd4" : "#ff7d88"} />
-            </div>
-
-            <div style={totaisBatem ? s.autoOk : s.autoBox}>
-              <div style={s.autoInfo}>
-                <strong>Conferência automática da Nexa</strong>
+            <div style={s.simpleStatus}>
+              <div>
+                <strong>{totaisBatem ? "✅ Conciliação do mês conferida" : "Conciliação do mês"}</strong>
                 <span>
-                  Entradas conciliáveis: <b>{moeda(resumoBancoComparavel.entradas)}</b> •
-                  Receitas em Bancos: <b>{moeda(resumoClienteBancos.receitas)}</b> •
-                  Diferença: <b>{moeda(diferencaEntradas)}</b>
-                </span>
-                <span>
-                  Saídas conciliáveis: <b>{moeda(resumoBancoComparavel.saidas)}</b> •
-                  Despesas em Bancos: <b>{moeda(resumoClienteBancos.despesas)}</b> •
-                  Diferença: <b>{moeda(diferencaSaidas)}</b>
-                </span>
-                <small>
                   {totaisBatem
-                    ? "✅ Os totais bancários conciliáveis do mês batem. Você não precisa conferir linha por linha."
-                    : `A Nexa encontrou ${diasComDiferenca.length} dia(s) com diferença. Revise somente esses dias.`}
-                </small>
+                    ? "Entradas e Saídas estão conferidas. Não é necessário conciliar linha por linha."
+                    : "A Nexa compara os totais do extrato com os lançamentos bancários do cliente. Resolva apenas as diferenças abaixo."}
+                </span>
               </div>
               {!fechamentoAtual && movimentos.length > 0 && (
                 <button
-                  style={{ ...s.autoButton, ...(processando ? s.disabled : {}) }}
+                  style={{ ...s.refresh, ...(processando ? s.disabled : {}) }}
                   disabled={processando}
                   onClick={conciliarAutomaticamente}
                 >
-                  {processando ? "Conferindo..." : "✨ Conferir automaticamente"}
+                  {processando ? "Atualizando..." : "Atualizar conferência"}
                 </button>
               )}
             </div>
 
-            <div style={s.diffBox}>
-              <div style={s.diffHeader}>
-                <div>
-                  <strong>Diferenças que realmente precisam de atenção</strong>
-                  <small style={s.block}>
-                    A Nexa compara o total do banco com os lançamentos bancários do cliente por dia.
-                    Correspondências 1↔1, vários↔1 e 1↔vários são tratadas automaticamente, inclusive com compensação de até 3 dias.
-                  </small>
+            <div style={s.reconGrid}>
+              <div style={{ ...s.reconCard, ...(entradasBatem ? s.reconCardOk : s.reconCardWarn) }}>
+                <div style={s.reconTitle}>
+                  <span>Entradas</span>
+                  <span style={entradasBatem ? s.statusOk : s.statusWarn}>{entradasBatem ? "Conferido" : "Diferença"}</span>
                 </div>
-                <span style={diasComDiferencaRelevante.length ? s.diffCountWarn : s.diffCountOk}>
-                  {diasComDiferencaRelevante.length ? `${diasComDiferencaRelevante.length} dia(s)` : "Tudo bateu"}
-                </span>
+                <div style={s.reconLine}>
+                  <span>Extrato bancário</span>
+                  <strong style={{ color: "#42f5a7" }}>{moeda(resumoBancoComparavel.entradas)}</strong>
+                </div>
+                <div style={s.reconLine}>
+                  <span>Receitas em Bancos</span>
+                  <strong>{moeda(resumoClienteBancos.receitas)}</strong>
+                </div>
+                <div style={s.reconDifference}>
+                  <span>Diferença</span>
+                  <strong style={{ color: entradasBatem ? "#73ffd4" : "#ffbf69" }}>
+                    {entradasBatem ? "R$ 0,00" : moeda(diferencaEntradas)}
+                  </strong>
+                </div>
+                {!entradasBatem && !fechamentoAtual && (
+                  <button style={s.investigateButton} onClick={() => setInvestigacao(investigacao === "Entrada" ? "" : "Entrada")}>
+                    {investigacao === "Entrada" ? "Fechar investigação" : "Investigar entradas"}
+                  </button>
+                )}
               </div>
 
-              {diasComDiferencaRelevante.length === 0 ? (
-                <div style={s.diffSuccess}>
-                  ✅ Nenhuma diferença diária. O mês está pronto para fechamento, salvo itens justificados/ignorados.
+              <div style={{ ...s.reconCard, ...(saidasBatem ? s.reconCardOk : s.reconCardWarn) }}>
+                <div style={s.reconTitle}>
+                  <span>Saídas</span>
+                  <span style={saidasBatem ? s.statusOk : s.statusWarn}>{saidasBatem ? "Conferido" : "Diferença"}</span>
                 </div>
-              ) : (
-                <div style={s.diffList}>
-                  {diasComDiferencaRelevante.map(item => (
-                    <div key={item.data} style={s.diffDay}>
-                      <div style={s.diffDate}>{dataBr(item.data)}</div>
-                      <div style={s.diffValues}>
-                        {Math.abs(item.diferencaEntradas) >= 0.01 && (
-                          <span>
-                            Entradas: banco {moeda(item.entradasBanco)} × cliente {moeda(item.receitasCliente)}
-                            {" "}→ <b>{rotuloDiferenca(item.diferencaEntradas)}</b>
-                          </span>
-                        )}
-                        {Math.abs(item.diferencaSaidas) >= 0.01 && (
-                          <span>
-                            Saídas: banco {moeda(item.saidasBanco)} × cliente {moeda(item.despesasCliente)}
-                            {" "}→ <b>{rotuloDiferenca(item.diferencaSaidas)}</b>
-                          </span>
-                        )}
-                      </div>
-                      <button style={s.small} onClick={() => abrirDetalhesDia(item.data)}>Ver este dia</button>
+                <div style={s.reconLine}>
+                  <span>Extrato bancário</span>
+                  <strong style={{ color: "#ff9ba4" }}>{moeda(resumoBancoComparavel.saidas)}</strong>
+                </div>
+                <div style={s.reconLine}>
+                  <span>Despesas em Bancos</span>
+                  <strong>{moeda(resumoClienteBancos.despesas)}</strong>
+                </div>
+                <div style={s.reconDifference}>
+                  <span>Diferença</span>
+                  <strong style={{ color: saidasBatem ? "#73ffd4" : "#ff7d88" }}>
+                    {saidasBatem ? "R$ 0,00" : moeda(diferencaSaidas)}
+                  </strong>
+                </div>
+                {!saidasBatem && !fechamentoAtual && (
+                  <button style={s.investigateButton} onClick={() => setInvestigacao(investigacao === "Saída" ? "" : "Saída")}>
+                    {investigacao === "Saída" ? "Fechar investigação" : "Investigar saídas"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {investigacao && (
+              <div style={s.investigationBox}>
+                <div style={s.investigationHeader}>
+                  <div>
+                    <strong>Investigar {investigacao === "Entrada" ? "entradas" : "saídas"}</strong>
+                    <span>
+                      {investigacao === "Entrada"
+                        ? diferencaEntradas > 0
+                          ? `Faltam ${moeda(diferencaEntradas)} nos lançamentos bancários do cliente.`
+                          : `O cliente lançou ${moeda(Math.abs(diferencaEntradas))} a mais em receitas bancárias.`
+                        : diferencaSaidas > 0
+                          ? `Faltam ${moeda(diferencaSaidas)} nos lançamentos bancários do cliente.`
+                          : `O cliente lançou ${moeda(Math.abs(diferencaSaidas))} a mais em despesas bancárias.`}
+                    </span>
+                  </div>
+                  <button style={s.secondary} onClick={() => setInvestigacao("")}>Fechar</button>
+                </div>
+
+                {(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas) > 0 ? (
+                  <>
+                    <div style={s.investigationTip}>
+                      Abaixo estão movimentos do extrato ainda sem correspondência automática. Se forem Receita/Despesa real, confira o lançamento em Movimentos Clientes. Se não fizerem parte da conciliação, use <b>Justificar</b>.
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div style={s.investigationList}>
+                      {bancoAindaSemCorrespondencia
+                        .filter(item => item.natureza === investigacao)
+                        .slice(0, 30)
+                        .map(item => (
+                          <div key={item.id} style={s.investigationItem}>
+                            <span><b>{dataBr(item.data)}</b> • {item.descricao || "Sem descrição"}</span>
+                            <strong style={{ color: investigacao === "Entrada" ? "#42f5a7" : "#ff9ba4" }}>{moeda(item.valor)}</strong>
+                            <button style={s.justifyButton} disabled={processando} onClick={() => classificarUm(item, "Ignorado")}>Justificar</button>
+                          </div>
+                        ))}
+                      {bancoAindaSemCorrespondencia.filter(item => item.natureza === investigacao).length === 0 && (
+                        <div style={s.empty}>Não há linhas bancárias pendentes dessa natureza. Atualize a conferência ou revise os lançamentos do cliente.</div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={s.investigationTip}>
+                      A diferença está do lado dos Movimentos Clientes. Confira os lançamentos bancários abaixo e corrija os que estiverem duplicados, com valor errado ou lançados no período incorreto.
+                    </div>
+                    <div style={s.investigationList}>
+                      {clienteAindaSemCorrespondencia
+                        .filter(item => item.tipo === (investigacao === "Entrada" ? "Receita" : "Despesa"))
+                        .slice(0, 30)
+                        .map(item => (
+                          <div key={item.id} style={s.investigationItem}>
+                            <span><b>{dataBr(item.data)}</b> • {item.descricao || item.historico || "Movimento do cliente"}</span>
+                            <strong>{moeda(item.valor)}</strong>
+                            <span style={s.reviewTag}>Revisar em Movimentos Clientes</span>
+                          </div>
+                        ))}
+                      {clienteAindaSemCorrespondencia.filter(item => item.tipo === (investigacao === "Entrada" ? "Receita" : "Despesa")).length === 0 && (
+                        <div style={s.empty}>Nenhum lançamento isolado foi identificado. Atualize a conferência para a Nexa recalcular as correspondências.</div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
-              {diasComDiferencaRelevante.length > 0 && (
-                <div style={s.diffFooter}>
-                  Diferença absoluta a revisar: <strong>{moeda(
-                    diasComDiferencaRelevante.reduce(
-                      (total, item) => total + Math.abs(item.diferencaEntradas) + Math.abs(item.diferencaSaidas),
-                      0
-                    )
-                  )}</strong>
-                </div>
-              )}
-
-              {pequenasDiferencas.length > 0 && (
-                <div style={s.microDiff}>
-                  ℹ️ {pequenasDiferencas.length} diferença(s) de até {moeda(TOLERANCIA_VISUAL)} não bloqueiam a revisão principal.
-                </div>
-              )}
-            </div>
-
-            <div style={s.legend}>
-              <span><b>Fluxo simplificado:</b> a Nexa resolve automaticamente o que bate e mostra somente os dias com diferença.</span>
-              <span><b>Agrupamentos:</b> vários movimentos do banco podem corresponder a um lançamento do cliente, e um movimento do banco pode corresponder a vários lançamentos, com janela de compensação de até 3 dias.</span>
-              <span><b>Regra de segurança:</b> importar extrato não cria Receita ou Despesa em Movimentos Clientes.</span>
-              <span><b>Caixa fica fora:</b> a conciliação usa apenas lançamentos bancários do cliente. Itens “Ignorados” são diferenças justificadas.</span>
-            </div>
-
-            <div style={fechamentoAtual ? s.closeDone : s.closeBox}>
+            <div style={fechamentoAtual ? s.closeDone : totaisBatem ? s.closeReady : s.closeBox}>
               <div>
-                <strong>{fechamentoAtual ? `✅ ${competenciaBr(competencia)} concluído` : `Fechamento de ${competenciaBr(competencia)}`}</strong>
+                <strong>
+                  {fechamentoAtual
+                    ? `✅ ${competenciaBr(competencia)} concluído`
+                    : totaisBatem
+                      ? `✅ ${competenciaBr(competencia)} pronto para concluir`
+                      : `Fechamento de ${competenciaBr(competencia)}`}
+                </strong>
                 <span style={s.closeText}>
                   {fechamentoAtual
-                    ? `Saldo final: ${moeda(fechamentoAtual.saldoFinal)}`
-                    : diasComDiferencaRelevante.length
-                      ? `${diasComDiferencaRelevante.length} dia(s) com diferença relevante para revisar. Não é necessário conferir cada linha do extrato.`
-                      : movimentos.length
-                        ? "Os totais diários batem ou foram justificados. O mês já pode ser concluído."
-                        : "Nenhum movimento nesta competência."}
+                    ? `Saldo final registrado: ${moeda(fechamentoAtual.saldoFinal)}`
+                    : totaisBatem
+                      ? "Entradas e Saídas estão conferidas. O fechamento não depende de conciliar cada linha do extrato."
+                      : `Resolva somente as diferenças: Entradas ${moeda(diferencaEntradas)} • Saídas ${moeda(diferencaSaidas)}.`}
                 </span>
               </div>
               <div style={s.actions}>
-                {!fechamentoAtual && diasComDiferencaRelevante.length > 0 && <button style={s.secondary} onClick={() => setMostrarDetalhes(false)}>Ver diferenças</button>}
-                {!fechamentoAtual && <button style={{ ...s.primary, ...(processando || diasComDiferencaRelevante.length > 0 || !movimentos.length ? s.disabled : {}) }} disabled={processando || diasComDiferencaRelevante.length > 0 || !movimentos.length} onClick={concluirMes}>Concluir mês</button>}
+                {!fechamentoAtual && (
+                  <button
+                    style={{ ...s.primary, ...(processando || !totaisBatem || !movimentos.length ? s.disabled : {}) }}
+                    disabled={processando || !totaisBatem || !movimentos.length}
+                    onClick={concluirMes}
+                  >
+                    Concluir mês
+                  </button>
+                )}
                 {fechamentoAtual && <button style={s.small} onClick={() => baixarRelatorio(fechamentoAtual)}>Baixar PDF</button>}
               </div>
             </div>
 
             {movimentos.length > 0 && (
-              <div style={{ marginTop: 14 }}>
-                <button
-                  style={s.detailsToggle}
-                  onClick={() => {
-                    setMostrarDetalhes(v => !v)
-                    if (mostrarDetalhes) setDiaDetalhe("")
-                  }}
-                >
-                  {mostrarDetalhes ? "Ocultar detalhes das linhas" : "Ver detalhes das linhas"}
-                </button>
-              </div>
-            )}
+              <details style={s.auditBox}>
+                <summary style={s.auditSummary}>Auditoria avançada <span>uso técnico • linhas do extrato</span></summary>
+                <div style={s.auditIntro}>
+                  Esta área não faz parte do fluxo normal da conciliação. Use apenas quando precisar auditar uma linha específica do extrato.
+                </div>
 
-            {mostrarDetalhes && movimentos.length > 0 && (
-              <div id="nexa-detalhes-conciliacao" style={s.batch}>
-                {diaDetalhe && (
-                  <button style={s.dayFilter} onClick={() => setDiaDetalhe("")}>
-                    📅 {dataBr(diaDetalhe)} ×
-                  </button>
-                )}
-                <select style={s.input} value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
-                  <option>Todos</option><option>A concluir</option><option>Pendente</option><option>Classificado</option><option>Conciliado</option><option>Ignorado</option><option>Lançado</option>
-                </select>
-                <select style={s.input} value={filtroConferencia} onChange={e => setFiltroConferencia(e.target.value)}>
-                  <option value="Todos">Todas as conferências</option>
-                  <option value="BATENDO">🟢 Batendo</option>
-                  <option value="FALTANDO">🟡 Faltando</option>
-                  <option value="REVISAR">🟠 Revisar</option>
-                  <option value="DIVERGENCIA">🔴 Divergências</option>
-                </select>
-                <button style={s.secondary} onClick={selecionarVisiveis}>Selecionar visíveis</button>
-                <button style={s.secondary} onClick={() => setSelecionados([])}>Limpar seleção</button>
-                <select style={s.input} value={planoLoteId} onChange={e => setPlanoLoteId(e.target.value)}>
-                  <option value="">Conta contábil para o lote</option>
-                  {planoContas.map(p => <option key={p.id} value={p.id}>{p.codigo} • {p.conta}</option>)}
-                </select>
-                <button style={s.small} disabled={processando || Boolean(fechamentoAtual)} onClick={() => classificarLote("Classificado")}>Classificar lote</button>
-                <button
-                  style={{
-                    ...s.primary,
-                    ...(processando || Boolean(fechamentoAtual) || !selecionados.length || selecionados.some(id => analiseConciliacao[id]?.status !== "BATENDO") ? s.disabled : {}),
-                  }}
-                  disabled={processando || Boolean(fechamentoAtual) || !selecionados.length || selecionados.some(id => analiseConciliacao[id]?.status !== "BATENDO")}
-                  onClick={() => classificarLote("Conciliado")}
-                >
-                  Conciliar lote
-                </button>
-                <button style={s.secondary} disabled={processando || Boolean(fechamentoAtual)} onClick={() => classificarLote("Ignorado")}>Ignorar lote</button>
-                <button style={s.small} disabled={processando || Boolean(fechamentoAtual)} onClick={sugerirClassificacoes}>Sugerir pelo histórico</button>
-                <button style={s.refresh} disabled={processando} onClick={carregarExtratos}>Atualizar conferência</button>
-                <strong>{selecionados.length} selecionado(s)</strong>
-              </div>
-            )}
+                <div style={s.batch}>
+                  <select style={s.input} value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
+                    <option>Todos</option><option>A concluir</option><option>Pendente</option><option>Classificado</option><option>Conciliado</option><option>Ignorado</option><option>Lançado</option>
+                  </select>
+                  <select style={s.input} value={filtroConferencia} onChange={e => setFiltroConferencia(e.target.value)}>
+                    <option value="Todos">Todas as conferências</option>
+                    <option value="BATENDO">🟢 Batendo</option>
+                    <option value="FALTANDO">🟡 Faltando</option>
+                    <option value="REVISAR">🟠 Revisar</option>
+                    <option value="DIVERGENCIA">🔴 Divergências</option>
+                  </select>
+                  <button style={s.refresh} disabled={processando} onClick={carregarExtratos}>Atualizar dados</button>
+                </div>
 
-            {movimentos.length === 0 ? (
-              <div style={s.empty}>Nenhum movimento em {competenciaBr(competencia)}.</div>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={s.table}>
-                  <thead>
-                    <tr><th>✓</th><th>Data</th><th>Descrição</th><th>Natureza</th><th>Valor</th><th>Plano de Contas</th><th>Conferência</th><th>Status</th><th>Ações</th></tr>
-                  </thead>
-                  <tbody>
-                    {movimentosVisiveis.map(m => {
-                      const conferencia = analiseConciliacao[m.id] || { status: "FALTANDO", titulo: "Sem conferência", detalhe: "" }
-                      return (
-                        <tr key={m.id} style={estiloLinha(conferencia.status)}>
-                          <td><input type="checkbox" checked={selecionados.includes(m.id)} disabled={Boolean(m.lancamentoContabilId) || Boolean(fechamentoAtual)} onChange={() => alternarSelecao(m.id)} /></td>
-                          <td>{dataBr(m.data)}</td>
-                          <td><strong>{m.descricao}</strong><small style={s.block}>{m.documento || ""}</small></td>
-                          <td><span style={m.natureza === "Entrada" ? s.entrada : s.saida}>{m.natureza}</span></td>
-                          <td style={{ color: m.natureza === "Entrada" ? "#42f5a7" : "#ff9ba4", fontWeight: 800 }}>{m.natureza === "Saída" ? "- " : "+ "}{moeda(m.valor)}</td>
-                          <td>
-                            <select style={s.tableSelect} value={classificacoes[m.id] || ""} disabled={Boolean(m.lancamentoContabilId) || Boolean(fechamentoAtual)} onChange={e => setClassificacoes(a => ({ ...a, [m.id]: e.target.value }))}>
-                              <option value="">Selecione</option>
-                              {planosPara(m.natureza).map(p => <option key={p.id} value={p.id}>{p.codigo} • {p.conta}</option>)}
-                            </select>
-                            {m.categoriaSugerida && <small style={s.block}>Sugestão: {m.categoriaSugerida}</small>}
-                          </td>
-                          <td><span style={badgeConferencia(conferencia.status)}>{conferencia.titulo}</span><small style={s.block}>{conferencia.detalhe}</small></td>
-                          <td>{m.statusConciliacao}</td>
-                          <td>
-                            <div style={s.actions}>
-                              {!m.lancamentoContabilId && !fechamentoAtual && <>
-                                <button style={s.small} disabled={processando} onClick={() => classificarUm(m, "Classificado")}>Classificar</button>
-                                <button
-                                  style={{ ...s.primary, ...(processando || conferencia.status !== "BATENDO" ? s.disabled : {}) }}
-                                  disabled={processando || conferencia.status !== "BATENDO"}
-                                  title={conferencia.status === "BATENDO" ? "Conciliar com o lançamento do cliente" : "Só é possível conciliar quando a linha estiver verde"}
-                                  onClick={() => classificarUm(m, "Conciliado")}
-                                >
-                                  Conciliar
-                                </button>
-                                <button style={s.secondary} disabled={processando} onClick={() => classificarUm(m, "Ignorado")}>Ignorar</button>
-                              </>}
-                              {m.lancamentoContabilId && <span style={s.lancado}>⚠ Lançamento #{m.lancamentoContabilId} — revisar</span>}
-                              {fechamentoAtual && !m.lancamentoContabilId && <span style={s.lancado}>Mês fechado</span>}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={s.table}>
+                    <thead>
+                      <tr><th>Data</th><th>Descrição</th><th>Natureza</th><th>Valor</th><th>Conferência</th><th>Status</th><th>Ação técnica</th></tr>
+                    </thead>
+                    <tbody>
+                      {movimentosVisiveis.map(m => {
+                        const conferencia = analiseConciliacao[m.id] || { status: "FALTANDO", titulo: "Sem conferência", detalhe: "" }
+                        return (
+                          <tr key={m.id} style={estiloLinha(conferencia.status)}>
+                            <td>{dataBr(m.data)}</td>
+                            <td><strong>{m.descricao}</strong><small style={s.block}>{m.documento || ""}</small></td>
+                            <td><span style={m.natureza === "Entrada" ? s.entrada : s.saida}>{m.natureza}</span></td>
+                            <td style={{ color: m.natureza === "Entrada" ? "#42f5a7" : "#ff9ba4", fontWeight: 800 }}>{m.natureza === "Saída" ? "- " : "+ "}{moeda(m.valor)}</td>
+                            <td><span style={badgeConferencia(conferencia.status)}>{conferencia.titulo}</span></td>
+                            <td>{m.statusConciliacao}</td>
+                            <td>
+                              {!m.lancamentoContabilId && !fechamentoAtual && m.statusConciliacao !== "Ignorado" && (
+                                <button style={s.secondary} disabled={processando} onClick={() => classificarUm(m, "Ignorado")}>Justificar</button>
+                              )}
+                              {m.statusConciliacao === "Ignorado" && <span style={s.reviewTag}>Justificado</span>}
+                              {fechamentoAtual && <span style={s.reviewTag}>Mês fechado</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
             )}
 
             {fechamentos.filter(f => f.status === "Fechado").length > 0 && (
@@ -1202,6 +1218,28 @@ const s = {
   empty: { padding: 20, textAlign: "center", color: "#9ab8d7", background: "#071f43", borderRadius: 12 },
   success: { display: "flex", flexDirection: "column", gap: 5, marginTop: 15, padding: 14, borderRadius: 12, background: "#0c5c50", color: "#caffee" },
   summary: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 18 },
+  simpleStatus: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap", padding: 15, marginBottom: 14, borderRadius: 12, background: "#071f43", border: "1px solid #22558d" },
+  reconGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 14, marginBottom: 14 },
+  reconCard: { padding: 17, borderRadius: 14, background: "#071f43", border: "1px solid #22558d" },
+  reconCardOk: { borderColor: "#258a72", boxShadow: "inset 0 0 0 1px rgba(60,235,183,.08)" },
+  reconCardWarn: { borderColor: "#80652a", boxShadow: "inset 0 0 0 1px rgba(255,196,72,.06)" },
+  reconTitle: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 14, fontSize: 18, fontWeight: 900 },
+  reconLine: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "8px 0", color: "#c3daf0", borderBottom: "1px solid rgba(255,255,255,.06)" },
+  reconDifference: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "13px 0 8px", fontSize: 16 },
+  statusOk: { padding: "5px 9px", borderRadius: 999, background: "#0d5d4c", color: "#9effdf", fontSize: 11, fontWeight: 900 },
+  statusWarn: { padding: "5px 9px", borderRadius: 999, background: "#6d510c", color: "#ffe08a", fontSize: 11, fontWeight: 900 },
+  investigateButton: { width: "100%", marginTop: 10, border: "1px solid #36c8e8", borderRadius: 10, padding: "10px 13px", background: "#0b6078", color: "#fff", fontWeight: 900, cursor: "pointer" },
+  investigationBox: { padding: 16, marginBottom: 14, borderRadius: 14, background: "#0a2448", border: "1px solid #2d6da6" },
+  investigationHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 },
+  investigationTip: { padding: 11, borderRadius: 10, background: "rgba(53,157,210,.08)", color: "#c6e2f5", fontSize: 12, marginBottom: 10 },
+  investigationList: { display: "grid", gap: 7 },
+  investigationItem: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", alignItems: "center", gap: 12, padding: 10, borderRadius: 10, background: "#071f43", border: "1px solid rgba(255,255,255,.06)", color: "#d8e7f5" },
+  justifyButton: { border: "1px solid #ffc658", borderRadius: 8, padding: "7px 10px", background: "#60470d", color: "#fff2bd", fontWeight: 800, cursor: "pointer" },
+  reviewTag: { display: "inline-block", padding: "5px 8px", borderRadius: 999, background: "#234b72", color: "#bfe3ff", fontSize: 10, fontWeight: 800, whiteSpace: "nowrap" },
+  closeReady: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap", padding: 16, marginBottom: 16, borderRadius: 13, background: "#0b4a3e", border: "1px solid #29c98d" },
+  auditBox: { marginTop: 16, padding: 12, borderRadius: 12, background: "#071f43", border: "1px solid #1b4774" },
+  auditSummary: { cursor: "pointer", color: "#9ebbd8", fontWeight: 800, fontSize: 12 },
+  auditIntro: { margin: "12px 0", padding: 10, borderRadius: 9, background: "rgba(255,255,255,.035)", color: "#8fb0cf", fontSize: 11 },
   summaryItem: { display: "flex", flexDirection: "column", gap: 6, padding: 14, background: "#071f43", borderRadius: 12 },
   diffBox: { padding: 14, marginBottom: 14, borderRadius: 12, background: "#071f43", border: "1px solid #22558d" },
   diffHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 10, color: "#e8f4ff" },
