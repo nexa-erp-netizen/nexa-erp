@@ -183,7 +183,7 @@ export default function MovimentosClientesEscritorio() {
     try {
       const resposta = await api.get("/movimentos-cliente/duplicados", {
         params: {
-          cliente: clienteSelecionado.nome,
+          clienteId: clienteSelecionado.id,
           ...(competenciaDuplicados()
             ? { competencia: competenciaDuplicados() }
             : {}),

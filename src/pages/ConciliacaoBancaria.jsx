@@ -1025,6 +1025,7 @@ export default function ConciliacaoBancaria({ setPage }) {
 
     const tipo = investigacao === "Entrada" ? "Receita" : "Despesa"
     const movimentosParaCriar = itensSelecionadosInvestigacao.map(item => ({
+      clienteId: cliente?.id || undefined,
       cliente: cliente?.nome || undefined,
       tipo,
       data: dataIso(item.data),

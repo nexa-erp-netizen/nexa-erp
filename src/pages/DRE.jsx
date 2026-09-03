@@ -3,6 +3,7 @@ import api from "../services/api"
 
 export default function DRE() {
   const [movimentos, setMovimentos] = useState([])
+  const [clientes, setClientes] = useState([])
   const [empresaSelecionada, setEmpresaSelecionada] = useState("Todas")
   const [competenciaSelecionada, setCompetenciaSelecionada] =
     useState("Todas")
@@ -18,8 +19,12 @@ export default function DRE() {
 
   async function carregarMovimentos() {
     try {
-      const resposta = await api.get("/lancamentos-contabeis")
+      const [resposta, clientesResp] = await Promise.all([
+        api.get("/lancamentos-contabeis"),
+        api.get("/clientes"),
+      ])
       setMovimentos(Array.isArray(resposta.data) ? resposta.data : [])
+      setClientes(Array.isArray(clientesResp.data) ? clientesResp.data : [])
     } catch (error) {
       alert("Erro ao carregar DRE")
       console.error(error)
@@ -112,22 +117,29 @@ export default function DRE() {
   }
 
   const empresas = useMemo(() => {
-    const porNomeNormalizado = new Map()
+    const nomes = clientes
+      .map((item) => String(item.nome || "").trim())
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }))
 
+    if (nomes.length) return ["Todas", ...nomes]
+
+    const legados = new Map()
     movimentos.forEach((item) => {
-      const nomeOriginal = String(item.cliente || "").trim()
-      const chave = normalizarNome(nomeOriginal)
-      if (!chave || porNomeNormalizado.has(chave)) return
-      porNomeNormalizado.set(chave, nomeOriginal)
+      const nome = String(item.cliente || "").trim()
+      const chave = normalizarNome(nome)
+      if (chave && !legados.has(chave)) legados.set(chave, nome)
     })
 
-    return [
-      "Todas",
-      ...Array.from(porNomeNormalizado.values()).sort((a, b) =>
-        a.localeCompare(b, "pt-BR", { sensitivity: "base" })
-      ),
-    ]
-  }, [movimentos])
+    return ["Todas", ...Array.from(legados.values())]
+  }, [clientes, movimentos])
+
+  const clienteSelecionado = useMemo(() => {
+    if (empresaSelecionada === "Todas") return null
+    return clientes.find(
+      (item) => normalizarNome(item.nome) === normalizarNome(empresaSelecionada)
+    ) || null
+  }, [clientes, empresaSelecionada])
 
   const competencias = useMemo(() => {
     return [
@@ -149,7 +161,9 @@ export default function DRE() {
       const empresaOk =
         empresaSelecionada === "Todas" ||
         empresaSelecionada === "" ||
-        normalizarNome(item.cliente) === empresaNormalizada
+        (clienteSelecionado?.id && item.clienteId
+          ? Number(item.clienteId) === Number(clienteSelecionado.id)
+          : normalizarNome(item.cliente) === empresaNormalizada)
 
       const competenciaOk =
         competenciaSelecionada === "Todas" ||
@@ -157,7 +171,7 @@ export default function DRE() {
 
       return empresaOk && competenciaOk
     })
-  }, [movimentos, empresaSelecionada, competenciaSelecionada])
+  }, [movimentos, empresaSelecionada, clienteSelecionado, competenciaSelecionada])
 
   const dados = useMemo(() => {
     const receitasLista = movimentosFiltrados.filter(

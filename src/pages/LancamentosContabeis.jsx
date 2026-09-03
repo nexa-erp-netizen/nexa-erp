@@ -276,6 +276,11 @@ export default function LancamentosContabeis() {
       .toLowerCase()
   }
 
+  function clientePorNome(nome) {
+    const chave = normalizarNome(nome)
+    return clientes.find((item) => normalizarNome(item.nome) === chave) || null
+  }
+
   function origemExibida(lancamento) {
     const origem = normalizarNome(lancamento?.origem)
 
@@ -386,9 +391,16 @@ export default function LancamentosContabeis() {
     const quantidade = quantidadeSegura(form.quantidade)
     const valorUnitario = valorSeguro(form.valor)
     const valorTotal = quantidade * valorUnitario
+    const clienteCadastro = clientePorNome(form.cliente)
+
+    if (!clienteCadastro) {
+      alert("Selecione um cliente cadastrado antes de salvar.")
+      return
+    }
 
     const dadosLancamento = {
-      cliente: form.cliente,
+      clienteId: clienteCadastro.id,
+      cliente: clienteCadastro.nome,
       descricao: form.descricao,
       tipo: form.tipo,
       quantidade,
@@ -477,14 +489,17 @@ export default function LancamentosContabeis() {
 
     lancamentos.filter((lancamento) => dataLancamentoValida(lancamento.data)).forEach((lancamento) => {
       const clienteOriginal = lancamento.cliente || "Sem cliente"
-      const chaveCliente = normalizarNome(clienteOriginal) || "sem cliente"
-      const clienteCadastrado = clientes.find(
-        (item) => normalizarNome(item.nome) === chaveCliente
-      )
+      const clienteCadastrado = lancamento.clienteId
+        ? clientes.find((item) => Number(item.id) === Number(lancamento.clienteId))
+        : clientePorNome(clienteOriginal)
       const cliente = clienteCadastrado?.nome || clienteOriginal
+      const chaveCliente = lancamento.clienteId
+        ? `id:${lancamento.clienteId}`
+        : `nome:${normalizarNome(clienteOriginal) || "sem cliente"}`
 
       if (!grupos[chaveCliente]) {
         grupos[chaveCliente] = {
+          clienteId: clienteCadastrado?.id || lancamento.clienteId || null,
           cliente,
           lancamentos: [],
           totalReceitas: 0,
@@ -555,9 +570,12 @@ export default function LancamentosContabeis() {
     }))
   }, [lancamentos, clientes])
 
+  const clienteFiltroCadastro = clientePorNome(clienteFiltro)
   const gruposFiltrados = clienteFiltro
-    ? clientesAgrupados.filter(
-        (grupo) => normalizarNome(grupo.cliente) === normalizarNome(clienteFiltro)
+    ? clientesAgrupados.filter((grupo) =>
+        clienteFiltroCadastro?.id && grupo.clienteId
+          ? Number(grupo.clienteId) === Number(clienteFiltroCadastro.id)
+          : normalizarNome(grupo.cliente) === normalizarNome(clienteFiltro)
       )
     : []
 

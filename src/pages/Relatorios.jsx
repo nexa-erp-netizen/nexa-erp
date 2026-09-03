@@ -72,6 +72,15 @@ export default function Relatorios() {
     return `${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
   }
 
+  function normalizarNome(valor) {
+    return String(valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase()
+  }
+
   function normalizarTipo(tipo) {
     const texto = String(tipo || "").toLowerCase()
 
@@ -92,7 +101,7 @@ export default function Relatorios() {
   }
 
   function lancamentoAutomaticoDeMovimento(item) {
-    return String(item.observacao || "").startsWith("movimento-cliente:")
+    return Boolean(item.movimentoClienteId) || String(item.observacao || "").startsWith("movimento-cliente:")
   }
 
   function normalizarMovimento(item, origem) {
@@ -143,12 +152,27 @@ export default function Relatorios() {
     ]
   }, [registrosRelatorio])
 
+  const clienteFixoCadastro = useMemo(() =>
+    clientes.find((item) => normalizarNome(item.nome) === normalizarNome(clienteFixo)) || null,
+  [clientes, clienteFixo])
+
+  const clienteSelecionadoCadastro = useMemo(() =>
+    clientes.find((item) => normalizarNome(item.nome) === normalizarNome(clienteSelecionado)) || null,
+  [clientes, clienteSelecionado])
+
+  function pertenceAoCliente(item, cadastro, nomeLegado) {
+    if (cadastro?.id && item?.clienteId) {
+      return Number(item.clienteId) === Number(cadastro.id)
+    }
+    return normalizarNome(item?.cliente) === normalizarNome(nomeLegado)
+  }
+
   const movimentosFiltrados = useMemo(() => {
     return registrosRelatorio.filter((item) => {
       const clienteOk =
         clienteLogado
-          ? item.cliente === clienteFixo
-          : !clienteSelecionado || item.cliente === clienteSelecionado
+          ? pertenceAoCliente(item, clienteFixoCadastro, clienteFixo)
+          : !clienteSelecionado || pertenceAoCliente(item, clienteSelecionadoCadastro, clienteSelecionado)
 
       const competenciaOk =
         competenciaSelecionada === "Todas" ||
@@ -164,7 +188,9 @@ export default function Relatorios() {
     registrosRelatorio,
     clienteLogado,
     clienteFixo,
+    clienteFixoCadastro,
     clienteSelecionado,
+    clienteSelecionadoCadastro,
     competenciaSelecionada,
     planoSelecionado,
   ])
