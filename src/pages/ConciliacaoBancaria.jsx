@@ -48,6 +48,10 @@ export default function ConciliacaoBancaria({ setPage }) {
   const [planoInvestigacaoId, setPlanoInvestigacaoId] = useState("")
   const [formaInvestigacao, setFormaInvestigacao] = useState("")
   const [mostrarAnaliseRestante, setMostrarAnaliseRestante] = useState(false)
+  const [ajusteEmRevisao, setAjusteEmRevisao] = useState(null)
+  const [tipoAjuste, setTipoAjuste] = useState("Arredondamento")
+  const [planoAjusteId, setPlanoAjusteId] = useState("")
+  const [observacaoAjuste, setObservacaoAjuste] = useState("")
   const periodoAutomaticoAplicadoRef = useRef("")
 
   useEffect(() => {
@@ -84,6 +88,10 @@ export default function ConciliacaoBancaria({ setPage }) {
   useEffect(() => {
     setSelecionadosInvestigacao([])
     setMostrarAnaliseRestante(false)
+    setAjusteEmRevisao(null)
+    setTipoAjuste("Arredondamento")
+    setPlanoAjusteId("")
+    setObservacaoAjuste("")
     if (!investigacao) return
 
     const planoBanco = planoContas.find(plano => {
@@ -297,6 +305,18 @@ export default function ConciliacaoBancaria({ setPage }) {
 
       if (
         movimento.statusConciliacao === "Conciliado" &&
+        String(movimento.observacoes || "").startsWith("Nexa Ajuste •")
+      ) {
+        resultado[movimento.id] = {
+          status: "BATENDO",
+          titulo: "Ajuste reconhecido",
+          detalhe: String(movimento.observacoes || "Ajuste registrado na auditoria da conciliação."),
+        }
+        return
+      }
+
+      if (
+        movimento.statusConciliacao === "Conciliado" &&
         String(movimento.observacoes || "").startsWith("Nexa Auto •")
       ) {
         const agrupado = String(movimento.observacoes || "").includes("agrupamento diário")
@@ -431,12 +451,24 @@ export default function ConciliacaoBancaria({ setPage }) {
     () => movimentos
       .filter(item => item.statusConciliacao !== "Ignorado")
       .reduce((r, item) => {
-        const valor = Number(item.valor || 0)
+        const valor = valorBancoConciliavel(item)
         if (item.natureza === "Entrada") r.entradas += valor
         else r.saidas += valor
         return r
       }, { entradas: 0, saidas: 0 }),
     [movimentos]
+  )
+
+  const ajustesReconhecidos = useMemo(
+    () => movimentos.filter(item =>
+      item.ajusteTipo || Math.abs(Number(item.ajusteComparacao || 0)) > 0.001
+    ),
+    [movimentos]
+  )
+
+  const efeitoLiquidoAjustes = useMemo(
+    () => ajustesReconhecidos.reduce((total, item) => total + Number(item.ajusteComparacao || 0), 0),
+    [ajustesReconhecidos]
   )
 
   const contaExtrato = useMemo(
@@ -476,7 +508,8 @@ export default function ConciliacaoBancaria({ setPage }) {
     ? null
     : saldoInicialBancoMes + variacaoBancoMes
   const resultadoClienteBancos = resumoClienteBancos.receitas - resumoClienteBancos.despesas
-  const diferencaVariacaoBancoCliente = variacaoBancoMes - resultadoClienteBancos
+  const variacaoBancoConciliavel = resumoBancoComparavel.entradas - resumoBancoComparavel.saidas
+  const diferencaVariacaoBancoCliente = variacaoBancoConciliavel - resultadoClienteBancos
   const diferencaSaldoOfx = saldoFinalBancoCalculado !== null && saldoFinalBancoInformado !== null
     ? saldoFinalBancoInformado - saldoFinalBancoCalculado
     : null
@@ -484,6 +517,7 @@ export default function ConciliacaoBancaria({ setPage }) {
   const diferencaEntradas = resumoBancoComparavel.entradas - resumoClienteBancos.receitas
   const diferencaSaidas = resumoBancoComparavel.saidas - resumoClienteBancos.despesas
   const TOLERANCIA_FECHAMENTO = 0.10
+  const LIMITE_MODO_TAXAS_CENTAVOS = 1.00
   const entradasBatem = Math.abs(diferencaEntradas) <= TOLERANCIA_FECHAMENTO
   const saidasBatem = Math.abs(diferencaSaidas) <= TOLERANCIA_FECHAMENTO
   const totaisBatem = entradasBatem && saidasBatem
@@ -552,6 +586,10 @@ export default function ConciliacaoBancaria({ setPage }) {
 
   const diferencaInvestigacaoAtual = investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas
   const restanteInvestigacao = Math.max(0, diferencaInvestigacaoAtual - totalSelecionadoInvestigacao)
+  const modoTaxasCentavos =
+    diferencaInvestigacaoAtual > TOLERANCIA_FECHAMENTO &&
+    diferencaInvestigacaoAtual < LIMITE_MODO_TAXAS_CENTAVOS
+  const exibirAnaliseRestante = modoTaxasCentavos || mostrarAnaliseRestante
 
   const analiseRestanteInvestigacao = useMemo(() => {
     if (!investigacao || restanteInvestigacao <= TOLERANCIA_FECHAMENTO) {
@@ -592,7 +630,8 @@ export default function ConciliacaoBancaria({ setPage }) {
 
         const valorBanco = Number(item.valor || 0)
         const valorCliente = Number(clienteMov.valor || 0)
-        const diferencaValores = Math.abs(valorCliente - valorBanco)
+        const diferencaAssinada = Number((valorCliente - valorBanco).toFixed(2))
+        const diferencaValores = Math.abs(diferencaAssinada)
 
         if (diferencaValores <= 0.01) continue
         if (diferencaValores > Math.max(5, restanteInvestigacao + 1)) continue
@@ -601,6 +640,7 @@ export default function ConciliacaoBancaria({ setPage }) {
           banco: item,
           cliente: clienteMov,
           analise,
+          diferencaAssinada,
           diferencaValores,
           distanciaRestante: Math.abs(diferencaValores - restanteInvestigacao),
         })
@@ -814,6 +854,9 @@ export default function ConciliacaoBancaria({ setPage }) {
   }
 
   function alternarSelecaoInvestigacao(id) {
+    if (modoTaxasCentavos) {
+      return alert(`Diferença restante de ${moeda(diferencaInvestigacaoAtual)}. O modo taxa/centavos está ativo e bloqueia novos lançamentos em massa.`)
+    }
     setMostrarAnaliseRestante(false)
     setSelecionadosInvestigacao(atual =>
       atual.includes(id) ? atual.filter(item => item !== id) : [...atual, id]
@@ -821,6 +864,9 @@ export default function ConciliacaoBancaria({ setPage }) {
   }
 
   function selecionarTodosInvestigacao() {
+    if (modoTaxasCentavos) {
+      return alert(`Diferença restante de ${moeda(diferencaInvestigacaoAtual)}. Revise taxas, agrupamentos e arredondamentos em vez de selecionar novos lançamentos.`)
+    }
     setMostrarAnaliseRestante(false)
     const ids = itensBancoInvestigacao.map(item => item.id)
     const todosSelecionados = ids.length > 0 && ids.every(id => selecionadosInvestigacao.includes(id))
@@ -829,6 +875,12 @@ export default function ConciliacaoBancaria({ setPage }) {
 
   function selecionarSomenteDiferencaInvestigacao() {
     const diferencaAtual = investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas
+
+    if (diferencaAtual > TOLERANCIA_FECHAMENTO && diferencaAtual < LIMITE_MODO_TAXAS_CENTAVOS) {
+      setSelecionadosInvestigacao([])
+      setMostrarAnaliseRestante(true)
+      return alert(`A diferença restante é de apenas ${moeda(diferencaAtual)}. A Nexa entrou no modo taxa/centavos e não fará nova seleção em massa.`)
+    }
     const alvoCentavos = Math.round(Number(diferencaAtual || 0) * 100)
 
     if (alvoCentavos <= Math.round(TOLERANCIA_FECHAMENTO * 100)) {
@@ -924,6 +976,10 @@ export default function ConciliacaoBancaria({ setPage }) {
   }
 
   async function lancarSelecionadosInvestigacao() {
+    if (modoTaxasCentavos) {
+      return alert(`Modo taxa/centavos ativo: a diferença é de ${moeda(diferencaInvestigacaoAtual)}. Identifique a origem antes de criar novos lançamentos.`)
+    }
+
     if (!itensSelecionadosInvestigacao.length) {
       return alert("Selecione pelo menos um movimento do extrato.")
     }
@@ -1024,6 +1080,85 @@ export default function ConciliacaoBancaria({ setPage }) {
       )
     } catch (e) {
       alert(e.response?.data?.message || "Erro ao lançar os movimentos selecionados.")
+    } finally {
+      setProcessando(false)
+    }
+  }
+
+  function abrirAjusteConciliacao(candidato) {
+    const diferenca = Number(candidato?.diferencaAssinada || 0)
+    const valor = Math.abs(diferenca)
+    const permiteTaxa = candidato?.banco?.natureza === "Entrada" && diferenca > 0.01
+    const permiteArredondamento = valor <= LIMITE_MODO_TAXAS_CENTAVOS
+
+    if (!permiteTaxa && !permiteArredondamento) {
+      return alert("Esta diferença não deve ser resolvida como taxa/centavos. Revise o lançamento ou o agrupamento antes de conciliar.")
+    }
+
+    setAjusteEmRevisao(candidato)
+    setTipoAjuste(permiteArredondamento ? "Arredondamento" : "Taxa")
+    setPlanoAjusteId("")
+    setObservacaoAjuste("")
+  }
+
+  async function registrarAjusteConciliacao() {
+    if (!ajusteEmRevisao) return
+    const diferenca = Number(ajusteEmRevisao.diferencaAssinada || 0)
+    const valor = Math.abs(diferenca)
+
+    if (tipoAjuste === "Taxa" && !planoAjusteId) {
+      return alert("Selecione o Plano de Contas que receberá a taxa/despesa.")
+    }
+
+    if (tipoAjuste === "Arredondamento" && valor > LIMITE_MODO_TAXAS_CENTAVOS) {
+      return alert("Arredondamento/compensação só pode ser usado para diferenças de até R$ 1,00.")
+    }
+
+    const textoTipo = tipoAjuste === "Taxa" ? "taxa/desconto" : "arredondamento/compensação"
+    const confirma = window.confirm(
+      `Registrar ${textoTipo} de ${moeda(valor)}?\n\n` +
+      `Banco: ${moeda(ajusteEmRevisao.banco.valor)}\n` +
+      `Movimento do cliente: ${moeda(ajusteEmRevisao.cliente.valor)}\n\n` +
+      (tipoAjuste === "Taxa"
+        ? "A Nexa criará uma Despesa contábil da taxa e manterá o valor real do extrato intacto."
+        : "Nenhum lançamento financeiro será criado; a diferença ficará registrada na auditoria da conciliação.")
+    )
+    if (!confirma) return
+
+    setProcessando(true)
+    try {
+      const r = await api.post(`/extratos-bancarios/movimentos/${ajusteEmRevisao.banco.id}/registrar-ajuste`, {
+        movimentoClienteReferenciaId: ajusteEmRevisao.cliente.id,
+        tipoAjuste,
+        planoContaId: tipoAjuste === "Taxa" ? planoAjusteId : null,
+        observacao: observacaoAjuste,
+      })
+      alert(r.data?.message || "Ajuste registrado.")
+      setAjusteEmRevisao(null)
+      setPlanoAjusteId("")
+      setObservacaoAjuste("")
+      await carregarExtratos()
+    } catch (e) {
+      alert(e.response?.data?.message || "Erro ao registrar ajuste da conciliação.")
+    } finally {
+      setProcessando(false)
+    }
+  }
+
+  async function desfazerAjusteConciliacao(item) {
+    const confirma = window.confirm(
+      `Desfazer o ajuste ${item.ajusteTipo || "reconhecido"} desta linha?\n\n` +
+      "Se a Nexa criou uma despesa de taxa, ela e o lançamento contábil correspondente também serão removidos."
+    )
+    if (!confirma) return
+
+    setProcessando(true)
+    try {
+      const r = await api.delete(`/extratos-bancarios/movimentos/${item.id}/ajuste`)
+      alert(r.data?.message || "Ajuste desfeito.")
+      await carregarExtratos()
+    } catch (e) {
+      alert(e.response?.data?.message || "Erro ao desfazer ajuste.")
     } finally {
       setProcessando(false)
     }
@@ -1395,11 +1530,11 @@ export default function ConciliacaoBancaria({ setPage }) {
                   <small>{moeda(resumoClienteBancos.receitas)} receitas • {moeda(resumoClienteBancos.despesas)} despesas</small>
                 </div>
                 <div style={s.balanceCard}>
-                  <span>Diferença da movimentação bancária</span>
+                  <span>Diferença da movimentação conciliável</span>
                   <strong style={{ color: Math.abs(diferencaVariacaoBancoCliente) <= TOLERANCIA_FECHAMENTO ? "#73ffd4" : "#ffbf69" }}>
                     {moeda(diferencaVariacaoBancoCliente)}
                   </strong>
-                  <small>Isso explica por que saldo bancário e resultado dos lançamentos podem parecer diferentes. Caixa não entra aqui.</small>
+                  <small>Compara Movimentos Clientes com o extrato após ajustes reconhecidos. O saldo bancário real continua usando o extrato sem alterações.</small>
                 </div>
               </div>
             </div>
@@ -1458,6 +1593,38 @@ export default function ConciliacaoBancaria({ setPage }) {
               </div>
             </div>
 
+            {ajustesReconhecidos.length > 0 && (
+              <div style={s.adjustmentsBox}>
+                <div style={s.adjustmentsHeader}>
+                  <div>
+                    <strong>Ajustes reconhecidos no mês: {ajustesReconhecidos.length}</strong>
+                    <small style={{ display: "block", marginTop: 4, color: "#b8d5ea" }}>
+                      Efeito comparativo líquido: {moeda(efeitoLiquidoAjustes)}. O saldo real do extrato não é alterado.
+                    </small>
+                  </div>
+                </div>
+                <div style={s.investigationList}>
+                  {ajustesReconhecidos.map(item => (
+                    <div key={`ajuste-${item.id}`} style={s.investigationItemSelectable}>
+                      <span>
+                        <b>{dataBr(item.data)}</b> • {item.descricao || "Movimento bancário"} • {item.ajusteTipo || "Ajuste"}
+                        <small style={{ display: "block", marginTop: 3, color: "#a9c9df" }}>
+                          Banco {moeda(item.valor)} → valor conciliável {moeda(valorBancoConciliavel(item))}
+                          {item.ajustadoPor ? ` • por ${item.ajustadoPor}` : ""}
+                        </small>
+                      </span>
+                      <strong style={{ color: Number(item.ajusteComparacao || 0) >= 0 ? "#42f5a7" : "#ffbf69" }}>
+                        {Number(item.ajusteComparacao || 0) >= 0 ? "+" : ""}{moeda(Number(item.ajusteComparacao || 0))}
+                      </strong>
+                      <button style={s.secondary} disabled={processando || fechamentoAtual?.status === "Fechado"} onClick={() => desfazerAjusteConciliacao(item)}>
+                        Desfazer
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {investigacao && (
               <div style={s.investigationBox}>
                 <div style={s.investigationHeader}>
@@ -1482,6 +1649,15 @@ export default function ConciliacaoBancaria({ setPage }) {
                       Abaixo estão movimentos do extrato ainda sem correspondência automática. Use <b>Selecionar só o que falta</b>: a Nexa considera automaticamente apenas linhas classificadas como faltantes seguros e ignora possíveis correspondências, agrupamentos e taxas. Revise antes de lançar. Cada linha será salva separadamente, mantendo data, descrição e valor. Se não fizerem parte da conciliação, use <b>Justificar</b>.
                     </div>
 
+                    {modoTaxasCentavos && (
+                      <div style={{ ...s.investigationTip, marginBottom: 12, border: "1px solid rgba(255, 196, 64, .55)", background: "rgba(255, 196, 64, .08)" }}>
+                        <strong style={{ display: "block", marginBottom: 6 }}>
+                          Modo taxa/centavos ativo • diferença {moeda(diferencaInvestigacaoAtual)}
+                        </strong>
+                        A diferença restante ficou abaixo de R$ 1,00. A Nexa bloqueou novas seleções e lançamentos em massa para evitar criar movimentos indevidos. Revise apenas taxas, arredondamentos, agrupamentos e compensações abaixo.
+                      </div>
+                    )}
+
                     <div style={s.investigationSummary}>
                       <div>
                         <strong>{itensBancoInvestigacao.length} linha(s) sem correspondência</strong>
@@ -1492,14 +1668,17 @@ export default function ConciliacaoBancaria({ setPage }) {
                           style={s.primary}
                           disabled={
                             processando ||
+                            modoTaxasCentavos ||
                             !itensBancoInvestigacao.length ||
                             (investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas) <= TOLERANCIA_FECHAMENTO
                           }
                           onClick={selecionarSomenteDiferencaInvestigacao}
                         >
-                          Selecionar só o que falta • {moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}
+                          {modoTaxasCentavos
+                            ? `Modo taxa/centavos • ${moeda(diferencaInvestigacaoAtual)}`
+                            : `Selecionar só o que falta • ${moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}`}
                         </button>
-                        <button style={s.secondary} disabled={processando || !itensBancoInvestigacao.length} onClick={selecionarTodosInvestigacao}>
+                        <button style={s.secondary} disabled={processando || modoTaxasCentavos || !itensBancoInvestigacao.length} onClick={selecionarTodosInvestigacao}>
                           {itensBancoInvestigacao.length > 0 && itensBancoInvestigacao.every(item => selecionadosInvestigacao.includes(item.id))
                             ? "Desmarcar todos"
                             : "Selecionar todos"}
@@ -1507,7 +1686,7 @@ export default function ConciliacaoBancaria({ setPage }) {
                       </div>
                     </div>
 
-                    {selecionadosInvestigacao.length > 0 && (
+                    {selecionadosInvestigacao.length > 0 && !modoTaxasCentavos && (
                       <div style={s.batchLaunchBox}>
                         <div style={s.batchLaunchHeader}>
                           <strong>Selecionados: {itensSelecionadosInvestigacao.length} • {moeda(totalSelecionadoInvestigacao)}</strong>
@@ -1556,7 +1735,7 @@ export default function ConciliacaoBancaria({ setPage }) {
                       </div>
                     )}
 
-                    {selecionadosInvestigacao.length > 0 && restanteInvestigacao > TOLERANCIA_FECHAMENTO && (
+                    {!modoTaxasCentavos && selecionadosInvestigacao.length > 0 && restanteInvestigacao > TOLERANCIA_FECHAMENTO && (
                       <div style={{ marginBottom: 12 }}>
                         <button
                           style={s.secondary}
@@ -1570,7 +1749,7 @@ export default function ConciliacaoBancaria({ setPage }) {
                       </div>
                     )}
 
-                    {mostrarAnaliseRestante && restanteInvestigacao > TOLERANCIA_FECHAMENTO && (
+                    {exibirAnaliseRestante && restanteInvestigacao > TOLERANCIA_FECHAMENTO && (
                       <div style={{ ...s.investigationTip, marginBottom: 12, border: "1px solid rgba(255, 196, 64, .45)" }}>
                         <strong style={{ display: "block", marginBottom: 6 }}>
                           Análise da diferença restante • {moeda(restanteInvestigacao)}
@@ -1591,13 +1770,87 @@ export default function ConciliacaoBancaria({ setPage }) {
                         {analiseRestanteInvestigacao.candidatosTaxa.length > 0 && (
                           <div style={{ marginTop: 10 }}>
                             <strong style={{ display: "block", marginBottom: 6 }}>Possíveis taxas/diferenças próximas</strong>
-                            {analiseRestanteInvestigacao.candidatosTaxa.map((candidato, indice) => (
-                              <div key={`${candidato.banco.id}-${candidato.cliente.id}-${indice}`} style={{ marginBottom: 5 }}>
-                                {dataBr(candidato.banco.data)} • {candidato.banco.descricao || "Movimento bancário"}:
-                                {" "}banco {moeda(candidato.banco.valor)} × cliente {moeda(candidato.cliente.valor)} →
-                                {" "}diferença {moeda(candidato.diferencaValores)}
-                              </div>
-                            ))}
+                            {analiseRestanteInvestigacao.candidatosTaxa.map((candidato, indice) => {
+                              const diferenca = Number(candidato.diferencaAssinada || 0)
+                              const valor = Math.abs(diferenca)
+                              const permiteTaxa = candidato.banco.natureza === "Entrada" && diferenca > 0.01
+                              const permiteArredondamento = valor <= LIMITE_MODO_TAXAS_CENTAVOS
+                              const podeRevisar = permiteTaxa || permiteArredondamento
+                              return (
+                                <div key={`${candidato.banco.id}-${candidato.cliente.id}-${indice}`} style={s.adjustmentCandidate}>
+                                  <div>
+                                    {dataBr(candidato.banco.data)} • {candidato.banco.descricao || "Movimento bancário"}:
+                                    {" "}banco {moeda(candidato.banco.valor)} × cliente {moeda(candidato.cliente.valor)} →
+                                    {" "}diferença {moeda(valor)}
+                                    <small style={{ display: "block", marginTop: 3, color: "#b8d5ea" }}>
+                                      {diferenca > 0
+                                        ? `O banco recebeu ${moeda(valor)} a menos que o valor registrado pelo cliente.`
+                                        : `O banco recebeu ${moeda(valor)} a mais que o valor registrado pelo cliente.`}
+                                    </small>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    style={s.secondary}
+                                    disabled={processando || !podeRevisar}
+                                    onClick={() => abrirAjusteConciliacao(candidato)}
+                                  >
+                                    {podeRevisar ? "Revisar ajuste" : "Revisão manual"}
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {ajusteEmRevisao && (
+                          <div style={s.adjustmentEditor}>
+                            <strong style={{ display: "block", marginBottom: 8 }}>Registrar ajuste com auditoria</strong>
+                            <div style={{ marginBottom: 8 }}>
+                              Banco {moeda(ajusteEmRevisao.banco.valor)} × cliente {moeda(ajusteEmRevisao.cliente.valor)} • diferença {moeda(ajusteEmRevisao.diferencaValores)}
+                            </div>
+                            <div style={s.batchLaunchControls}>
+                              <label style={s.label}>Tratamento
+                                <select style={s.input} value={tipoAjuste} onChange={e => setTipoAjuste(e.target.value)}>
+                                  {Math.abs(Number(ajusteEmRevisao.diferencaAssinada || 0)) <= LIMITE_MODO_TAXAS_CENTAVOS && (
+                                    <option value="Arredondamento">Arredondamento / compensação</option>
+                                  )}
+                                  {ajusteEmRevisao.banco.natureza === "Entrada" && Number(ajusteEmRevisao.diferencaAssinada || 0) > 0.01 && (
+                                    <option value="Taxa">Taxa / desconto de adquirente</option>
+                                  )}
+                                </select>
+                              </label>
+
+                              {tipoAjuste === "Taxa" && (
+                                <label style={s.label}>Plano da despesa
+                                  <select style={s.input} value={planoAjusteId} onChange={e => setPlanoAjusteId(e.target.value)}>
+                                    <option value="">Selecione</option>
+                                    {planoContas.map(plano => (
+                                      <option key={`ajuste-plano-${plano.id}`} value={plano.id}>{plano.nome || plano.descricao || plano.conta}</option>
+                                    ))}
+                                  </select>
+                                </label>
+                              )}
+
+                              <label style={s.label}>Observação
+                                <input
+                                  style={s.input}
+                                  value={observacaoAjuste}
+                                  onChange={e => setObservacaoAjuste(e.target.value)}
+                                  placeholder="Ex.: taxa InfinitePay / diferença de liquidação"
+                                />
+                              </label>
+                            </div>
+                            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                              <button style={s.primary} disabled={processando} onClick={registrarAjusteConciliacao}>
+                                {processando ? "Registrando..." : "Confirmar ajuste"}
+                              </button>
+                              <button style={s.secondary} disabled={processando} onClick={() => setAjusteEmRevisao(null)}>
+                                Cancelar
+                              </button>
+                            </div>
+                            <small style={{ display: "block", marginTop: 8, color: "#b8d5ea" }}>
+                              Taxa/desconto gera uma Despesa separada e auditável. Arredondamento/compensação não cria lançamento e é limitado a R$ 1,00.
+                            </small>
                           </div>
                         )}
 
@@ -1621,7 +1874,7 @@ export default function ConciliacaoBancaria({ setPage }) {
                           analiseRestanteInvestigacao.combinacaoRevisaoExata.length === 0 && (
                             <div style={{ marginTop: 10 }}>
                               A Nexa não encontrou, entre as linhas em revisão, uma explicação matemática direta para {moeda(restanteInvestigacao)}.
-                              Revise especialmente agrupamentos de cartão/adquirente e diferenças de taxa antes de lançar o lote.
+                              Revise especialmente agrupamentos de cartão/adquirente e diferenças de taxa. {modoTaxasCentavos ? "Novos lançamentos em massa permanecem bloqueados." : "Revise antes de lançar o lote."}
                             </div>
                           )}
                       </div>
@@ -1632,8 +1885,8 @@ export default function ConciliacaoBancaria({ setPage }) {
                         <div key={item.id} style={s.investigationItemSelectable}>
                           <input
                             type="checkbox"
+                            disabled={modoTaxasCentavos || processando}
                             checked={selecionadosInvestigacao.includes(item.id)}
-                            disabled={processando}
                             onChange={() => alternarSelecaoInvestigacao(item.id)}
                             aria-label={`Selecionar movimento ${item.id}`}
                           />
@@ -1827,7 +2080,14 @@ function rotuloDiferenca(valor) {
 
 function Campo({ t, children }) { return <label style={s.label}>{t}{children}</label> }
 function Resumo({ t, v, cor }) { return <div style={s.summaryItem}><span>{t}</span><strong style={{ color: cor }}>{v}</strong></div> }
+function valorBancoConciliavel(item) {
+  return Number(item?.valor || 0) + Number(item?.ajusteComparacao || 0)
+}
+
 function movimentoClienteEhBancario(item) {
+  const observacao = normalizar(item?.observacao)
+  if (observacao.includes("ajuste-conciliacao-bancaria:")) return false
+
   const plano = String(item?.planoContaNome || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -1891,6 +2151,10 @@ const s = {
   statusWarn: { padding: "5px 9px", borderRadius: 999, background: "#6d510c", color: "#ffe08a", fontSize: 11, fontWeight: 900 },
   investigateButton: { width: "100%", marginTop: 10, border: "1px solid #36c8e8", borderRadius: 10, padding: "10px 13px", background: "#0b6078", color: "#fff", fontWeight: 900, cursor: "pointer" },
   investigationBox: { padding: 16, marginBottom: 14, borderRadius: 14, background: "#0a2448", border: "1px solid #2d6da6" },
+  adjustmentsBox: { padding: 14, marginBottom: 14, borderRadius: 14, background: "rgba(30, 124, 106, .12)", border: "1px solid rgba(66, 245, 167, .35)" },
+  adjustmentsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 },
+  adjustmentCandidate: { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,.08)" },
+  adjustmentEditor: { marginTop: 12, marginBottom: 12, padding: 12, borderRadius: 10, background: "rgba(7,31,67,.72)", border: "1px solid rgba(66,245,167,.38)" },
   investigationHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 10 },
   investigationTip: { padding: 11, borderRadius: 10, background: "rgba(53,157,210,.08)", color: "#c6e2f5", fontSize: 12, marginBottom: 10 },
   investigationList: { display: "grid", gap: 7 },
