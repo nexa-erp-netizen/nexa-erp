@@ -6,6 +6,7 @@ export default function LancamentosContabeis() {
   const [clientes, setClientes] = useState([])
   const [servicos, setServicos] = useState([])
   const [planoContas, setPlanoContas] = useState([])
+  const [formasPagamento, setFormasPagamento] = useState([])
   const [clienteAtual, setClienteAtual] = useState(0)
   const [clienteFiltro, setClienteFiltro] = useState("")
   const competenciaAtual = new Date().toISOString().slice(0, 7)
@@ -22,6 +23,7 @@ export default function LancamentosContabeis() {
     data: "",
     categoria: "",
     planoConta: "",
+    formaPagamento: "",
     origem: "Escritório",
   })
 
@@ -54,6 +56,7 @@ export default function LancamentosContabeis() {
         data: "",
         categoria: "",
         planoConta: "",
+        formaPagamento: "",
         origem: "Escritório",
       }))
       localStorage.removeItem("nexaFiltroLancamentosCliente")
@@ -69,6 +72,7 @@ export default function LancamentosContabeis() {
       carregarClientes(),
       carregarServicos(),
       carregarPlanoContas(),
+      carregarFormasPagamento(),
     ])
   }
 
@@ -105,6 +109,16 @@ export default function LancamentosContabeis() {
       setPlanoContas(Array.isArray(resposta.data) ? resposta.data : [])
     } catch (erro) {
       console.error("Erro ao carregar plano de contas:", erro)
+    }
+  }
+
+  async function carregarFormasPagamento() {
+    try {
+      const resposta = await api.get("/formas-pagamento")
+      setFormasPagamento(Array.isArray(resposta.data) ? resposta.data : [])
+    } catch (erro) {
+      console.error("Erro ao carregar formas de pagamento:", erro)
+      setFormasPagamento([])
     }
   }
 
@@ -359,8 +373,8 @@ export default function LancamentosContabeis() {
   async function salvarLancamento(e) {
     e.preventDefault()
 
-    if (!form.cliente || !form.descricao || !form.valor || !form.data) {
-      alert("Preencha cliente, descrição, quantidade, valor unitário e data.")
+    if (!form.cliente || !form.descricao || !form.valor || !form.data || !form.formaPagamento) {
+      alert("Preencha cliente, descrição, quantidade, valor unitário, data e forma de pagamento.")
       return
     }
 
@@ -383,6 +397,7 @@ export default function LancamentosContabeis() {
       data: form.data,
       categoria: form.planoConta || form.categoria,
       planoConta: form.planoConta || form.categoria,
+      formaPagamento: form.formaPagamento,
       origem: "Escritório",
     }
 
@@ -418,6 +433,7 @@ export default function LancamentosContabeis() {
       data: "",
       categoria: "",
       planoConta: "",
+      formaPagamento: "",
       origem: "Escritório",
     })
   }
@@ -435,6 +451,7 @@ export default function LancamentosContabeis() {
       data: lancamento.data || "",
       categoria: lancamento.planoConta || lancamento.categoria || "",
       planoConta: lancamento.planoConta || lancamento.categoria || "",
+      formaPagamento: lancamento.formaPagamento || lancamento.forma || "",
       origem: origemExibida(lancamento),
     })
 
@@ -1045,6 +1062,34 @@ export default function LancamentosContabeis() {
               )}
           </select>
 
+          <select
+            className="lc-select"
+            value={form.formaPagamento}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                formaPagamento: e.target.value,
+              })
+            }
+          >
+            <option value="">Selecione a forma de pagamento</option>
+
+            {formasPagamento
+              .filter((forma) => forma.ativo !== false)
+              .map((forma) => (
+                <option key={forma.id} value={forma.nome}>
+                  {forma.nome}
+                </option>
+              ))}
+
+            {form.formaPagamento &&
+              !formasPagamento.some((forma) => forma.nome === form.formaPagamento) && (
+                <option value={form.formaPagamento}>
+                  {form.formaPagamento}
+                </option>
+              )}
+          </select>
+
           <button className="lc-button">
             {editandoId ? "Atualizar Lançamento" : "Salvar Lançamento"}
           </button>
@@ -1217,6 +1262,7 @@ export default function LancamentosContabeis() {
                 <th>Qtd.</th>
                 <th>Valor unitário</th>
                 <th>Total</th>
+                <th>Forma</th>
                 <th>Origem</th>
                 <th>Ações</th>
               </tr>
@@ -1239,6 +1285,7 @@ export default function LancamentosContabeis() {
                   <td>{quantidadeSegura(lancamento.quantidade)}</td>
                   <td>{formatarMoeda(valorUnitarioLancamento(lancamento))}</td>
                   <td><strong>{formatarMoeda(lancamento.valor)}</strong></td>
+                  <td>{lancamento.formaPagamento || lancamento.forma || "-"}</td>
                   <td>{origemExibida(lancamento)}</td>
                   <td>
                     <div className="lc-actions">
