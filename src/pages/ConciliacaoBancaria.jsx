@@ -2085,7 +2085,11 @@ function valorBancoConciliavel(item) {
 }
 
 function movimentoClienteEhBancario(item) {
-  const observacao = normalizar(item?.observacao)
+  const observacao = String(item?.observacao || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
   if (observacao.includes("ajuste-conciliacao-bancaria:")) return false
 
   const plano = String(item?.planoContaNome || "")
