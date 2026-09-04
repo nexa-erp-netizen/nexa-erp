@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.53.1",
-  build: "35301",
-  release: "Plano de Contas e lançamentos corrigidos",
+  version: "3.54.0",
+  build: "35400",
+  release: "Migrations controladas no PostgreSQL",
   date: "04/09/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.54.0", release: "Migrations controladas no PostgreSQL", date: "04/09/2026", items: ["Inicialização da API deixa de usar sequelize.sync({ alter: true })", "Banco existente passa a evoluir por migrations transacionais e versionadas", "Tabela schema_migrations registra nome, checksum e tempo de execução", "Migration já aplicada não pode ser alterada silenciosamente: mudança de checksum bloqueia a inicialização", "Banco totalmente vazio pode receber bootstrap inicial sem alter e sem force", "Baseline v3.53.1 é somente aditiva e protege clienteId, vínculos contábeis, ajustes bancários, idempotência e auditoria de backup", "Health da API passa a informar o estado das migrations", "Nenhum dado existente é excluído ou recalculado"] },
     { version: "3.53.1", release: "Plano de Contas e lançamentos corrigidos", date: "04/09/2026", items: ["Naturezas padrão corrigidas: Caixa e Bancos devedoras; Simples a recolher credora", "Receita Bruta Mensal permanece credora e Simples Nacional permanece devedora", "Lançamentos Contábeis deixam de esconder contas analíticas por natureza", "Contas sintéticas continuam fora do seletor de lançamentos", "Nenhum lançamento histórico ou valor financeiro é alterado"] },
     { version: "3.53.0", release: "Backup e restauração segura", date: "03/09/2026", items: ["Backups passam a usar formato v2 com checksum geral e por tabela", "Backup do escritório é capturado em snapshot consistente do PostgreSQL", "Restauração automática disponível para backups v3.53 ou superiores", "Antes de restaurar, a Nexa cria automaticamente um backup de segurança do estado atual", "Restauração é executada em transação e desfeita integralmente se houver falha", "Após inserir os dados, cada tabela é conferida novamente pelo checksum antes do commit", "Backups de outro escritório e arquivos alterados ou incompletos são bloqueados", "Restaurações exigem confirmação explícita e ficam registradas em auditoria", "Backups antigos continuam disponíveis para download, sem restauração automática", "Download local autenticado corrigido quando o Supabase não estiver disponível"] },
     { version: "3.52.0", release: "Antiduplicidade persistente no PostgreSQL", date: "03/09/2026", items: ["Chaves de idempotência dos Movimentos do Cliente passam a ser persistidas no PostgreSQL", "Proteção continua ativa após reinício do Render e entre múltiplas instâncias da API", "Reenvio da mesma chave retorna a resposta original sem criar novos movimentos", "Chaves explícitas ficam protegidas por 24 horas", "Lotes sem chave explícita continuam com proteção heurística curta para evitar bloquear lançamentos legítimos", "Movimento e Lançamento Contábil continuam gravados na mesma transação", "Falhas durante a gravação desfazem também a reserva idempotente, permitindo retry seguro", "Ferramenta de localizar e remover possíveis duplicados permanece disponível como camada extra"] },
