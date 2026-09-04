@@ -1,6 +1,6 @@
 {
   "name": "contabilplus-web",
-  "version": "3.53.0",
+  "version": "3.53.1",
   "private": true,
   "main": "electron/main.js",
   "scripts": {

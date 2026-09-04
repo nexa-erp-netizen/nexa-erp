@@ -122,25 +122,13 @@ export default function LancamentosContabeis() {
     }
   }
 
-  function naturezaCompativel(conta, tipoLancamento) {
-    const natureza = String(conta?.natureza || "").toLowerCase()
-    const nomeConta = String(conta?.conta || "").toLowerCase()
+  function contaLancavel(conta) {
+    const tipoConta = String(conta?.tipo || "").trim().toLowerCase()
 
-    if (tipoLancamento === "receita") {
-      return (
-        natureza.includes("credora") ||
-        nomeConta.includes("receita") ||
-        nomeConta.includes("faturamento")
-      )
-    }
-
-    return (
-      natureza.includes("devedora") ||
-      nomeConta.includes("despesa") ||
-      nomeConta.includes("custo") ||
-      nomeConta.includes("imposto") ||
-      nomeConta.includes("taxa")
-    )
+    // Conta sintética serve apenas para agrupamento.
+    // Lançamentos devem aceitar qualquer conta analítica, independentemente
+    // de sua natureza devedora/credora.
+    return !tipoConta || !tipoConta.includes("sint")
   }
 
   function selecionarPlanoConta(valor) {
@@ -616,12 +604,10 @@ export default function LancamentosContabeis() {
   }, [grupo, competenciaFiltro])
 
   const planosContasFiltrados = useMemo(() => {
-    const filtrados = planoContas.filter((conta) =>
-      naturezaCompativel(conta, form.tipo)
-    )
+    const lancaveis = planoContas.filter(contaLancavel)
 
-    return filtrados.length > 0 ? filtrados : planoContas
-  }, [planoContas, form.tipo])
+    return lancaveis.length > 0 ? lancaveis : planoContas
+  }, [planoContas])
 
   return (
     <div className="lc-page">
