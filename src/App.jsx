@@ -282,7 +282,7 @@ export default function App() {
         return <Relatorios />
 
       case "Usuários":
-        return <Usuarios />
+        return <Usuarios usuarioLogado={usuario} />
 
       case "Escritórios Nexa":
         return usuario?.plataformaAdmin ? <EscritoriosNexa /> : <Dashboard />

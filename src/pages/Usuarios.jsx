@@ -2,7 +2,17 @@ import { useEffect, useMemo, useState } from "react"
 import api from "../services/api"
 import ClienteAcessoResumo from "../components/ClienteAcessoResumo"
 
-export default function Usuarios() {
+function gerarCodigo(nome) {
+  return String(nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+export default function Usuarios({ usuarioLogado }) {
   const [usuarios, setUsuarios] = useState([])
   const [clientes, setClientes] = useState([])
 
@@ -11,6 +21,9 @@ export default function Usuarios() {
   const [senha, setSenha] = useState("")
   const [perfil, setPerfil] = useState("Cliente")
   const [clienteVinculado, setClienteVinculado] = useState("")
+  const [escritorioNome, setEscritorioNome] = useState("")
+  const [codigoAcesso, setCodigoAcesso] = useState("")
+  const [acessoCriado, setAcessoCriado] = useState(null)
   const [editandoId, setEditandoId] = useState(null)
 
   useEffect(() => {
@@ -83,6 +96,41 @@ export default function Usuarios() {
       return
     }
 
+    if (perfil === "Empresa" && !editandoId) {
+      if (!usuarioLogado?.plataformaAdmin) {
+        alert("Somente a administração da plataforma pode criar um escritório para outra empresa")
+        return
+      }
+
+      if (!escritorioNome || !codigoAcesso) {
+        alert("Preencha o nome do escritório e o código de acesso")
+        return
+      }
+
+      try {
+        const resposta = await api.post("/escritorios", {
+          nome: escritorioNome,
+          codigo: codigoAcesso,
+          adminNome: nome,
+          adminEmail: email,
+          adminSenha: senha,
+          adminPerfil: "Empresa",
+          plano: "Profissional",
+        })
+        setAcessoCriado({
+          escritorio: resposta.data?.escritorio?.nome || escritorioNome,
+          codigo: resposta.data?.escritorio?.codigo || codigoAcesso,
+          email,
+        })
+        limparCampos({ preservarAcesso: true })
+        return
+      } catch (error) {
+        alert(error.response?.data?.message || "Erro ao criar o escritório da empresa")
+        console.error(error)
+        return
+      }
+    }
+
     const dados = {
       nome,
       email,
@@ -138,13 +186,26 @@ export default function Usuarios() {
     }
   }
 
-  function limparCampos() {
+  function limparCampos(opcoes = {}) {
     setEditandoId(null)
     setNome("")
     setEmail("")
     setSenha("")
     setPerfil("Cliente")
     setClienteVinculado("")
+    setEscritorioNome("")
+    setCodigoAcesso("")
+    if (!opcoes.preservarAcesso) setAcessoCriado(null)
+  }
+
+  async function copiarCodigo() {
+    if (!acessoCriado?.codigo) return
+    try {
+      await navigator.clipboard.writeText(acessoCriado.codigo)
+      alert("Código de acesso copiado")
+    } catch {
+      alert(`Código de acesso: ${acessoCriado.codigo}`)
+    }
   }
 
   return (
@@ -152,8 +213,22 @@ export default function Usuarios() {
       <h2>Usuários</h2>
 
       <p style={subtitle}>
-        Crie acessos para administradores, empresas, funcionários e clientes. A Nexa é exclusiva do Administrador.
+        Crie acessos para administradores, funcionários e clientes. Empresas externas recebem um escritório próprio e isolado.
       </p>
+
+      {acessoCriado && (
+        <div style={acessoInfo}>
+          <div>
+            <strong>Escritório criado com ambiente vazio e isolado</strong>
+            <span>{acessoCriado.escritorio} · {acessoCriado.email}</span>
+          </div>
+          <div style={codigoBox}>
+            <span>Código de acesso</span>
+            <b>{acessoCriado.codigo}</b>
+            <button style={copyButton} onClick={copiarCodigo}>Copiar código</button>
+          </div>
+        </div>
+      )}
 
       <div style={form}>
         <input
@@ -194,7 +269,7 @@ export default function Usuarios() {
           }}
         >
           <option value="Administrador">Administrador</option>
-          <option value="Empresa">Empresa</option>
+          {usuarioLogado?.plataformaAdmin && <option value="Empresa">Empresa (novo escritório)</option>}
           <option value="Funcionário">Funcionário</option>
           <option value="Cliente">Cliente</option>
         </select>
@@ -217,8 +292,29 @@ export default function Usuarios() {
           </select>
         )}
 
+        {perfil === "Empresa" && !editandoId && (
+          <>
+            <input
+              style={input}
+              placeholder="Nome do escritório/empresa"
+              value={escritorioNome}
+              onChange={(e) => {
+                const valor = e.target.value
+                setEscritorioNome(valor)
+                setCodigoAcesso(gerarCodigo(valor))
+              }}
+            />
+            <input
+              style={input}
+              placeholder="Código de acesso"
+              value={codigoAcesso}
+              onChange={(e) => setCodigoAcesso(gerarCodigo(e.target.value))}
+            />
+          </>
+        )}
+
         <button style={button} onClick={salvarUsuario}>
-          {editandoId ? "Salvar Alteração" : "Criar Usuário"}
+          {editandoId ? "Salvar Alteração" : perfil === "Empresa" ? "Criar Empresa e Escritório" : "Criar Usuário"}
         </button>
 
         {editandoId && (
@@ -335,6 +431,36 @@ const clienteInfo = {
   marginBottom: "24px",
   color: "#d9e7ff",
   lineHeight: "24px",
+}
+
+const acessoInfo = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "18px",
+  flexWrap: "wrap",
+  background: "rgba(55,255,116,.10)",
+  border: "1px solid rgba(55,255,116,.35)",
+  borderRadius: "14px",
+  padding: "16px",
+  marginBottom: "22px",
+  color: "#eafff0",
+}
+
+const codigoBox = {
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  flexWrap: "wrap",
+}
+
+const copyButton = {
+  padding: "9px 12px",
+  borderRadius: "9px",
+  border: "1px solid rgba(55,255,116,.5)",
+  background: "#06335a",
+  color: "white",
+  cursor: "pointer",
 }
 
 const button = {

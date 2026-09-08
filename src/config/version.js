@@ -1,14 +1,15 @@
 const NEXA_VERSION = {
-  version: "3.55.0",
-  build: "35500",
-  release: "Contingência automática da API",
-  date: "04/09/2026",
+  version: "3.55.1",
+  build: "35501",
+  release: "Escritórios de teste isolados",
+  date: "08/09/2026",
   status: "Produção",
   frontend: "Vercel",
   backend: "Render",
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.55.1", release: "Escritórios de teste isolados", date: "08/09/2026", items: ["Perfil Empresa passa a criar um novo escritório em vez de herdar o escritório atual", "Código de acesso exclusivo é gerado a partir do nome do escritório e pode ser ajustado antes do cadastro", "Usuário Empresa é criado dentro do novo escritório com ambiente vazio", "Clientes, documentos, financeiro e demais dados permanecem isolados por escritorioId", "Cadastro comum de usuários bloqueia a criação acidental de Empresa dentro do escritório atual", "Código criado fica disponível para copiar e entregar à empresa"] },
     { version: "3.55.0", release: "Contingência automática da API", date: "04/09/2026", items: ["Web passa a suportar API principal e API secundária por VITE_API_SECONDARY_URL", "Health check valida servidor, PostgreSQL e versão da API antes de trocar de instância", "Se a principal cair, novas requisições seguem automaticamente para a secundária saudável", "GET, HEAD e OPTIONS podem ser repetidos uma única vez na secundária após falha de infraestrutura", "POST, PUT, PATCH e DELETE nunca são repetidos automaticamente para evitar duplicidade após resposta perdida", "Quando a principal volta, a Nexa retorna automaticamente para ela", "Faixa de status diferencia contingência ativa de indisponibilidade total", "Captura de incidentes também tenta a API secundária", "Migrations usam advisory lock do PostgreSQL para permitir duas instâncias da API com segurança"] },
     { version: "3.54.0", release: "Migrations controladas no PostgreSQL", date: "04/09/2026", items: ["Inicialização da API deixa de usar sequelize.sync({ alter: true })", "Banco existente passa a evoluir por migrations transacionais e versionadas", "Tabela schema_migrations registra nome, checksum e tempo de execução", "Migration já aplicada não pode ser alterada silenciosamente: mudança de checksum bloqueia a inicialização", "Banco totalmente vazio pode receber bootstrap inicial sem alter e sem force", "Baseline v3.53.1 é somente aditiva e protege clienteId, vínculos contábeis, ajustes bancários, idempotência e auditoria de backup", "Health da API passa a informar o estado das migrations", "Nenhum dado existente é excluído ou recalculado"] },
     { version: "3.53.1", release: "Plano de Contas e lançamentos corrigidos", date: "04/09/2026", items: ["Naturezas padrão corrigidas: Caixa e Bancos devedoras; Simples a recolher credora", "Receita Bruta Mensal permanece credora e Simples Nacional permanece devedora", "Lançamentos Contábeis deixam de esconder contas analíticas por natureza", "Contas sintéticas continuam fora do seletor de lançamentos", "Nenhum lançamento histórico ou valor financeiro é alterado"] },
@@ -377,4 +378,3 @@ const NEXA_VERSION = {
 }
 
 export default NEXA_VERSION
-
