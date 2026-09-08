@@ -59,6 +59,8 @@ export default function CentralEcac({ usuarioLogado }) {
   const [cofreAtivo,setCofreAtivo]=useState(false)
   const [acesso,setAcesso]=useState(ACESSO_INICIAL)
   const [salvandoAcesso,setSalvandoAcesso]=useState(false)
+  const [senhaRevelada,setSenhaRevelada]=useState("")
+  const [revelandoSenha,setRevelandoSenha]=useState(false)
   const usuario=useMemo(()=>{
     if (usuarioLogado) return usuarioLogado
     try {
@@ -102,6 +104,19 @@ export default function CentralEcac({ usuarioLogado }) {
     ()=>credenciais.filter(x=>String(x.clienteId)===String(clienteId)),
     [credenciais,clienteId]
   )
+  const credencialGovBr=useMemo(
+    ()=>credenciaisCliente.find(x=>x.metodo==="GOV_BR"&&x.ativo&&x.possuiSegredo),
+    [credenciaisCliente]
+  )
+  const temSenhaGovBr=Boolean(credencialGovBr||cliente?.possuiSenhaGovBr)
+
+  useEffect(()=>{ setSenhaRevelada("") },[clienteId])
+
+  useEffect(()=>{
+    if (!senhaRevelada) return undefined
+    const timer=setTimeout(()=>setSenhaRevelada(""),30000)
+    return ()=>clearTimeout(timer)
+  },[senhaRevelada])
 
   async function salvarCredencial() {
     if (!cliente) return alert("Selecione o cliente.")
@@ -133,6 +148,30 @@ export default function CentralEcac({ usuarioLogado }) {
       await api.delete(`/credenciais-fiscais/${item.id}`)
       setCredenciais(atual=>atual.filter(x=>x.id!==item.id))
     } catch(e) { alert(e?.response?.data?.message||"Não foi possível remover o acesso.") }
+  }
+
+  async function revelarSenhaGovBr() {
+    if (!cliente||!temSenhaGovBr) return
+    if (!window.confirm(`Revelar a senha Gov.br de ${cliente.nome}? Esta consulta ficará registrada no histórico.`)) return
+    setRevelandoSenha(true)
+    try {
+      const resposta=await api.post(`/credenciais-fiscais/cliente/${cliente.id}/senha-gov/revelar`,{confirmado:true})
+      setSenhaRevelada(String(resposta.data?.segredo||""))
+      const cred=await api.get("/credenciais-fiscais")
+      setCredenciais(Array.isArray(cred.data)?cred.data:[])
+    } catch(e) {
+      alert(e?.response?.data?.message||"Não foi possível revelar a senha Gov.br.")
+    } finally { setRevelandoSenha(false) }
+  }
+
+  async function copiarSenhaGovBr() {
+    if (!senhaRevelada) return
+    try {
+      await navigator.clipboard.writeText(senhaRevelada)
+      alert("Senha Gov.br copiada. Não compartilhe em canais inseguros.")
+    } catch {
+      alert("Não foi possível copiar automaticamente.")
+    }
   }
 
   async function abrir(link) {
@@ -184,11 +223,22 @@ export default function CentralEcac({ usuarioLogado }) {
           <button style={styles.safeButton} disabled={!cofreAtivo||salvandoAcesso} onClick={salvarCredencial}>{salvandoAcesso?"Protegendo...":"Salvar no cofre"}</button>
         </div>
         <div style={styles.vaultList}>
-          {credenciaisCliente.length===0?<p style={styles.empty}>Nenhum método de acesso vinculado.</p>:credenciaisCliente.map(item=><div key={item.id} style={styles.vaultItem}>
+          {credenciaisCliente.length===0&&!cliente?.possuiSenhaGovBr?<p style={styles.empty}>Nenhum método de acesso vinculado.</p>:credenciaisCliente.map(item=><div key={item.id} style={styles.vaultItem}>
             <div><strong>{ROTULOS_METODO[item.metodo]||item.metodo}</strong><span style={styles.meta}>{item.nomeArquivo||item.identificador||"Vínculo cadastrado"} • {item.possuiSegredo?"segredo protegido":"sem senha"} • {item.arquivoNoSupabase?"arquivo privado":"sem arquivo privado"} • {item.ativo?"ativo":"inativo"}</span></div>
-            <button style={styles.removeButton} onClick={()=>removerCredencial(item)}>Remover</button>
+            <div style={styles.vaultActions}>
+              {item.metodo==="GOV_BR"&&item.possuiSegredo&&item.ativo&&<button style={styles.revealButton} disabled={revelandoSenha} onClick={revelarSenhaGovBr}>{revelandoSenha?"Consultando...":"Mostrar senha"}</button>}
+              <button style={styles.removeButton} onClick={()=>removerCredencial(item)}>Remover</button>
+            </div>
           </div>)}
+          {!credencialGovBr&&cliente?.possuiSenhaGovBr&&<div style={styles.vaultItem}>
+            <div><strong>Conta gov.br</strong><span style={styles.meta}>Senha antiga cadastrada • será migrada para o cofre na primeira consulta</span></div>
+            <button style={styles.revealButton} disabled={revelandoSenha} onClick={revelarSenhaGovBr}>{revelandoSenha?"Protegendo...":"Mostrar senha"}</button>
+          </div>}
         </div>
+        {senhaRevelada&&<div style={styles.secretBox}>
+          <div><span style={styles.label}>Senha Gov.br — ocultada automaticamente em 30 segundos</span><strong style={styles.secretValue}>{senhaRevelada}</strong></div>
+          <div style={styles.vaultActions}><button style={styles.copyButton} onClick={copiarSenhaGovBr}>Copiar senha</button><button style={styles.removeButton} onClick={()=>setSenhaRevelada("")}>Ocultar</button></div>
+        </div>}
         <p style={styles.warning}>Esta etapa não acessa, transmite nem retifica declarações. A conta gov.br fica cadastrada, mas a automação permanece bloqueada.</p>
       </>}
     </div> : <div style={styles.card}>
@@ -220,5 +270,5 @@ const styles={
   page:{display:"flex",flexDirection:"column",gap:"18px"}, hero:{background:"linear-gradient(135deg,#061f47,#032f68)",border:"1px solid rgba(55,255,116,.18)",borderRadius:"22px",padding:"24px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:"16px",flexWrap:"wrap"}, badge:{color:"#37ff74",fontWeight:"bold",fontSize:"13px"}, title:{margin:"8px 0",fontSize:"30px"}, subtitle:{margin:0,color:"#b8c7dc"}, refresh:{background:"#00a8ff",color:"white",border:0,borderRadius:"10px",padding:"11px 16px",fontWeight:"bold",cursor:"pointer"},
   card:{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.10)",borderRadius:"18px",padding:"20px"}, label:{display:"block",color:"#a9b8cc",fontSize:"13px",marginBottom:"7px"}, select:{width:"100%",background:"#061f47",color:"white",border:"1px solid rgba(255,255,255,.18)",borderRadius:"10px",padding:"12px"}, input:{width:"100%",boxSizing:"border-box",background:"#061f47",color:"white",border:"1px solid rgba(255,255,255,.18)",borderRadius:"10px",padding:"12px"}, statusGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"12px"}, statusCard:{background:"#061f47",border:"1px solid rgba(255,255,255,.11)",borderRadius:"16px",padding:"17px",display:"flex",flexDirection:"column",gap:"6px"},
   linksGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"12px"}, linkCard:{textAlign:"left",background:"linear-gradient(145deg,#061f47,#07346d)",color:"white",border:"1px solid rgba(0,168,255,.25)",borderRadius:"16px",padding:"18px",cursor:"pointer",display:"flex",flexDirection:"column",gap:"8px"}, linkTitle:{fontSize:"18px"}, linkDesc:{color:"#b8c7dc",minHeight:"38px"}, open:{color:"#37ff74",fontWeight:"bold"}, cardTitle:{marginTop:0}, empty:{color:"#a9b8cc"}, history:{display:"flex",justifyContent:"space-between",gap:"12px",padding:"12px 0",borderBottom:"1px solid rgba(255,255,255,.08)",flexWrap:"wrap"}, meta:{display:"block",color:"#a9b8cc",fontSize:"13px",marginTop:"4px"}, right:{textAlign:"right",color:"#dce8f8"}
-  ,listHeader:{display:"flex",justifyContent:"space-between",gap:"12px",alignItems:"center",flexWrap:"wrap"}, formGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:"10px"}, safeButton:{background:"#37ff74",color:"#00142f",border:0,borderRadius:"10px",padding:"12px",fontWeight:"bold",cursor:"pointer"}, cofreBadge:{fontWeight:"bold",background:"#061f47",padding:"9px 12px",borderRadius:"999px"}, vaultList:{display:"flex",flexDirection:"column",gap:"8px",marginTop:"16px"}, vaultItem:{display:"flex",justifyContent:"space-between",gap:"12px",alignItems:"center",background:"#061f47",padding:"12px",borderRadius:"12px"}, removeButton:{background:"transparent",color:"#ff8a8f",border:"1px solid rgba(255,95,101,.5)",borderRadius:"9px",padding:"8px 11px",cursor:"pointer"}, warning:{color:"#ffd54a",fontSize:"13px",marginBottom:0}
+  ,listHeader:{display:"flex",justifyContent:"space-between",gap:"12px",alignItems:"center",flexWrap:"wrap"}, formGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:"10px"}, safeButton:{background:"#37ff74",color:"#00142f",border:0,borderRadius:"10px",padding:"12px",fontWeight:"bold",cursor:"pointer"}, cofreBadge:{fontWeight:"bold",background:"#061f47",padding:"9px 12px",borderRadius:"999px"}, vaultList:{display:"flex",flexDirection:"column",gap:"8px",marginTop:"16px"}, vaultItem:{display:"flex",justifyContent:"space-between",gap:"12px",alignItems:"center",background:"#061f47",padding:"12px",borderRadius:"12px",flexWrap:"wrap"}, vaultActions:{display:"flex",gap:"8px",alignItems:"center",flexWrap:"wrap"}, revealButton:{background:"#00a8ff",color:"white",border:0,borderRadius:"9px",padding:"9px 12px",fontWeight:"bold",cursor:"pointer"}, copyButton:{background:"#37ff74",color:"#00142f",border:0,borderRadius:"9px",padding:"9px 12px",fontWeight:"bold",cursor:"pointer"}, secretBox:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"16px",flexWrap:"wrap",marginTop:"12px",padding:"14px",borderRadius:"12px",background:"rgba(55,255,116,.10)",border:"1px solid rgba(55,255,116,.35)"}, secretValue:{display:"block",fontFamily:"monospace",fontSize:"19px",wordBreak:"break-all"}, removeButton:{background:"transparent",color:"#ff8a8f",border:"1px solid rgba(255,95,101,.5)",borderRadius:"9px",padding:"8px 11px",cursor:"pointer"}, warning:{color:"#ffd54a",fontSize:"13px",marginBottom:0}
 }

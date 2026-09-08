@@ -2279,7 +2279,7 @@ export default function Clientes({ setPage }) {
               <Info label="Data Nascimento" value={formatarDataBR(clienteSelecionado.dataNascimento)} />
               <Info label="Título de Eleitor" value={clienteSelecionado.tituloEleitor} />
               <Info label="Código Simples Nacional" value={clienteSelecionado.codigoSimplesNacional} />
-              <Info label="Senha Gov.br" value={clienteSelecionado.senhaGovBr ? "••••••••" : ""} />
+              <Info label="Senha Gov.br" value={clienteSelecionado.possuiSenhaGovBr ? "Protegida no cofre" : ""} />
               <Info label="CNAE Principal" value={clienteSelecionado.cnaePrincipal} />
               <Info label="Inscrição Municipal" value={clienteSelecionado.inscricaoMunicipal} />
               <Info label="Inscrição Estadual" value={clienteSelecionado.inscricaoEstadual} />
