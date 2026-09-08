@@ -77,6 +77,8 @@ function limparTextoResposta(valor, fallback = "Comando concluído.") {
 export default function ConversaNexa({ usuario, setPage }) {
   const [clientes, setClientes] = useState([])
   const [conversas, setConversas] = useState([])
+  const [conversasCarregadas, setConversasCarregadas] = useState(false)
+  const [contextoInicialRestaurado, setContextoInicialRestaurado] = useState(false)
   const [conversaId, setConversaId] = useState(null)
   const [tipoContexto, setTipoContexto] = useState("geral")
   const [clienteId, setClienteId] = useState("")
@@ -128,6 +130,7 @@ export default function ConversaNexa({ usuario, setPage }) {
       if (conversasResultado.status === "fulfilled") {
         setConversas(conversasResultado.value)
       }
+      setConversasCarregadas(true)
     })
 
     return () => {
@@ -136,28 +139,31 @@ export default function ConversaNexa({ usuario, setPage }) {
   }, [])
 
   useEffect(() => {
-    if (contextoInicialAplicadoRef.current || !conversas.length) return
+    if (contextoInicialAplicadoRef.current || !conversasCarregadas) return
     contextoInicialAplicadoRef.current = true
 
     if (localStorage.getItem("nexaAbrirConversaGeral") === "true") {
       localStorage.removeItem("nexaAbrirConversaGeral")
       limparContextoClienteVoz()
       novaConversa()
+      setContextoInicialRestaurado(true)
       return
     }
 
     abrirConversaRecenteNexa().then((dados) => {
       const conversaAtiva = dados?.conversa
-      if (conversaAtiva) selecionarConversa(conversaAtiva)
-    }).catch(() => selecionarConversa(conversas[0]))
-  }, [conversas])
+      return conversaAtiva ? selecionarConversa(conversaAtiva) : undefined
+    }).catch(() => selecionarConversa(conversas[0])).finally(() => {
+      setContextoInicialRestaurado(true)
+    })
+  }, [conversas, conversasCarregadas])
 
   useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [conversa, enviando])
 
   useEffect(() => {
-    if (consultaAutomaticaAplicadaRef.current) return
+    if (consultaAutomaticaAplicadaRef.current || !contextoInicialRestaurado) return
 
     const consulta = localStorage.getItem("nexaConsultaAutomatica")
     if (!consulta) return
@@ -165,7 +171,7 @@ export default function ConversaNexa({ usuario, setPage }) {
     consultaAutomaticaAplicadaRef.current = true
     localStorage.removeItem("nexaConsultaAutomatica")
     enviar(consulta)
-  }, [])
+  }, [contextoInicialRestaurado])
 
   useEffect(() => {
     carregarMemorias()
@@ -598,6 +604,7 @@ export default function ConversaNexa({ usuario, setPage }) {
       }
       setMensagem("")
       setConversa((atual) => [...atual, { id: `n-arquivo-${Date.now()}`, autor: "Nexa", texto: resposta.resposta, pontos: resposta.pontos || [], provedor: "groq", modelo: "Nexa Documentos 1.0", data: new Date().toISOString() }])
+      await Promise.all([recarregarConversas(), carregarMemorias()])
     } catch (error) {
       setErro(error.response?.data?.message || "Não consegui analisar esse documento.")
     } finally {
