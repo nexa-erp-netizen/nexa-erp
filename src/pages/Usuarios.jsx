@@ -25,11 +25,12 @@ export default function Usuarios({ usuarioLogado }) {
   const [codigoAcesso, setCodigoAcesso] = useState("")
   const [acessoCriado, setAcessoCriado] = useState(null)
   const [editandoId, setEditandoId] = useState(null)
+  const [mostrarExcluidos, setMostrarExcluidos] = useState(false)
 
   useEffect(() => {
     carregarUsuarios()
     carregarClientes()
-  }, [])
+  }, [mostrarExcluidos])
 
   const clienteSelecionado = useMemo(() => {
     return clientes.find(
@@ -39,7 +40,7 @@ export default function Usuarios({ usuarioLogado }) {
 
   async function carregarUsuarios() {
     try {
-      const resposta = await api.get("/usuarios")
+      const resposta = await api.get("/usuarios", { params: { arquivados: mostrarExcluidos } })
       setUsuarios(resposta.data || [])
     } catch (error) {
       alert("Erro ao carregar usuários")
@@ -186,6 +187,29 @@ export default function Usuarios({ usuarioLogado }) {
     }
   }
 
+  async function excluirUsuario(usuario) {
+    const confirmar = window.confirm(`Excluir ${usuario.nome} com segurança? O acesso será bloqueado, o usuário sairá da lista ativa e o histórico será preservado.`)
+    if (!confirmar) return
+    try {
+      await api.delete(`/usuarios/${usuario.id}`)
+      await carregarUsuarios()
+      alert("Usuário excluído com segurança")
+    } catch (error) {
+      alert(error.response?.data?.message || "Erro ao excluir usuário")
+    }
+  }
+
+  async function restaurarUsuario(usuario) {
+    if (!window.confirm(`Restaurar o usuário ${usuario.nome}?`)) return
+    try {
+      const resposta = await api.patch(`/usuarios/${usuario.id}/restaurar`)
+      await carregarUsuarios()
+      alert(resposta.data?.message || "Usuário restaurado")
+    } catch (error) {
+      alert(error.response?.data?.message || "Erro ao restaurar usuário")
+    }
+  }
+
   function limparCampos(opcoes = {}) {
     setEditandoId(null)
     setNome("")
@@ -215,6 +239,10 @@ export default function Usuarios({ usuarioLogado }) {
       <p style={subtitle}>
         Crie acessos para administradores, funcionários e clientes. Empresas externas recebem um escritório próprio e isolado.
       </p>
+
+      <button style={archiveToggleButton} onClick={() => setMostrarExcluidos((valor) => !valor)}>
+        {mostrarExcluidos ? "Voltar aos usuários ativos" : "Ver usuários excluídos"}
+      </button>
 
       {acessoCriado && (
         <div style={acessoInfo}>
@@ -364,19 +392,19 @@ export default function Usuarios({ usuarioLogado }) {
               </td>
               <td style={td}>
                 <div style={actions}>
-                  <button
-                    style={editButton}
-                    onClick={() => editarUsuario(usuario)}
-                  >
-                    Corrigir
-                  </button>
-
-                  <button
-                    style={usuario.ativo === false ? unlockButton : deleteButton}
-                    onClick={() => alterarAcessoUsuario(usuario)}
-                  >
-                    {usuario.ativo === false ? "Desbloquear" : "Bloquear"}
-                  </button>
+                  {mostrarExcluidos ? (
+                    <button style={unlockButton} onClick={() => restaurarUsuario(usuario)}>Restaurar</button>
+                  ) : (
+                    <>
+                      <button style={editButton} onClick={() => editarUsuario(usuario)}>Corrigir</button>
+                      <button style={usuario.ativo === false ? unlockButton : blockButton} onClick={() => alterarAcessoUsuario(usuario)}>
+                        {usuario.ativo === false ? "Desbloquear" : "Bloquear"}
+                      </button>
+                      {!usuario.plataformaAdmin && Number(usuario.id) !== Number(usuarioLogado?.id) && (
+                        <button style={deleteButton} onClick={() => excluirUsuario(usuario)}>Excluir</button>
+                      )}
+                    </>
+                  )}
                 </div>
               </td>
             </tr>
@@ -524,8 +552,26 @@ const deleteButton = {
   cursor: "pointer",
 }
 
+const blockButton = {
+  ...deleteButton,
+  background: "#f59e0b",
+  color: "#291800",
+}
+
 const unlockButton = {
   ...deleteButton,
   background: "#22c55e",
   color: "#052e16",
+}
+
+
+const archiveToggleButton = {
+  padding: "10px 14px",
+  marginBottom: "18px",
+  borderRadius: "10px",
+  border: "1px solid rgba(255,255,255,.2)",
+  background: "#0b3265",
+  color: "white",
+  fontWeight: "bold",
+  cursor: "pointer",
 }

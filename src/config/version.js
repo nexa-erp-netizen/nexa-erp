@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.55.3",
-  build: "35503",
-  release: "Modo Desenvolvedor exclusivo da plataforma",
+  version: "3.55.4",
+  build: "35504",
+  release: "Exclusão segura e recuperável",
   date: "08/09/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.55.4", release: "Exclusão segura e recuperável", date: "08/09/2026", items: ["Botão Excluir disponível na lista de usuários", "Usuários excluídos são arquivados sem apagar histórico e podem ser restaurados", "Botão Excluir disponível em Escritórios Nexa", "Exclusão de escritório exige digitar exatamente o nome", "Backup automático é gerado antes de arquivar usuário ou escritório", "Escritório arquivado bloqueia todas as sessões sem alterar os estados individuais dos usuários", "Escritório principal e administrador da plataforma não podem ser excluídos", "Listas separadas permitem consultar e restaurar itens excluídos"] },
     { version: "3.55.3", release: "Modo Desenvolvedor exclusivo da plataforma", date: "08/09/2026", items: ["Acesso ao código e ao GitHub exige plataformaAdmin", "Administradores dos escritórios não podem consultar incidentes técnicos", "Preparação, testes e publicação de código ficam exclusivos do administrador da plataforma", "Permissão plataformaAdmin é conferida novamente no banco em cada requisição", "Tentativas técnicas bloqueadas são registradas sem expor dados sensíveis", "Inteligência contábil normal permanece disponível nos escritórios", "Isolamento por escritorioId permanece obrigatório"] },
     { version: "3.55.2", release: "Senha Gov.br protegida e acessível", date: "08/09/2026", items: ["Administrador pode revelar e copiar a senha Gov.br na Central e-CAC após confirmação", "Senha revelada é ocultada automaticamente após 30 segundos", "Cada consulta fica registrada no histórico do cofre", "Senhas antigas são migradas automaticamente do cadastro para o cofre criptografado na primeira consulta", "Novas senhas Gov.br são gravadas diretamente no cofre", "API deixa de enviar a senha Gov.br nas respostas comuns de clientes", "Isolamento por escritório da v3.55.1 permanece obrigatório"] },
     { version: "3.55.1", release: "Escritórios de teste isolados", date: "08/09/2026", items: ["Perfil Empresa passa a criar um novo escritório em vez de herdar o escritório atual", "Código de acesso exclusivo é gerado a partir do nome do escritório e pode ser ajustado antes do cadastro", "Usuário Empresa é criado dentro do novo escritório com ambiente vazio", "Clientes, documentos, financeiro e demais dados permanecem isolados por escritorioId", "Cadastro comum de usuários bloqueia a criação acidental de Empresa dentro do escritório atual", "Código criado fica disponível para copiar e entregar à empresa"] },
