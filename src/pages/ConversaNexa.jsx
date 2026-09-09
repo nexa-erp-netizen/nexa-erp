@@ -84,6 +84,8 @@ export default function ConversaNexa({ usuario, setPage }) {
   const [mensagem, setMensagem] = useState("")
   const [enviando, setEnviando] = useState(false)
   const [carregandoConversa, setCarregandoConversa] = useState(false)
+  const [inicializacaoConcluida, setInicializacaoConcluida] = useState(false)
+  const [erroCarregamento, setErroCarregamento] = useState("")
   const [erro, setErro] = useState("")
   const [provedores, setProvedores] = useState(STATUS_INICIAL)
   const [conversa, setConversa] = useState([boasVindas()])
@@ -120,15 +122,7 @@ export default function ConversaNexa({ usuario, setPage }) {
         if (ativo) setProvedores({ ...STATUS_INICIAL, verificando: false })
       })
 
-    Promise.allSettled([api.get("/clientes"), listarConversasNexa()]).then(([clientesResultado, conversasResultado]) => {
-      if (!ativo) return
-      if (clientesResultado.status === "fulfilled") {
-        setClientes(Array.isArray(clientesResultado.value.data) ? clientesResultado.value.data : [])
-      }
-      if (conversasResultado.status === "fulfilled") {
-        setConversas(conversasResultado.value)
-      }
-    })
+    carregarDadosIniciais().catch(() => {})
 
     return () => {
       ativo = false
@@ -136,28 +130,11 @@ export default function ConversaNexa({ usuario, setPage }) {
   }, [])
 
   useEffect(() => {
-    if (contextoInicialAplicadoRef.current || !conversas.length) return
-    contextoInicialAplicadoRef.current = true
-
-    if (localStorage.getItem("nexaAbrirConversaGeral") === "true") {
-      localStorage.removeItem("nexaAbrirConversaGeral")
-      limparContextoClienteVoz()
-      novaConversa()
-      return
-    }
-
-    abrirConversaRecenteNexa().then((dados) => {
-      const conversaAtiva = dados?.conversa
-      if (conversaAtiva) selecionarConversa(conversaAtiva)
-    }).catch(() => selecionarConversa(conversas[0]))
-  }, [conversas])
-
-  useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [conversa, enviando])
 
   useEffect(() => {
-    if (consultaAutomaticaAplicadaRef.current) return
+    if (!inicializacaoConcluida || carregandoConversa || consultaAutomaticaAplicadaRef.current) return
 
     const consulta = localStorage.getItem("nexaConsultaAutomatica")
     if (!consulta) return
@@ -165,7 +142,7 @@ export default function ConversaNexa({ usuario, setPage }) {
     consultaAutomaticaAplicadaRef.current = true
     localStorage.removeItem("nexaConsultaAutomatica")
     enviar(consulta)
-  }, [])
+  }, [inicializacaoConcluida, carregandoConversa, conversaId, tipoContexto, clienteId])
 
   useEffect(() => {
     carregarMemorias()
@@ -204,11 +181,52 @@ export default function ConversaNexa({ usuario, setPage }) {
 
   const algumProvedorDisponivel = provedores.openai?.online || provedores.groq.online || (provedores.ollama.online && provedores.ollama.instalado)
 
+  async function carregarDadosIniciais() {
+    if (contextoInicialAplicadoRef.current) return
+    contextoInicialAplicadoRef.current = true
+    setErroCarregamento("")
+
+    const [clientesResultado, conversasResultado] = await Promise.allSettled([api.get("/clientes"), listarConversasNexa()])
+    const clientesCarregados = clientesResultado.status === "fulfilled" && Array.isArray(clientesResultado.value.data)
+      ? clientesResultado.value.data
+      : []
+    const conversasCarregadas = conversasResultado.status === "fulfilled" ? conversasResultado.value : []
+    setClientes(clientesCarregados)
+    setConversas(conversasCarregadas)
+
+    const falhas = []
+    if (clientesResultado.status === "rejected") falhas.push("clientes")
+    if (conversasResultado.status === "rejected") falhas.push("histórico")
+    if (falhas.length) setErroCarregamento(`Não foi possível carregar ${falhas.join(" e ")}. Tente novamente.`)
+
+    try {
+      if (localStorage.getItem("nexaAbrirConversaGeral") === "true") {
+        localStorage.removeItem("nexaAbrirConversaGeral")
+        limparContextoClienteVoz()
+        novaConversa()
+      } else if (conversasCarregadas.length) {
+        const recente = await abrirConversaRecenteNexa().catch(() => null)
+        await selecionarConversa(recente?.conversa || conversasCarregadas[0])
+      }
+    } finally {
+      setInicializacaoConcluida(true)
+    }
+  }
+
+  async function tentarCarregarNovamente() {
+    contextoInicialAplicadoRef.current = false
+    setInicializacaoConcluida(false)
+    await carregarDadosIniciais()
+    await carregarMemorias()
+  }
+
   async function recarregarConversas() {
     try {
       setConversas(await listarConversasNexa())
+      setErroCarregamento("")
     } catch (error) {
       console.error(error)
+      setErroCarregamento("Não foi possível atualizar o histórico de conversas. Tente novamente.")
     }
   }
 
@@ -227,6 +245,7 @@ export default function ConversaNexa({ usuario, setPage }) {
       setMemorias(await listarMemoriasNexa(filtros))
     } catch (error) {
       console.error(error)
+      setErroCarregamento("Não foi possível atualizar as memórias da Nexa. Tente novamente.")
     }
   }
 
@@ -557,7 +576,7 @@ export default function ConversaNexa({ usuario, setPage }) {
       setConversa((atual) => [...atual, {
         id: `e-${Date.now()}`,
         autor: "Nexa",
-        texto: "Não consegui responder agora.",
+        texto: limparTextoResposta(mensagemErro, "Não consegui responder agora. Tente novamente em alguns instantes."),
         data: new Date().toISOString(),
         erro: true,
       }])
@@ -597,7 +616,8 @@ export default function ConversaNexa({ usuario, setPage }) {
         registrarConversaVoz(resposta.conversaId)
       }
       setMensagem("")
-      setConversa((atual) => [...atual, { id: `n-arquivo-${Date.now()}`, autor: "Nexa", texto: resposta.resposta, pontos: resposta.pontos || [], provedor: "groq", modelo: "Nexa Documentos 1.0", data: new Date().toISOString() }])
+      setConversa((atual) => [...atual, { id: `n-arquivo-${Date.now()}`, autor: "Nexa", texto: limparTextoResposta(resposta.resposta, "O documento foi processado, mas não retornou uma análise."), pontos: resposta.pontos || [], provedor: resposta.provedor || "sistema", modelo: resposta.modelo || "Nexa Documentos 1.0", data: resposta.respondidoEm || new Date().toISOString() }])
+      await Promise.all([recarregarConversas(), carregarMemorias()])
     } catch (error) {
       setErro(error.response?.data?.message || "Não consegui analisar esse documento.")
     } finally {
@@ -663,18 +683,15 @@ export default function ConversaNexa({ usuario, setPage }) {
           <div style={styles.conversationList}>
             {!conversas.length && <span style={styles.emptyText}>As conversas salvas aparecerão aqui.</span>}
             {conversas.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                style={{ ...styles.conversationItem, ...(String(conversaId) === String(item.id) ? styles.conversationActive : {}) }}
-                onClick={() => selecionarConversa(item)}
-              >
-                <div style={styles.conversationInfo}>
+              <div key={item.id} style={{ ...styles.conversationItem, ...(String(conversaId) === String(item.id) ? styles.conversationActive : {}) }}>
+                <button type="button" style={styles.conversationSelect} onClick={() => selecionarConversa(item)}>
+                  <span style={styles.conversationInfo}>
                   <strong>{item.titulo || "Nova conversa"}</strong>
                   <span>{rotuloContexto(item.tipoContexto, item.interessadoNome)}</span>
-                </div>
-                <span style={styles.deleteConversation} onClick={(event) => removerConversa(event, item.id)}>×</span>
-              </button>
+                  </span>
+                </button>
+                <button type="button" style={styles.deleteConversation} onClick={(event) => removerConversa(event, item.id)} aria-label={`Excluir conversa ${item.titulo || "sem título"}`}>×</button>
+              </div>
             ))}
           </div>
         </aside>
@@ -757,6 +774,7 @@ export default function ConversaNexa({ usuario, setPage }) {
             <div ref={fimRef} />
           </section>
 
+          {erroCarregamento && <div style={styles.error}>{erroCarregamento} <button type="button" style={styles.retryButton} onClick={tentarCarregarNovamente}>Tentar novamente</button></div>}
           {erro && <div style={styles.error}>{erro}</div>}
 
           <section style={styles.composer}>
@@ -991,10 +1009,11 @@ const styles = {
   sidebarNew: { background: "rgba(0,168,255,.13)", color: "#8bd7ff", border: "1px solid rgba(0,168,255,.30)", borderRadius: "10px", padding: "10px", cursor: "pointer", fontWeight: "bold" },
   sidebarTitle: { color: "#91a6bf", fontSize: "11px", textTransform: "uppercase", letterSpacing: ".06em" },
   conversationList: { display: "flex", flexDirection: "column", gap: "6px", overflowY: "auto" },
-  conversationItem: { width: "100%", display: "flex", justifyContent: "space-between", gap: "8px", textAlign: "left", background: "transparent", color: "#dce8f8", border: "1px solid transparent", borderRadius: "12px", padding: "11px", cursor: "pointer" },
+  conversationItem: { width: "100%", display: "flex", justifyContent: "space-between", gap: "8px", textAlign: "left", background: "transparent", color: "#dce8f8", border: "1px solid transparent", borderRadius: "12px", padding: "4px" },
   conversationActive: { background: "rgba(0,168,255,.12)", borderColor: "rgba(0,168,255,.32)" },
+  conversationSelect: { flex: 1, minWidth: 0, display: "flex", textAlign: "left", background: "transparent", color: "inherit", border: 0, borderRadius: "9px", padding: "7px", cursor: "pointer" },
   conversationInfo: { minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" },
-  deleteConversation: { color: "#91a6bf", fontSize: "18px", lineHeight: 1 },
+  deleteConversation: { alignSelf: "center", background: "transparent", color: "#91a6bf", border: 0, borderRadius: "8px", padding: "8px", fontSize: "18px", lineHeight: 1, cursor: "pointer" },
   main: { minWidth: 0, display: "flex", flexDirection: "column", gap: "10px", background: "#041a3a", border: "1px solid rgba(255,255,255,.09)", borderRadius: "18px", padding: "12px" },
   context: { background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.08)", borderRadius: "14px", padding: "11px 13px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: "10px", alignItems: "end" },
   label: { display: "block", color: "#a9b8cc", fontSize: "12px", marginBottom: "6px" },
@@ -1044,5 +1063,6 @@ const styles = {
   textarea: { resize: "none", minHeight: "58px", maxHeight: "170px", background: "transparent", color: "white", border: 0, outline: "none", borderRadius: "14px", padding: "12px 6px", fontFamily: "inherit", fontSize: "14px", lineHeight: 1.5 },
   send: { alignSelf: "center", minWidth: "82px", height: "46px", background: "linear-gradient(135deg,#00a8ff,#2eff78)", color: "#001b34", border: 0, borderRadius: "16px", padding: "0 18px", fontWeight: "bold", cursor: "pointer" },
   error: { background: "rgba(255,95,101,.12)", border: "1px solid rgba(255,95,101,.35)", borderRadius: "12px", padding: "12px", color: "#ffb5b8" },
+  retryButton: { marginLeft: "10px", background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,.35)", borderRadius: "8px", padding: "6px 9px", cursor: "pointer" },
   emptyText: { color: "#8295ae", fontSize: "12px" },
 }
