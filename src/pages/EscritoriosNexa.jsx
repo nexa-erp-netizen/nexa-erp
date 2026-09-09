@@ -3,6 +3,16 @@ import api from "../services/api"
 
 const vazio = { nome: "", codigo: "", cnpj: "", email: "", telefone: "", plano: "Profissional", adminNome: "", adminEmail: "", adminSenha: "" }
 
+function formatarData(valor) {
+  if (!valor) return "Nunca acessou"
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(valor))
+}
+
+function estaOnline(valor) {
+  if (!valor) return false
+  return Date.now() - new Date(valor).getTime() <= 20 * 60 * 1000
+}
+
 export default function EscritoriosNexa() {
   const [escritorios, setEscritorios] = useState([])
   const [form, setForm] = useState(vazio)
@@ -87,9 +97,21 @@ export default function EscritoriosNexa() {
       <div style={styles.lista}>
         {escritorios.map((item) => (
           <div key={item.id} style={styles.card}>
-            <div><strong>{item.nome}</strong><span style={styles.codigo}>Código: {item.codigo}</span></div>
+            <div style={styles.identificacao}>
+              <strong>{item.nome}</strong>
+              <span style={styles.codigo}>Código: {item.codigo}</span>
+              <div style={styles.acesso}>
+                <span><b>Primeiro acesso:</b> {formatarData(item.primeiroAcessoEm)}</span>
+                <span><b>Último acesso:</b> {formatarData(item.ultimoAcessoEm)}</span>
+                <span><b>Logins:</b> {Number(item.totalAcessos || 0)}</span>
+                {item.ultimoAcessoUsuarioNome && <span><b>Último usuário:</b> {item.ultimoAcessoUsuarioNome}</span>}
+                {item.ultimoAcessoDispositivo && <span><b>Dispositivo:</b> {item.ultimoAcessoDispositivo}</span>}
+                {item.ultimoAcessoIp && <span><b>IP:</b> {item.ultimoAcessoIp}</span>}
+              </div>
+            </div>
             <div style={styles.direita}>
               <span>{item.plano}</span><b style={item.arquivadoEm ? styles.arquivado : styles.status}>{item.status}</b>
+              {!item.arquivadoEm && item.ultimoAcessoEm && <b style={estaOnline(item.ultimaAtividadeEm) ? styles.online : styles.offline}>{estaOnline(item.ultimaAtividadeEm) ? "Online" : "Offline"}</b>}
               {mostrarExcluidos
                 ? <button style={styles.restaurar} onClick={() => restaurar(item)}>Restaurar</button>
                 : !item.protegido && <button style={styles.excluir} onClick={() => excluir(item)}>Excluir</button>}
@@ -109,10 +131,14 @@ const styles = {
   botao: { padding: 12, border: 0, borderRadius: 10, background: "#37ff74", color: "#00142f", fontWeight: 800, cursor: "pointer" },
   botaoSecundario: { padding: "10px 14px", marginBottom: 18, border: "1px solid #315784", borderRadius: 10, background: "#0b3265", color: "white", fontWeight: 700, cursor: "pointer" },
   lista: { display: "grid", gap: 10, marginTop: 24 },
-  card: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: 16, borderRadius: 12, background: "#001a3d" },
+  card: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, padding: 16, borderRadius: 12, background: "#001a3d" },
+  identificacao: { flex: "1 1 520px", minWidth: 0 },
   codigo: { display: "block", color: "#a9b8cc", marginTop: 5 },
-  direita: { display: "flex", alignItems: "center", gap: 12 },
+  acesso: { display: "flex", flexWrap: "wrap", gap: "6px 18px", color: "#a9b8cc", fontSize: 13, marginTop: 12 },
+  direita: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 },
   status: { color: "#37ff74" },
+  online: { color: "#37ff74", background: "#064e3b", padding: "5px 9px", borderRadius: 999 },
+  offline: { color: "#cbd5e1", background: "#334155", padding: "5px 9px", borderRadius: 999 },
   arquivado: { color: "#fbbf24" },
   excluir: { padding: "9px 12px", border: 0, borderRadius: 9, background: "#ff4d4f", color: "white", fontWeight: 800, cursor: "pointer" },
   restaurar: { padding: "9px 12px", border: 0, borderRadius: 9, background: "#22c55e", color: "#052e16", fontWeight: 800, cursor: "pointer" },
