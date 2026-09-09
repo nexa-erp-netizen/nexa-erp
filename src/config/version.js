@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.55.5",
-  build: "35505",
-  release: "Inteligência conversacional estabilizada",
+  version: "3.55.6",
+  build: "35506",
+  release: "Histórico claro e acesso direto ao cofre",
   date: "09/09/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.55.6", release: "Histórico claro e acesso direto ao cofre", date: "09/09/2026", items: ["Histórico de anotações da Nexa passa a ser exibido em lista legível", "Registros idênticos do histórico deixam de aparecer repetidos na resposta", "A indicação de senha Gov.br protegida oferece acesso direto à Central e-CAC", "Central e-CAC abre com o cliente correto já selecionado", "Acesso ao cofre e revelação da senha permanecem exclusivos do Administrador", "Confirmação, auditoria e ocultação automática da senha em 30 segundos permanecem obrigatórias"] },
     { version: "3.55.5", release: "Inteligência conversacional estabilizada", date: "09/09/2026", items: ["Consulta automática aguarda a restauração da conversa e do contexto", "Análise de documentos atualiza histórico e memórias", "Respostas de documentos usam a mesma normalização do chat", "Exclusão de conversa passa a funcionar por teclado", "Falhas ao carregar clientes, histórico ou memórias ficam visíveis e permitem nova tentativa", "Falha de resposta mostra a causa informada pelo serviço", "Modo Desenvolvedor prioriza OpenAI e usa Groq como reserva para preparar correções"] },
     { version: "3.55.4", release: "Exclusão segura e recuperável", date: "08/09/2026", items: ["Botão Excluir disponível na lista de usuários", "Usuários excluídos são arquivados sem apagar histórico e podem ser restaurados", "Botão Excluir disponível em Escritórios Nexa", "Exclusão de escritório exige digitar exatamente o nome", "Backup automático é gerado antes de arquivar usuário ou escritório", "Escritório arquivado bloqueia todas as sessões sem alterar os estados individuais dos usuários", "Escritório principal e administrador da plataforma não podem ser excluídos", "Listas separadas permitem consultar e restaurar itens excluídos"] },
     { version: "3.55.3", release: "Modo Desenvolvedor exclusivo da plataforma", date: "08/09/2026", items: ["Acesso ao código e ao GitHub exige plataformaAdmin", "Administradores dos escritórios não podem consultar incidentes técnicos", "Preparação, testes e publicação de código ficam exclusivos do administrador da plataforma", "Permissão plataformaAdmin é conferida novamente no banco em cada requisição", "Tentativas técnicas bloqueadas são registradas sem expor dados sensíveis", "Inteligência contábil normal permanece disponível nos escritórios", "Isolamento por escritorioId permanece obrigatório"] },

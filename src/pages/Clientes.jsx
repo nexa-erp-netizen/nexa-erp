@@ -12,7 +12,7 @@ function formatarCodigoCliente(id) {
   return `CLI-${String(numero).padStart(4, "0")}`
 }
 
-export default function Clientes({ setPage }) {
+export default function Clientes({ setPage, usuarioLogado }) {
   const [tela, setTela] = useState("lista")
   const [clienteSelecionado, setClienteSelecionado] = useState(null)
   const [editandoId, setEditandoId] = useState(null)
@@ -79,6 +79,17 @@ export default function Clientes({ setPage }) {
   ]
 
   const [clientes, setClientes] = useState([])
+  const administrador = String(usuarioLogado?.perfil || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase() === "administrador"
+
+  function abrirCofreCliente() {
+    if (!administrador || !clienteSelecionado?.id || typeof setPage !== "function") return
+    localStorage.setItem("nexaCentralEcacClienteId", String(clienteSelecionado.id))
+    setPage("Central e-CAC")
+  }
 
   useEffect(() => {
     carregarClientes()
@@ -2279,7 +2290,12 @@ export default function Clientes({ setPage }) {
               <Info label="Data Nascimento" value={formatarDataBR(clienteSelecionado.dataNascimento)} />
               <Info label="Título de Eleitor" value={clienteSelecionado.tituloEleitor} />
               <Info label="Código Simples Nacional" value={clienteSelecionado.codigoSimplesNacional} />
-              <Info label="Senha Gov.br" value={clienteSelecionado.possuiSenhaGovBr ? "Protegida no cofre" : ""} />
+              <Info
+                label="Senha Gov.br"
+                value={clienteSelecionado.possuiSenhaGovBr ? "Protegida no cofre" : ""}
+                actionLabel={clienteSelecionado.possuiSenhaGovBr && administrador ? "Abrir cofre" : ""}
+                onAction={abrirCofreCliente}
+              />
               <Info label="CNAE Principal" value={clienteSelecionado.cnaePrincipal} />
               <Info label="Inscrição Municipal" value={clienteSelecionado.inscricaoMunicipal} />
               <Info label="Inscrição Estadual" value={clienteSelecionado.inscricaoEstadual} />
@@ -2317,11 +2333,14 @@ function formatarDataHoraBR(data) {
   return new Date(data).toLocaleString("pt-BR")
 }
 
-function Info({ label, value }) {
+function Info({ label, value, actionLabel = "", onAction }) {
   return (
     <div style={infoBox}>
       <span style={infoLabel}>{label}</span>
       <strong style={infoValue}>{value || "Não informado"}</strong>
+      {actionLabel && typeof onAction === "function" && (
+        <button type="button" style={infoAction} onClick={onAction}>{actionLabel} →</button>
+      )}
     </div>
   )
 }
@@ -2802,6 +2821,17 @@ const infoLabel = {
 const infoValue = {
   color: "white",
   fontSize: "16px",
+}
+
+const infoAction = {
+  display: "block",
+  marginTop: "12px",
+  padding: 0,
+  border: 0,
+  background: "transparent",
+  color: "#37ff74",
+  fontWeight: "bold",
+  cursor: "pointer",
 }
 
 const observacaoBox = {
