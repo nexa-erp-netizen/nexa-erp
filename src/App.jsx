@@ -57,6 +57,10 @@ import Ferias from "./pages/Ferias"
 import ConciliacaoBancaria from "./pages/ConciliacaoBancaria"
 import AtualizacaoCadastroCliente from "./pages/AtualizacaoCadastroCliente"
 
+const ULTIMA_ATIVIDADE_KEY = "nexaUltimaAtividade"
+const TEMPO_INATIVIDADE_CLIENTE = 5 * 60 * 1000
+const TEMPO_INATIVIDADE_ESCRITORIO = 20 * 60 * 1000
+
 export default function App() {
   const [usuario, setUsuario] = useState(null)
   const [page, setPage] = useState("Dashboard")
@@ -163,8 +167,90 @@ export default function App() {
   useEffect(() => {
     localStorage.removeItem("token")
     localStorage.removeItem("usuario")
+    localStorage.removeItem(ULTIMA_ATIVIDADE_KEY)
     setUsuario(null)
   }, [])
+
+  useEffect(() => {
+    if (!usuario) return undefined
+
+    const limite = usuario.perfil === "Cliente"
+      ? TEMPO_INATIVIDADE_CLIENTE
+      : TEMPO_INATIVIDADE_ESCRITORIO
+    let ultimaAtividade = Number(localStorage.getItem(ULTIMA_ATIVIDADE_KEY))
+    let timer = null
+    let ultimoRegistroEvento = 0
+
+    function expirarSessao() {
+      clearTimeout(timer)
+      localStorage.removeItem("token")
+      localStorage.removeItem("usuario")
+      localStorage.removeItem(ULTIMA_ATIVIDADE_KEY)
+      setUsuario(null)
+      setPage("Dashboard")
+    }
+
+    function agendarVerificacao() {
+      clearTimeout(timer)
+      const restante = Math.max(0, ultimaAtividade + limite - Date.now())
+      timer = window.setTimeout(verificarExpiracao, restante + 50)
+    }
+
+    function verificarExpiracao() {
+      if (Date.now() - ultimaAtividade >= limite) {
+        expirarSessao()
+        return true
+      }
+      agendarVerificacao()
+      return false
+    }
+
+    function registrarAtividade() {
+      const agora = Date.now()
+      if (agora - ultimoRegistroEvento < 1000) return
+      ultimoRegistroEvento = agora
+      ultimaAtividade = agora
+      localStorage.setItem(ULTIMA_ATIVIDADE_KEY, String(agora))
+      agendarVerificacao()
+    }
+
+    function verificarAoRetornar() {
+      if (document.visibilityState === "hidden") return
+      if (!verificarExpiracao()) registrarAtividade()
+    }
+
+    function sincronizarAbas(evento) {
+      if (evento.key !== ULTIMA_ATIVIDADE_KEY) return
+      if (!evento.newValue) {
+        expirarSessao()
+        return
+      }
+      const valor = Number(evento.newValue)
+      if (!Number.isFinite(valor)) return
+      ultimaAtividade = valor
+      verificarExpiracao()
+    }
+
+    if (!Number.isFinite(ultimaAtividade) || ultimaAtividade <= 0 || ultimaAtividade > Date.now()) {
+      ultimaAtividade = Date.now()
+      localStorage.setItem(ULTIMA_ATIVIDADE_KEY, String(ultimaAtividade))
+    }
+
+    const eventosAtividade = ["pointerdown", "pointermove", "keydown", "scroll", "touchstart"]
+    eventosAtividade.forEach((evento) => window.addEventListener(evento, registrarAtividade, { passive: true }))
+    window.addEventListener("focus", verificarAoRetornar)
+    window.addEventListener("storage", sincronizarAbas)
+    document.addEventListener("visibilitychange", verificarAoRetornar)
+    verificarExpiracao()
+
+    return () => {
+      clearTimeout(timer)
+      eventosAtividade.forEach((evento) => window.removeEventListener(evento, registrarAtividade))
+      window.removeEventListener("focus", verificarAoRetornar)
+      window.removeEventListener("storage", sincronizarAbas)
+      document.removeEventListener("visibilitychange", verificarAoRetornar)
+    }
+  }, [usuario])
 
   useEffect(() => {
     if (usuario?.perfil !== "Cliente") return
@@ -192,6 +278,7 @@ export default function App() {
   function sair() {
     localStorage.removeItem("token")
     localStorage.removeItem("usuario")
+    localStorage.removeItem(ULTIMA_ATIVIDADE_KEY)
 
     setUsuario(null)
     setPage("Dashboard")
@@ -362,6 +449,7 @@ export default function App() {
         <SistemaInstavelAviso />
         <Login
           onLogin={(usuarioLogado) => {
+            localStorage.setItem(ULTIMA_ATIVIDADE_KEY, String(Date.now()))
             setUsuario(usuarioLogado)
 
             if (usuarioLogado?.perfil === "Cliente") {

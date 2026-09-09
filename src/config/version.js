@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.55.6",
-  build: "35506",
-  release: "Histórico claro e acesso direto ao cofre",
+  version: "3.55.7",
+  build: "35507",
+  release: "Sessão protegida por inatividade",
   date: "09/09/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.55.7", release: "Sessão protegida por inatividade", date: "09/09/2026", items: ["Cliente retorna ao login após 5 minutos sem atividade", "Administrador, Funcionário e Empresa retornam ao login após 20 minutos sem atividade", "Token e dados da sessão são removidos ao expirar", "A expiração é verificada ao retornar para uma aba suspensa", "Atividade é sincronizada entre abas abertas", "Logout manual e automático usam a mesma limpeza de autenticação"] },
     { version: "3.55.6", release: "Histórico claro e acesso direto ao cofre", date: "09/09/2026", items: ["Histórico de anotações da Nexa passa a ser exibido em lista legível", "Registros idênticos do histórico deixam de aparecer repetidos na resposta", "A indicação de senha Gov.br protegida oferece acesso direto à Central e-CAC", "Central e-CAC abre com o cliente correto já selecionado", "Acesso ao cofre e revelação da senha permanecem exclusivos do Administrador", "Confirmação, auditoria e ocultação automática da senha em 30 segundos permanecem obrigatórias"] },
     { version: "3.55.5", release: "Inteligência conversacional estabilizada", date: "09/09/2026", items: ["Consulta automática aguarda a restauração da conversa e do contexto", "Análise de documentos atualiza histórico e memórias", "Respostas de documentos usam a mesma normalização do chat", "Exclusão de conversa passa a funcionar por teclado", "Falhas ao carregar clientes, histórico ou memórias ficam visíveis e permitem nova tentativa", "Falha de resposta mostra a causa informada pelo serviço", "Modo Desenvolvedor prioriza OpenAI e usa Groq como reserva para preparar correções"] },
     { version: "3.55.4", release: "Exclusão segura e recuperável", date: "08/09/2026", items: ["Botão Excluir disponível na lista de usuários", "Usuários excluídos são arquivados sem apagar histórico e podem ser restaurados", "Botão Excluir disponível em Escritórios Nexa", "Exclusão de escritório exige digitar exatamente o nome", "Backup automático é gerado antes de arquivar usuário ou escritório", "Escritório arquivado bloqueia todas as sessões sem alterar os estados individuais dos usuários", "Escritório principal e administrador da plataforma não podem ser excluídos", "Listas separadas permitem consultar e restaurar itens excluídos"] },
