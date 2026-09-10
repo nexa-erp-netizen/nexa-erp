@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.56.1",
-  build: "35601",
-  release: "Escuta protegida contra comandos do ambiente",
+  version: "3.56.2",
+  build: "35602",
+  release: "Navegação confirmada pelo resultado real",
   date: "10/09/2026",
   status: "Produção",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.56.2", release: "Navegação confirmada pelo resultado real", date: "10/09/2026", items: ["Abrir nota fiscal e abrir NF navegam deterministicamente para NF-e", "A Web recupera comandos conhecidos quando a conversa não entrega a ação", "A Nexa confere a página realmente renderizada antes de confirmar a abertura", "Falhas de navegação deixam de produzir confirmação falsa", "Resposta de erro informa que a ação não foi concluída"] },
     { version: "3.56.1", release: "Escuta protegida contra comandos do ambiente", date: "10/09/2026", items: ["Nomes isolados de telas e sites deixam de ser executados como comandos", "e-CAC, Fiscal, Drive e outros atalhos exigem verbo de navegação ou o chamado Nexa", "Sim, não e obrigado continuam disponíveis durante a conversa", "Falas de televisão ou de outras pessoas têm menor risco de provocar navegação indevida"] },
     { version: "3.56.0", release: "Inteligência Nexa e comandos de voz estabilizados", date: "10/09/2026", items: ["Nexa, Sim e Não deixam de ser descartados quando falados rapidamente", "Pausas naturais de fala não encerram a gravação cedo demais", "Perguntas faladas podem durar até 25 segundos", "Conversa permanece ativa sem repetir Nexa e termina pelo comando Obrigado", "Navegação por voz cobre todas as telas atuais do escritório", "Permissões de perfil continuam validadas antes da navegação", "Componentes antigos e duplicados de voz foram removidos", "Testes de regressão cobrem as novas rotas de voz"] },
     { version: "3.55.9", release: "Acessos dos escritórios e contingência estabilizada", date: "10/09/2026", items: ["Escritórios Nexa mostra primeiro e último acesso, quantidade de logins, usuário, dispositivo, IP e estado online", "Registro começa automaticamente no próximo login de cada escritório", "API secundária possui endereço seguro padrão quando a variável da Vercel estiver ausente", "Web aceita atualizações de correção compatíveis da mesma linha 3.55.x", "Publicação da API antes da Web deixa de causar falsa indisponibilidade por diferença de patch", "APIs principal e secundária permanecem com banco e migrations compartilhados"] },

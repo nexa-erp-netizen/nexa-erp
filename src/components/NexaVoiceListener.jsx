@@ -93,7 +93,7 @@ const NAVEGACAO_LOCAL = [
   { pagina: "Documentos Digitais", aliases: ["documentos digitais", "documentos"] },
   { pagina: "Pendências Clientes", aliases: ["pendencias dos clientes", "pendencias clientes", "pendencias"] },
   { pagina: "Acesso Rápido Fiscal", aliases: ["acesso rapido fiscal", "atalhos fiscais"] },
-  { pagina: "NF-e", aliases: ["nota fiscal eletronica", "emissor de nfe", "nfe", "nf-e"] },
+  { pagina: "NF-e", aliases: ["nota fiscal eletronica", "nota fiscal", "emissor de nfe", "nfe", "nf-e", "nf"] },
   { pagina: "NFS-e", aliases: ["nota fiscal de servico", "emissor de nfse", "nfse", "nfs-e"] },
   { pagina: "WhatsApp Inteligente", aliases: ["whatsapp inteligente", "whatsapp"] },
   { pagina: "Assistente do Dia", aliases: ["assistente do dia", "prioridades do dia", "iniciar meu dia", "comecar meu dia", "começar meu dia"] },
@@ -440,6 +440,11 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
   const videoTelaRef = useRef(null)
   const aguardandoDesativacaoTelaRef = useRef(false)
   const aguardandoFocoAnaliseTelaRef = useRef(false)
+  const paginaAtualRef = useRef(page || "")
+
+  useEffect(() => {
+    paginaAtualRef.current = page || ""
+  }, [page])
 
   useEffect(() => {
     if (usuario?.perfil !== "Administrador") return undefined
@@ -1395,12 +1400,23 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         })
       }
 
+      // Reserva determinística: se a conversa geral descreveu uma navegação,
+      // mas não entregou a ação, a Web resolve o comando conhecido localmente.
+      // Isso impede a Nexa de afirmar que abriu uma tela sem sequer tentar.
+      if (!resposta.acao) {
+        const acaoLocal = detectarAcaoLocalDeNavegacao(comandoInterpretado)
+        if (acaoLocal) {
+          const [confirmacao, fala] = respostaLocalDeNavegacao(acaoLocal.pagina, acaoLocal.grupo)
+          resposta = { ...resposta, acao: acaoLocal, resposta: confirmacao, fala }
+        }
+      }
+
       const textoRespostaBase = limparRespostaDaNexa(resposta.resposta || "Comando concluído.")
       const textoResposta = resposta.visualizacaoAtiva === true && resposta.provedor === "groq-visao"
         ? `${textoRespostaBase}\n\nDeseja desativar a visualização?`
         : textoRespostaBase
       const temFalaEspecifica = Object.prototype.hasOwnProperty.call(resposta, "fala")
-      const textoFalado = temFalaEspecifica
+      let textoFalado = temFalaEspecifica
         ? limparRespostaDaNexa(resposta.fala, resposta.acao ? "Pronto." : textoResposta)
         : textoResposta
       setUltimaResposta(textoResposta)
@@ -1475,7 +1491,38 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
       } else if (janelaDocumentoPendente && !janelaDocumentoPendente.closed) {
         janelaDocumentoPendente.close()
       }
-      const acaoExecutada = executarAcaoDeVoz({ acao: resposta.acao || acaoConfirmacaoCliente, setPage })
+      const acaoEfetiva = resposta.acao || acaoConfirmacaoCliente
+      let acaoExecutada = executarAcaoDeVoz({ acao: acaoEfetiva, setPage })
+
+      // setPage apenas solicita a troca. A confirmação real vem do estado que
+      // o App renderizou. A Nexa aguarda e verifica antes de dizer que abriu.
+      if (acaoExecutada && acaoEfetiva?.tipo === "navegar") {
+        const paginaEsperada = acaoEfetiva.alvo === "central-cliente"
+          ? "Clientes"
+          : String(acaoEfetiva.pagina || "")
+        let paginaConfirmada = paginaAtualRef.current === paginaEsperada
+        for (let tentativa = 0; !paginaConfirmada && tentativa < 12; tentativa += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 50))
+          paginaConfirmada = paginaAtualRef.current === paginaEsperada
+        }
+        acaoExecutada = paginaConfirmada
+
+        if (!paginaConfirmada) {
+          const falhaNavegacao = `Não consegui abrir ${paginaEsperada || "a tela solicitada"}. A navegação foi interrompida sem confirmar uma ação que não aconteceu.`
+          textoFalado = falhaNavegacao
+          setUltimaResposta(falhaNavegacao)
+          setMensagensPainel((atual) => atual.map((item) => (
+            item.id === `nexa-${idBase}`
+              ? { ...item, texto: falhaNavegacao, erro: true, acaoExecutada: false }
+              : item
+          )))
+          historicoRef.current = historicoRef.current.map((item, indice, lista) => (
+            indice === lista.length - 1 && item.autor === "Nexa"
+              ? { ...item, texto: falhaNavegacao }
+              : item
+          ))
+        }
+      }
       if (resposta.acao) {
         setMensagensPainel((atual) => atual.map((item) => (
           item.id === `nexa-${idBase}`
