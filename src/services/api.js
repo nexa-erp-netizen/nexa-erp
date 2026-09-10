@@ -3,7 +3,7 @@ import NEXA_VERSION from "../config/version"
 import { registrarIncidenteWeb } from "./incidentesNexaService"
 
 const URL_PRINCIPAL = String(import.meta.env.VITE_API_PRIMARY_URL || "https://nexa-erp-api.onrender.com").replace(/\/+$/, "")
-const URL_SECUNDARIA = String(import.meta.env.VITE_API_SECONDARY_URL || "").replace(/\/+$/, "")
+const URL_SECUNDARIA = String(import.meta.env.VITE_API_SECONDARY_URL || "https://nexa-erp-api-secondary.onrender.com").replace(/\/+$/, "")
 const TEMPO_CACHE_SAUDE_MS = 30000
 const TIMEOUT_HEALTH_MS = 5000
 const STATUS_INFRAESTRUTURA = new Set([502, 503, 504])
@@ -25,6 +25,11 @@ function metodoSeguroParaRetry(metodo) {
 
 function secundariaConfigurada() {
   return Boolean(URL_SECUNDARIA && URL_SECUNDARIA !== URL_PRINCIPAL)
+}
+
+function versoesCompativeis(web, api) {
+  const linha = valor => String(valor || "").split(".").slice(0, 2).join(".")
+  return Boolean(linha(web) && linha(web) === linha(api))
 }
 
 function avisarStatus(disponivel, extras = {}) {
@@ -60,7 +65,7 @@ async function consultarSaude(url) {
       return { ok: false, status: resposta.status, motivo: "banco-indisponivel", dados }
     }
 
-    if (dados.versao && dados.versao !== NEXA_VERSION.version) {
+    if (dados.versao && !versoesCompativeis(NEXA_VERSION.version, dados.versao)) {
       return {
         ok: false,
         status: resposta.status,
