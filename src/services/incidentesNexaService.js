@@ -2,7 +2,7 @@ import NEXA_VERSION from "../config/version"
 
 const enviados = new Map()
 const URL_PRINCIPAL = String(import.meta.env.VITE_API_PRIMARY_URL || "https://nexa-erp-api.onrender.com").replace(/\/+$/, "")
-const URL_SECUNDARIA = String(import.meta.env.VITE_API_SECONDARY_URL || "").replace(/\/+$/, "")
+const URL_SECUNDARIA = String(import.meta.env.VITE_API_SECONDARY_URL || "https://nexa-erp-api-secondary.onrender.com").replace(/\/+$/, "")
 
 function texto(valor, limite = 1200) {
   return String(valor || "")
