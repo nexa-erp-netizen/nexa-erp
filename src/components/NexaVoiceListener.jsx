@@ -21,7 +21,6 @@ const SPOKEN_RESPONSES_ENABLED_KEY = "nexaSpokenResponsesEnabled"
 const MICROPHONE_DEVICE_KEY = "nexaVoiceMicrophoneDeviceId"
 const FLOAT_POSITION_KEY = "nexaVoiceFloatPosition"
 const PROTECTED_LISTENING_KEY = "nexaProtectedListeningEnabled"
-const PROTECTED_SESSION_TIMEOUT_MS = 45000
 const WAKE_WORD_PATTERN = /^\s*(?:(?:ei|ola|olá)\s+)?(?:nexa|néxa|neksa|nexta|nessa)\b[\s,.!?;:-]*(.*)$/i
 const GREETING_PATTERN = /^\s*(bom\s+dia|boa\s+tarde)\b[\s,.!?;:-]*(.*)$/i
 const END_SESSION_PATTERN = /^\s*(?:(?:muito\s+)?(?:o)?brigad[oa](?:\s*,?\s*nexa)?|(?:pode\s+)?encerr(?:e|ar)(?:\s+a\s+conversa)?)[.!?]*\s*$/i
@@ -30,9 +29,9 @@ const CONFIRMACAO_NAO_PATTERN = /^\s*(?:não|nao|negativo|não é|nao e|outro|ou
 const CANCELAR_SELECAO_CLIENTE_PATTERN = /^\s*(?:cancela|cancelar|cancele|deixa|deixe|deixa pra la|deixa para la|esquece|esqueca|não quero|nao quero)[.!?]*\s*$/i
 const TEMPO_MAXIMO_FALA_MS = 30000
 
-const SILENCIO_PARA_FINALIZAR_MS = 420
+const SILENCIO_PARA_FINALIZAR_MS = 700
 const DURACAO_MINIMA_FALA_MS = 300
-const DURACAO_MAXIMA_FALA_MS = 8500
+const DURACAO_MAXIMA_FALA_MS = 25000
 const TAMANHO_MINIMO_AUDIO = 450
 const TEMPO_CALIBRACAO_RUIDO_MS = 320
 const TEMPO_REARME_MICROFONE_MS = 380
@@ -77,8 +76,15 @@ const NAVEGACAO_LOCAL = [
   { tipo: "abrir-grupo", grupo: "Atendimento", aliases: ["menu atendimento", "grupo atendimento", "atendimento"] },
   { pagina: "Dashboard", aliases: ["dashboard", "painel inicial", "tela inicial", "inicio", "home"] },
   { pagina: "Clientes", aliases: ["cadastro de clientes", "carteira de clientes", "lista de clientes", "clientes"] },
+  { pagina: "Funcionários", aliases: ["funcionarios", "colaboradores", "empregados"] },
+  { pagina: "Folha de Pagamento", aliases: ["folha de pagamento", "folha salarial", "folha"] },
+  { pagina: "Pró-labore", aliases: ["pro labore", "pro-labore", "retirada dos socios"] },
+  { pagina: "Férias", aliases: ["ferias dos funcionarios", "controle de ferias", "ferias"] },
+  { pagina: "Calculadora de Rescisão", aliases: ["calculadora de rescisao", "calculo de rescisao", "rescisao"] },
+  { pagina: "Plano de Contas", aliases: ["plano de contas"] },
   { pagina: "Fiscal", aliases: ["modulo fiscal", "tela fiscal", "area fiscal", "parte fiscal", "fiscal"] },
   { pagina: "Financeiro", aliases: ["financeiro do escritorio", "modulo financeiro", "tela financeira", "financeiro"] },
+  { pagina: "Conciliação Bancária", aliases: ["conciliacao bancaria", "conciliacao do banco", "extrato bancario"] },
   { pagina: "Movimentos Clientes", aliases: ["movimentos dos clientes", "movimentacoes dos clientes", "movimentos clientes", "movimentacoes clientes", "movimentacao", "movimentacoes", "movimento", "movimentos"] },
   { pagina: "Lançamentos Contábeis", aliases: ["lancamentos contabeis", "lancamento contabil", "contabilidade", "contabil"] },
   { pagina: "Clientes", secao: "servicos", aliases: ["servicos e cobrancas", "servico e cobranca", "servicos avulsos", "servico avulso", "lancar servico avulso", "lancamento de servico avulso"] },
@@ -87,6 +93,8 @@ const NAVEGACAO_LOCAL = [
   { pagina: "Documentos Digitais", aliases: ["documentos digitais", "documentos"] },
   { pagina: "Pendências Clientes", aliases: ["pendencias dos clientes", "pendencias clientes", "pendencias"] },
   { pagina: "Acesso Rápido Fiscal", aliases: ["acesso rapido fiscal", "atalhos fiscais"] },
+  { pagina: "NF-e", aliases: ["nota fiscal eletronica", "emissor de nfe", "nfe", "nf-e"] },
+  { pagina: "NFS-e", aliases: ["nota fiscal de servico", "emissor de nfse", "nfse", "nfs-e"] },
   { pagina: "WhatsApp Inteligente", aliases: ["whatsapp inteligente", "whatsapp"] },
   { pagina: "Assistente do Dia", aliases: ["assistente do dia", "prioridades do dia", "iniciar meu dia", "comecar meu dia", "começar meu dia"] },
   { pagina: "Escritório Digital", aliases: ["escritorio digital"] },
@@ -100,6 +108,9 @@ const NAVEGACAO_LOCAL = [
   { pagina: "Radar Inteligente", aliases: ["radar inteligente", "radar"] },
   { pagina: "Relatórios", aliases: ["relatorios"] },
   { pagina: "Agenda", aliases: ["agenda"] },
+  { pagina: "Google Drive", aliases: ["google drive", "meu drive", "drive"] },
+  { pagina: "Usuários", aliases: ["cadastro de usuarios", "controle de usuarios", "usuarios"] },
+  { pagina: "Escritórios Nexa", aliases: ["escritorios nexa", "gestao de escritorios", "escritorios"] },
   { pagina: "Backup Sistema", aliases: ["backup do sistema", "backup sistema", "backup"] },
   { pagina: "Sobre", aliases: ["sobre a nexa", "sobre"] },
 ]
@@ -121,6 +132,17 @@ function transcricaoPareceEco(texto, ultimaResposta) {
   return ouvido === falado || falado.includes(ouvido) || ouvido.includes(falado)
 }
 
+function falaCurtaOficial(texto) {
+  return Boolean(
+    WAKE_WORD_PATTERN.test(texto)
+    || GREETING_PATTERN.test(texto)
+    || END_SESSION_PATTERN.test(texto)
+    || CONFIRMACAO_SIM_PATTERN.test(texto)
+    || CONFIRMACAO_NAO_PATTERN.test(texto)
+    || CANCELAR_SELECAO_CLIENTE_PATTERN.test(texto)
+  )
+}
+
 
 const TRANSCRICOES_RUIDO_PATTERN = /^\s*(?:e\s+a[ií]|ei|oi|ah|hã|ha|hum|hmm|é|eh|tá|ta|obrigad[oa]\s+por\s+assistir|legendas(?:\s+pela\s+comunidade)?.*)\s*[.!?]*\s*$/i
 
@@ -129,6 +151,13 @@ function falaTemQualidadeMinima(texto, metadados = {}) {
   const pico = Number(metadados.pico || 0)
   const ruido = Math.max(Number(metadados.ruido || 0.006), 0.003)
   const palavras = normalizarComandoLocal(texto).split(" ").filter(Boolean)
+
+  // Os comandos oficiais são naturalmente curtos. Eles ainda precisam ter
+  // voz audível, mas não podem ser rejeitados pela duração mínima usada para
+  // frases livres.
+  if (falaCurtaOficial(texto)) {
+    return duracao >= 180 && pico >= Math.max(0.011, ruido * 1.65)
+  }
 
   const picoMinimo = Math.max(0.014, ruido * 2.25)
   if (duracao < DURACAO_MINIMA_FALA_MS || pico < picoMinimo) return false
@@ -150,6 +179,10 @@ function falaPassaEscutaProtegida(texto, metadados = {}) {
   const pico = Number(metadados.pico || 0)
   const ruido = Math.max(Number(metadados.ruido || 0.006), 0.003)
   const palavras = normalizarComandoLocal(texto).split(" ").filter(Boolean)
+
+  if (falaCurtaOficial(texto)) {
+    return duracao >= 180 && pico >= Math.max(0.012, ruido * 1.8)
+  }
 
   // Música, televisão e conversas ao fundo costumam produzir trechos longos,
   // contínuos e com pouca separação entre a voz e o ruído ambiente.
@@ -1038,20 +1071,10 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
 
   const renovarJanelaProtegida = useCallback(() => {
     clearTimeout(timeoutSessaoProtegidaRef.current)
-    if (!escutaProtegidaRef.current || !sessaoAtivaRef.current) return
-
-    timeoutSessaoProtegidaRef.current = setTimeout(() => {
-      if (processandoRef.current || falandoRef.current) {
-        renovarJanelaProtegida()
-        return
-      }
-      sessaoAtivaRef.current = false
-      setSessaoAtiva(false)
-      modoRef.current = "wake"
-      selecaoClientePendenteRef.current = null
-      atualizarEstado("aguardando", "Sessão protegida encerrada. Diga “Nexa” para conversar novamente.")
-    }, PROTECTED_SESSION_TIMEOUT_MS)
-  }, [atualizarEstado])
+    // A sessão de voz permanece ativa até o comando “Obrigado”. A segurança
+    // geral continua garantida pelo encerramento da sessão do sistema por
+    // inatividade, que desmonta este componente no logout.
+  }, [])
 
   const iniciarSessao = useCallback(async (gatilho) => {
     if (processandoRef.current || falandoRef.current) return

@@ -28,8 +28,14 @@ function secundariaConfigurada() {
 }
 
 function versoesCompativeis(web, api) {
-  const linha = valor => String(valor || "").split(".").slice(0, 2).join(".")
-  return Boolean(linha(web) && linha(web) === linha(api))
+  const partes = valor => String(valor || "").split(".").slice(0, 2).map(Number)
+  const [webMajor, webMinor] = partes(web)
+  const [apiMajor, apiMinor] = partes(api)
+  if (![webMajor, webMinor, apiMajor, apiMinor].every(Number.isInteger)) return false
+
+  // Durante uma publicação segura, a Web nova entra primeiro e precisa
+  // conversar com a API da linha imediatamente anterior até o Render terminar.
+  return webMajor === apiMajor && (apiMinor === webMinor || apiMinor === webMinor - 1)
 }
 
 function avisarStatus(disponivel, extras = {}) {
