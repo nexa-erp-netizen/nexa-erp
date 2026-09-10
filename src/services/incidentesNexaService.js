@@ -47,22 +47,40 @@ export async function registrarIncidenteWeb(dados = {}) {
       pagina: window.location.pathname,
       navegador: navigator.userAgent.slice(0, 300),
       apiTentada: texto(dados.apiBaseUrl, 300),
+      paginaAnterior: texto(dados.contexto?.paginaAnterior, 120),
+      paginaEsperada: texto(dados.contexto?.paginaEsperada, 120),
+      paginaEncontrada: texto(dados.contexto?.paginaEncontrada, 120),
+      comando: texto(dados.contexto?.comando, 500),
+      tipoAcao: texto(dados.contexto?.tipoAcao, 80),
     },
   })
 
   for (const url of candidatosApi(dados.apiBaseUrl)) {
     try {
-      const resposta = await fetch(`${url}/incidentes/capturar`, {
+      const endpoint = dados.criarPlano ? "/incidentes/capturar-acao" : "/incidentes/capturar"
+      const resposta = await fetch(`${url}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: corpo,
         keepalive: true,
       })
-      if (resposta.ok) return
+      if (resposta.ok) return await resposta.json().catch(() => ({ registrado: true }))
+      // Administradores comuns podem registrar o incidente, mas não gerar
+      // planos técnicos da plataforma.
+      if (dados.criarPlano && resposta.status === 403) {
+        const captura = await fetch(`${url}/incidentes/capturar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: corpo,
+          keepalive: true,
+        })
+        if (captura.ok) return await captura.json().catch(() => ({ registrado: true }))
+      }
     } catch {
       // Tenta a próxima instância. A captura nunca pode interromper o sistema.
     }
   }
+  return null
 }
 
 export function iniciarMonitoramentoWeb() {

@@ -15,6 +15,7 @@ import {
   registrarConversaVoz,
   resolverEscolhaClientePendente,
 } from "../services/nexaVoiceService"
+import { registrarIncidenteWeb } from "../services/incidentesNexaService"
 
 const VOICE_ENABLED_KEY = "nexaVoiceEnabled"
 const SPOKEN_RESPONSES_ENABLED_KEY = "nexaSpokenResponsesEnabled"
@@ -1508,7 +1509,26 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         acaoExecutada = paginaConfirmada
 
         if (!paginaConfirmada) {
-          const falhaNavegacao = `Não consegui abrir ${paginaEsperada || "a tela solicitada"}. A navegação foi interrompida sem confirmar uma ação que não aconteceu.`
+          const incidente = await registrarIncidenteWeb({
+            origem: "web-acao",
+            titulo: `Navegação não concluída: ${paginaEsperada || "tela desconhecida"}`,
+            mensagem: `A Nexa tentou navegar de ${page || "tela não identificada"} para ${paginaEsperada || "destino não identificado"}, mas a Web permaneceu em ${paginaAtualRef.current || "tela não identificada"}.`,
+            rota: "nexa-voice/navegacao",
+            metodo: "ACAO",
+            componente: "src/components/NexaVoiceListener.jsx",
+            criarPlano: true,
+            contexto: {
+              comando,
+              tipoAcao: acaoEfetiva.tipo,
+              paginaAnterior: page || "",
+              paginaEsperada,
+              paginaEncontrada: paginaAtualRef.current,
+            },
+          }).catch(() => null)
+          const referencia = incidente?.planoId
+            ? ` Registrei o incidente #${incidente.incidenteId} e o plano #${incidente.planoId}. Diga “prepare a correção do plano #${incidente.planoId}” para eu corrigir sem publicar.`
+            : (incidente?.incidenteId ? ` Registrei o incidente #${incidente.incidenteId} para diagnóstico.` : "")
+          const falhaNavegacao = `Não consegui abrir ${paginaEsperada || "a tela solicitada"}. A tela permaneceu em ${paginaAtualRef.current || "uma página não identificada"}.${referencia}`
           textoFalado = falhaNavegacao
           setUltimaResposta(falhaNavegacao)
           setMensagensPainel((atual) => atual.map((item) => (
