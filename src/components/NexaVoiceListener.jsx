@@ -1710,6 +1710,25 @@ export default function NexaVoiceListener({ usuario, setPage, page }) {
         }
 
         const palavrasProtegidas = normalizarComandoLocal(texto).split(" ").filter(Boolean)
+        const temWakeWordExplicita = Boolean(wakeDuranteSessao)
+        const temVerboDeNavegacao = /(^|\s)(abra|abre|abrir|acesse|acessar|entre|entrar|va|vai|ir|navegue|navegar|mostre|mostrar|exiba|ver|me leve|me leva)(\s|$)/.test(normalizarComandoLocal(texto))
+        const atalhoIsolado = Boolean(
+          palavrasProtegidas.length <= 2
+          && (detectarAcaoLocalDeNavegacao(texto) || COMANDO_SITE_PATTERN.test(texto))
+          && !temWakeWordExplicita
+          && !temVerboDeNavegacao
+        )
+
+        // Palavras isoladas como “e-CAC”, “Fiscal” ou “Drive” podem vir de
+        // televisão ou de outra pessoa no ambiente. Durante a escuta protegida,
+        // só executamos esses atalhos quando houver intenção explícita: verbo de
+        // navegação ou o chamado “Nexa”.
+        if (escutaProtegidaRef.current && atalhoIsolado) {
+          console.info("[Nexa Voice] Atalho isolado do ambiente descartado:", texto)
+          voltarParaEscuta()
+          return
+        }
+
         const fraseCurtaPermitida = Boolean(
           detectarAcaoLocalDeNavegacao(texto)
           || COMANDO_SITE_PATTERN.test(texto)
