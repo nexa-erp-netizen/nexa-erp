@@ -11,6 +11,12 @@ export default function NexaInteligenciaFlutuante({ usuario, setPage }) {
     verificarProvedores().then((dados) => setPiloto(dados.piloto || null)).catch(() => {})
   }, [aberta])
 
+  function navegarPelaNexa(pagina) {
+    if (typeof setPage !== "function") return
+    setPage(pagina)
+    setAberta(false)
+  }
+
   if (usuario?.perfil !== "Administrador") return null
   return <>
     <button type="button" style={styles.launcher} onClick={() => setAberta(true)} aria-label="Abrir Nexa Inteligência"><span style={styles.spark}>✦</span><span>Nexa</span></button>
@@ -22,7 +28,7 @@ export default function NexaInteligenciaFlutuante({ usuario, setPage }) {
           <button type="button" style={styles.close} onClick={() => setAberta(false)} aria-label="Fechar">×</button>
         </div>
       </header>
-      <div style={styles.content}><ConversaNexa usuario={usuario} setPage={setPage} flutuante /></div>
+      <div style={styles.content}><ConversaNexa usuario={usuario} setPage={navegarPelaNexa} flutuante /></div>
     </section>}
   </>
 }
