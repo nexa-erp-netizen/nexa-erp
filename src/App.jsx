@@ -3,9 +3,9 @@ import api from "./services/api"
 
 import Sidebar from "./components/Sidebar"
 import Header from "./components/Header"
-import NexaVoiceListener from "./components/NexaVoiceListener"
 import FloatingCalculator from "./components/FloatingCalculator"
 import SistemaInstavelAviso from "./components/SistemaInstavelAviso"
+import NexaInteligenciaFlutuante from "./components/NexaInteligenciaFlutuante"
 
 import Login from "./pages/Login"
 
@@ -487,7 +487,7 @@ export default function App() {
 
         {usuario?.perfil !== "Cliente" && <FloatingCalculator avoidNexa={usuario?.perfil === "Administrador"} />}
 
-        {usuario?.perfil === "Administrador" && <NexaVoiceListener usuario={usuario} setPage={setPage} page={page} />}
+        {usuario?.perfil === "Administrador" && <NexaInteligenciaFlutuante usuario={usuario} setPage={setPage} />}
       </div>
     </div>
   )
