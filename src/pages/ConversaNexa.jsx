@@ -712,8 +712,8 @@ export default function ConversaNexa({ usuario, setPage, flutuante = false }) {
         </section>
       )}
 
-      <div style={{ ...styles.workspace, ...(flutuante ? styles.workspaceFloating : {}), gridTemplateColumns: flutuante || isMobile ? "1fr" : "280px minmax(0,1fr)" }}>
-        {!flutuante && <aside style={styles.sidebar}>
+      <div style={{ ...styles.workspace, ...(flutuante ? styles.workspaceFloating : {}), gridTemplateColumns: isMobile ? "1fr" : flutuante ? "240px minmax(0,1fr)" : "280px minmax(0,1fr)" }}>
+        {!isMobile && <aside style={{ ...styles.sidebar, ...(flutuante ? styles.sidebarFloating : {}) }}>
           <button style={styles.sidebarNew} onClick={novaConversa}>+ Nova conversa</button>
           <span style={styles.sidebarTitle}>Conversas</span>
           <div style={styles.conversationList}>
