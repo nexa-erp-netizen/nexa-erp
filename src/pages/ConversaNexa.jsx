@@ -74,7 +74,7 @@ function limparTextoResposta(valor, fallback = "Comando concluído.") {
   }
 }
 
-export default function ConversaNexa({ usuario, setPage }) {
+export default function ConversaNexa({ usuario, setPage, flutuante = false }) {
   const [clientes, setClientes] = useState([])
   const [conversas, setConversas] = useState([])
   const [conversaId, setConversaId] = useState(null)
@@ -626,8 +626,8 @@ export default function ConversaNexa({ usuario, setPage }) {
   }
 
   return (
-    <div style={styles.page}>
-      <header style={styles.hero}>
+    <div style={{ ...styles.page, ...(flutuante ? styles.pageFloating : {}) }}>
+      {!flutuante && <header style={styles.hero}>
         <div>
           <span style={styles.badge}>Nexa Conversacional v2 • voz, texto, memória e contexto</span>
           <h2 style={styles.title}>Conversa com a Nexa</h2>
@@ -642,14 +642,14 @@ export default function ConversaNexa({ usuario, setPage }) {
           </button>
           <button style={styles.newButton} onClick={novaConversa}>+ Nova conversa</button>
         </div>
-      </header>
+      </header>}
 
-      <div style={{ ...styles.providerStatus, ...(algumProvedorDisponivel ? styles.providerOnline : styles.providerOffline) }}>
+      {!flutuante && <div style={{ ...styles.providerStatus, ...(algumProvedorDisponivel ? styles.providerOnline : styles.providerOffline) }}>
         <strong>{provedores.verificando ? "Verificando IA..." : provedores.openai?.online ? "OpenAI conectada — IA principal" : provedores.groq.online ? "Groq conectada — IA de reserva" : "IA indisponível"}</strong>
         <span>{provedores.ollama.online && provedores.ollama.instalado ? `Ollama pronto como alternativa local • ${provedores.ollama.modelo}` : "Ollama local opcional"}</span>
-      </div>
+      </div>}
 
-      {mostrarMemorias && (
+      {!flutuante && mostrarMemorias && (
         <section style={styles.memoryPanel}>
           <div style={styles.memoryHeader}>
             <div>
@@ -676,8 +676,8 @@ export default function ConversaNexa({ usuario, setPage }) {
         </section>
       )}
 
-      <div style={{ ...styles.workspace, gridTemplateColumns: isMobile ? "1fr" : "280px minmax(0,1fr)" }}>
-        <aside style={styles.sidebar}>
+      <div style={{ ...styles.workspace, ...(flutuante ? styles.workspaceFloating : {}), gridTemplateColumns: flutuante || isMobile ? "1fr" : "280px minmax(0,1fr)" }}>
+        {!flutuante && <aside style={styles.sidebar}>
           <button style={styles.sidebarNew} onClick={novaConversa}>+ Nova conversa</button>
           <span style={styles.sidebarTitle}>Histórico</span>
           <div style={styles.conversationList}>
@@ -694,10 +694,10 @@ export default function ConversaNexa({ usuario, setPage }) {
               </div>
             ))}
           </div>
-        </aside>
+        </aside>}
 
         <main style={styles.main}>
-          <section style={styles.context}>
+          {!flutuante && <section style={styles.context}>
             <div>
               <label style={styles.label}>Tipo de conversa</label>
               <select style={styles.select} value={tipoContexto} onChange={(event) => alterarContexto(event.target.value)}>
@@ -733,11 +733,11 @@ export default function ConversaNexa({ usuario, setPage }) {
             )}
 
             <span style={styles.contextText}>{textoContexto(tipoContexto, cliente, interessadoNome)}</span>
-          </section>
+          </section>}
 
-          <div style={styles.suggestions}>
+          {!flutuante && <div style={styles.suggestions}>
             {SUGESTOES.map((item) => <button key={item} style={styles.suggestion} onClick={() => enviar(item)}>{item}</button>)}
-          </div>
+          </div>}
 
           <section style={styles.chat}>
             {carregandoConversa && <div style={styles.typing}>Abrindo conversa...</div>}
@@ -986,6 +986,8 @@ function formatarHora(data) {
 }
 
 const styles = {
+  pageFloating: { height: "100%", minHeight: 0, padding: 0, background: "#0b1728" },
+  workspaceFloating: { height: "100%", minHeight: 0, border: 0, borderRadius: 0, background: "transparent" },
   page: { display: "flex", flexDirection: "column", gap: "12px", maxWidth: "1500px", margin: "0 auto", minHeight: "calc(100vh - 110px)" },
   hero: { background: "#071f43", border: "1px solid rgba(255,255,255,.09)", borderRadius: "18px", padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "15px", flexWrap: "wrap" },
   badge: { color: "#37ff74", fontWeight: "bold", fontSize: "13px" },
