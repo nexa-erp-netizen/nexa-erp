@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.57.0",
-  build: "35700",
-  release: "Piloto Nexa Inteligência",
+  version: "3.57.1",
+  build: "35701",
+  release: "Navegação segura para o Cofre",
   date: "11/09/2026",
   status: "Piloto não publicado",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.57.1", release: "Navegação segura para o Cofre", date: "11/09/2026", items: ["Comandos com Cofre abrem a Central e-CAC no cliente correto", "Continuações como abra o cofre dela reutilizam o cliente citado no histórico", "Navegação usa clienteId e evita depender apenas de aproximação por nome", "Painel flutuante fecha após navegar para exibir imediatamente a tela solicitada", "Senhas continuam fora da conversa e só podem ser reveladas dentro do Cofre", "Acesso ao Cofre permanece exclusivo do Administrador", "Publicação permanece bloqueada até autorização expressa"] },
     { version: "3.57.0", release: "Piloto Nexa Inteligência", date: "11/09/2026", items: ["Conversa flutuante inspirada no ChatGPT substitui o painel flutuante anterior", "Acesso exclusivo do perfil Administrador validado também pela API", "Piloto inicia no primeiro uso e encerra após 30 dias", "Teto de US$ 10 é reservado antes da chamada e bloqueado no servidor", "Consumo é reconciliado pelos tokens informados pela OpenAI", "Google Drive continua em modo somente leitura e pode ser acionado pelas ferramentas da conversa", "Nenhuma publicação é realizada sem autorização expressa"] },
     { version: "3.56.3", release: "Autodiagnóstico automático de ações", date: "10/09/2026", items: ["Falhas de navegação geram incidente automaticamente com evidências protegidas", "Tela esperada e tela encontrada passam a fazer parte do diagnóstico", "Administrador da plataforma recebe um plano de correção automaticamente", "A Nexa informa os números do incidente e do plano no próprio painel", "Preparação e publicação continuam dependendo de autorização expressa", "Administradores comuns podem registrar falhas sem receber acesso técnico à plataforma"] },
     { version: "3.56.2", release: "Navegação confirmada pelo resultado real", date: "10/09/2026", items: ["Abrir nota fiscal e abrir NF navegam deterministicamente para NF-e", "A Web recupera comandos conhecidos quando a conversa não entrega a ação", "A Nexa confere a página realmente renderizada antes de confirmar a abertura", "Falhas de navegação deixam de produzir confirmação falsa", "Resposta de erro informa que a ação não foi concluída"] },
