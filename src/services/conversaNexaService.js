@@ -329,7 +329,7 @@ export async function verificarProvedores() {
     ? ollamaResultado.value
     : { online: false, instalado: false, modelo: configuracaoLocal().modelo, modelos: [] }
 
-  return { openai, groq, ollama, provedorPrincipal: status.provedorPrincipal || "openai" }
+  return { openai, groq, ollama, piloto: status.piloto || null, provedorPrincipal: status.provedorPrincipal || "openai" }
 }
 
 export async function baixarRelatorioNexa(configuracao) {
