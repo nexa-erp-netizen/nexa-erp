@@ -380,6 +380,9 @@ export default function ConversaNexa({ usuario, setPage, flutuante = false }) {
       localStorage.setItem("nexaAbrirClienteNome", clienteNome)
       if (acao.secao) localStorage.setItem("nexaAbrirSecaoCliente", String(acao.secao))
     }
+    if (pagina === "Central e-CAC" && clienteAcaoId) {
+      localStorage.setItem("nexaCentralEcacClienteId", clienteAcaoId)
+    }
     if (pagina === "Fiscal") {
       if (clienteNome) localStorage.setItem("nexaFiltroFiscalCliente", clienteNome)
       else localStorage.removeItem("nexaFiltroFiscalCliente")
