@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.58.1",
-  build: "35801",
-  release: "Conversas no painel flutuante",
+  version: "3.58.2",
+  build: "35802",
+  release: "Janela completa e envio por arrastar",
   date: "11/09/2026",
   status: "Publicada",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.58.2", release: "Janela completa e envio por arrastar", date: "11/09/2026", items: ["Nexa abre maximizada para aproveitar toda a tela", "Controles para minimizar, maximizar, restaurar e fechar", "PDF e outros documentos podem ser arrastados diretamente para a conversa", "Área visual confirma onde soltar o arquivo antes da análise", "Botão Documento permanece disponível como alternativa"] },
     { version: "3.58.1", release: "Conversas no painel flutuante", date: "11/09/2026", items: ["Painel flutuante passa a exibir a coluna lateral de conversas", "Histórico organizado em Fixadas e Recentes também no acesso rápido", "Janela ampliada para manter leitura confortável no formato inspirado no ChatGPT", "Layout compacto preservado em telas móveis"] },
     { version: "3.58.0", release: "Memória operacional por cliente", date: "11/09/2026", items: ["Conversa selecionada na lateral passa a ser soberana e não mistura atendimentos", "Histórico separado em conversas fixadas e recentes", "Conversas podem ser fixadas, renomeadas, arquivadas ou excluídas", "Nexa reconhece o responsável do escritório e deixa de mandar procurar um contador", "Retomada usa o histórico salvo para separar o que foi concluído da pendência e orientar o próximo passo", "Vínculo do atendimento permanece por clienteId"] },
     { version: "3.57.2", release: "Cofre priorizado antes da IA", date: "11/09/2026", items: ["Pedido explícito para abrir o Cofre é executado antes do núcleo generativo", "Groq e OpenAI deixam de recusar comandos seguros de navegação como se fossem pedidos de senha", "Cliente continua identificado por clienteId", "Nenhuma senha é exibida na conversa", "Cofre permanece exclusivo do Administrador"] },

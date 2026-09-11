@@ -93,8 +93,10 @@ export default function ConversaNexa({ usuario, setPage, flutuante = false }) {
   const [mostrarMemorias, setMostrarMemorias] = useState(false)
   const [gerandoDiagnostico, setGerandoDiagnostico] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900)
+  const [arrastandoArquivo, setArrastandoArquivo] = useState(false)
   const fimRef = useRef(null)
   const arquivoRef = useRef(null)
+  const profundidadeArrasteRef = useRef(0)
   const contextoInicialAplicadoRef = useRef(false)
   const consultaAutomaticaAplicadaRef = useRef(false)
   const visualizacaoTelaRef = useRef(null)
@@ -638,9 +640,7 @@ export default function ConversaNexa({ usuario, setPage, flutuante = false }) {
     }
   }
 
-  async function analisarArquivo(evento) {
-    const arquivo = evento.target.files?.[0]
-    evento.target.value = ""
+  async function processarArquivo(arquivo) {
     if (!arquivo || enviando) return
     setEnviando(true)
     setErro("")
@@ -661,8 +661,64 @@ export default function ConversaNexa({ usuario, setPage, flutuante = false }) {
     }
   }
 
+  async function analisarArquivo(evento) {
+    const arquivo = evento.target.files?.[0]
+    evento.target.value = ""
+    await processarArquivo(arquivo)
+  }
+
+  function iniciarArraste(evento) {
+    evento.preventDefault()
+    evento.stopPropagation()
+    profundidadeArrasteRef.current += 1
+    if (evento.dataTransfer?.types?.includes("Files")) setArrastandoArquivo(true)
+  }
+
+  function manterArraste(evento) {
+    evento.preventDefault()
+    evento.stopPropagation()
+    if (evento.dataTransfer) evento.dataTransfer.dropEffect = "copy"
+  }
+
+  function encerrarArraste(evento) {
+    evento.preventDefault()
+    evento.stopPropagation()
+    profundidadeArrasteRef.current = Math.max(0, profundidadeArrasteRef.current - 1)
+    if (profundidadeArrasteRef.current === 0) setArrastandoArquivo(false)
+  }
+
+  function soltarArquivo(evento) {
+    evento.preventDefault()
+    evento.stopPropagation()
+    profundidadeArrasteRef.current = 0
+    setArrastandoArquivo(false)
+    const arquivo = evento.dataTransfer?.files?.[0]
+    if (!arquivo) return
+    const extensaoPermitida = /\.(pdf|docx|txt|csv|json|xml)$/i.test(arquivo.name)
+    if (!extensaoPermitida) {
+      setErro("Envie um arquivo PDF, DOCX, TXT, CSV, JSON ou XML.")
+      return
+    }
+    processarArquivo(arquivo)
+  }
+
   return (
-    <div style={{ ...styles.page, ...(flutuante ? styles.pageFloating : {}) }}>
+    <div
+      style={{ ...styles.page, ...(flutuante ? styles.pageFloating : {}) }}
+      onDragEnter={iniciarArraste}
+      onDragOver={manterArraste}
+      onDragLeave={encerrarArraste}
+      onDrop={soltarArquivo}
+    >
+      {arrastandoArquivo && (
+        <div style={styles.dropOverlay} role="status" aria-live="polite">
+          <div style={styles.dropCard}>
+            <span style={styles.dropIcon}>📄</span>
+            <strong>Solte o arquivo aqui</strong>
+            <span>A Nexa vai anexar e analisar o documento nesta conversa.</span>
+          </div>
+        </div>
+      )}
       {!flutuante && <header style={styles.hero}>
         <div>
           <span style={styles.badge}>Nexa Conversacional v2 • voz, texto, memória e contexto</span>
@@ -1032,9 +1088,12 @@ function formatarHora(data) {
 }
 
 const styles = {
-  pageFloating: { height: "100%", minHeight: 0, padding: 0, background: "#0b1728" },
+  pageFloating: { height: "100%", minHeight: 0, padding: 0, background: "#0b1728", overflow: "hidden" },
   workspaceFloating: { height: "100%", minHeight: 0, border: 0, borderRadius: 0, background: "transparent" },
-  page: { display: "flex", flexDirection: "column", gap: "12px", maxWidth: "1500px", margin: "0 auto", minHeight: "calc(100vh - 110px)" },
+  page: { position: "relative", display: "flex", flexDirection: "column", gap: "12px", maxWidth: "1500px", margin: "0 auto", minHeight: "calc(100vh - 110px)" },
+  dropOverlay: { position: "absolute", inset: 0, zIndex: 50, display: "grid", placeItems: "center", padding: 24, background: "rgba(4,18,38,.88)", border: "3px dashed #25e69a", backdropFilter: "blur(3px)", pointerEvents: "none" },
+  dropCard: { width: "min(440px,90%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "30px 24px", borderRadius: 18, background: "#10233d", color: "#f7fafc", textAlign: "center", boxShadow: "0 18px 55px rgba(0,0,0,.35)" },
+  dropIcon: { fontSize: 38 },
   hero: { background: "#071f43", border: "1px solid rgba(255,255,255,.09)", borderRadius: "18px", padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "15px", flexWrap: "wrap" },
   badge: { color: "#37ff74", fontWeight: "bold", fontSize: "13px" },
   title: { margin: "6px 0", fontSize: "26px" },
