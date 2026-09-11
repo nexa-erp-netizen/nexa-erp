@@ -328,6 +328,39 @@ export default function ConversaNexa({ usuario, setPage, flutuante = false }) {
     }
   }
 
+  async function fixarConversa(event, item) {
+    event.stopPropagation()
+    try {
+      await atualizarConversaNexa(item.id, { fixada: !item.fixada })
+      await recarregarConversas()
+    } catch (error) {
+      setErro(error.response?.data?.message || "Não consegui alterar a conversa fixada.")
+    }
+  }
+
+  async function renomearConversa(event, item) {
+    event.stopPropagation()
+    const titulo = window.prompt("Novo nome da conversa:", item.titulo || "Nova conversa")
+    if (titulo === null || !titulo.trim()) return
+    try {
+      await atualizarConversaNexa(item.id, { titulo: titulo.trim() })
+      await recarregarConversas()
+    } catch (error) {
+      setErro(error.response?.data?.message || "Não consegui renomear a conversa.")
+    }
+  }
+
+  async function arquivarConversa(event, item) {
+    event.stopPropagation()
+    try {
+      await atualizarConversaNexa(item.id, { arquivada: true, fixada: false })
+      if (String(conversaId) === String(item.id)) novaConversa()
+      await recarregarConversas()
+    } catch (error) {
+      setErro(error.response?.data?.message || "Não consegui arquivar a conversa.")
+    }
+  }
+
   async function alterarContexto(novoTipo) {
     setTipoContexto(novoTipo)
     if (novoTipo !== "cliente") setClienteId("")
@@ -682,18 +715,28 @@ export default function ConversaNexa({ usuario, setPage, flutuante = false }) {
       <div style={{ ...styles.workspace, ...(flutuante ? styles.workspaceFloating : {}), gridTemplateColumns: flutuante || isMobile ? "1fr" : "280px minmax(0,1fr)" }}>
         {!flutuante && <aside style={styles.sidebar}>
           <button style={styles.sidebarNew} onClick={novaConversa}>+ Nova conversa</button>
-          <span style={styles.sidebarTitle}>Histórico</span>
+          <span style={styles.sidebarTitle}>Conversas</span>
           <div style={styles.conversationList}>
             {!conversas.length && <span style={styles.emptyText}>As conversas salvas aparecerão aqui.</span>}
-            {conversas.map((item) => (
-              <div key={item.id} style={{ ...styles.conversationItem, ...(String(conversaId) === String(item.id) ? styles.conversationActive : {}) }}>
+            {conversas.map((item, indice) => (
+              <div key={item.id}>
+              {(indice === 0 || Boolean(conversas[indice - 1]?.fixada) !== Boolean(item.fixada)) && (
+                <span style={styles.conversationGroup}>{item.fixada ? "Fixadas" : "Recentes"}</span>
+              )}
+              <div style={{ ...styles.conversationItem, ...(String(conversaId) === String(item.id) ? styles.conversationActive : {}) }}>
                 <button type="button" style={styles.conversationSelect} onClick={() => selecionarConversa(item)}>
                   <span style={styles.conversationInfo}>
                   <strong>{item.titulo || "Nova conversa"}</strong>
                   <span>{rotuloContexto(item.tipoContexto, item.interessadoNome)}</span>
                   </span>
                 </button>
-                <button type="button" style={styles.deleteConversation} onClick={(event) => removerConversa(event, item.id)} aria-label={`Excluir conversa ${item.titulo || "sem título"}`}>×</button>
+                <div style={styles.conversationActions}>
+                  <button type="button" style={{ ...styles.conversationAction, ...(item.fixada ? styles.conversationActionActive : {}) }} onClick={(event) => fixarConversa(event, item)} title={item.fixada ? "Desafixar" : "Fixar"} aria-label={item.fixada ? "Desafixar conversa" : "Fixar conversa"}>●</button>
+                  <button type="button" style={styles.conversationAction} onClick={(event) => renomearConversa(event, item)} title="Renomear" aria-label="Renomear conversa">✎</button>
+                  <button type="button" style={styles.conversationAction} onClick={(event) => arquivarConversa(event, item)} title="Arquivar" aria-label="Arquivar conversa">▾</button>
+                  <button type="button" style={styles.deleteConversation} onClick={(event) => removerConversa(event, item.id)} title="Excluir" aria-label={`Excluir conversa ${item.titulo || "sem título"}`}>×</button>
+                </div>
+              </div>
               </div>
             ))}
           </div>
@@ -1014,10 +1057,14 @@ const styles = {
   sidebarNew: { background: "rgba(0,168,255,.13)", color: "#8bd7ff", border: "1px solid rgba(0,168,255,.30)", borderRadius: "10px", padding: "10px", cursor: "pointer", fontWeight: "bold" },
   sidebarTitle: { color: "#91a6bf", fontSize: "11px", textTransform: "uppercase", letterSpacing: ".06em" },
   conversationList: { display: "flex", flexDirection: "column", gap: "6px", overflowY: "auto" },
+  conversationGroup: { display: "block", color: "#7187a1", fontSize: "10px", fontWeight: "bold", letterSpacing: ".08em", textTransform: "uppercase", padding: "8px 8px 4px" },
   conversationItem: { width: "100%", display: "flex", justifyContent: "space-between", gap: "8px", textAlign: "left", background: "transparent", color: "#dce8f8", border: "1px solid transparent", borderRadius: "12px", padding: "4px" },
   conversationActive: { background: "rgba(0,168,255,.12)", borderColor: "rgba(0,168,255,.32)" },
   conversationSelect: { flex: 1, minWidth: 0, display: "flex", textAlign: "left", background: "transparent", color: "inherit", border: 0, borderRadius: "9px", padding: "7px", cursor: "pointer" },
   conversationInfo: { minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" },
+  conversationActions: { alignSelf: "center", display: "flex", alignItems: "center", gap: "1px" },
+  conversationAction: { background: "transparent", color: "#7187a1", border: 0, borderRadius: "7px", padding: "6px", fontSize: "13px", lineHeight: 1, cursor: "pointer" },
+  conversationActionActive: { color: "#37ff74" },
   deleteConversation: { alignSelf: "center", background: "transparent", color: "#91a6bf", border: 0, borderRadius: "8px", padding: "8px", fontSize: "18px", lineHeight: 1, cursor: "pointer" },
   main: { minWidth: 0, display: "flex", flexDirection: "column", gap: "10px", background: "#041a3a", border: "1px solid rgba(255,255,255,.09)", borderRadius: "18px", padding: "12px" },
   context: { background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.08)", borderRadius: "14px", padding: "11px 13px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: "10px", alignItems: "end" },
