@@ -47,6 +47,7 @@ export default function ConciliacaoBancaria({ setPage }) {
   const [selecionadosInvestigacao, setSelecionadosInvestigacao] = useState([])
   const [planoInvestigacaoId, setPlanoInvestigacaoId] = useState("")
   const [formaInvestigacao, setFormaInvestigacao] = useState("")
+  const [filtroRecebimento, setFiltroRecebimento] = useState("Todos")
   const [mostrarAnaliseRestante, setMostrarAnaliseRestante] = useState(false)
   const [ajusteEmRevisao, setAjusteEmRevisao] = useState(null)
   const [tipoAjuste, setTipoAjuste] = useState("Arredondamento")
@@ -92,6 +93,8 @@ export default function ConciliacaoBancaria({ setPage }) {
     setTipoAjuste("Arredondamento")
     setPlanoAjusteId("")
     setObservacaoAjuste("")
+    setFormaInvestigacao("")
+    setFiltroRecebimento("Todos")
     if (!investigacao) return
 
     const planoBanco = planoContas.find(plano => {
@@ -101,10 +104,6 @@ export default function ConciliacaoBancaria({ setPage }) {
     })
     if (planoBanco) setPlanoInvestigacaoId(String(planoBanco.id))
 
-    const formaPix = formasPagamento.find(forma =>
-      String(forma?.nome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === "pix"
-    )
-    if (formaPix) setFormaInvestigacao(formaPix.nome)
   }, [investigacao, planoContas, formasPagamento])
 
   async function carregar() {
@@ -429,6 +428,19 @@ export default function ConciliacaoBancaria({ setPage }) {
     return r
   }, { entradas: 0, saidas: 0 }), [movimentos])
 
+  const resumoFormasRecebimento = useMemo(() => movimentos
+    .filter(item => item.natureza === "Entrada")
+    .reduce((resumo, item) => {
+      const forma = classificarFormaExtrato(item)
+      resumo[forma].quantidade += 1
+      resumo[forma].total += Number(item.valor || 0)
+      return resumo
+    }, {
+      PIX: { quantidade: 0, total: 0 },
+      "Cartão": { quantidade: 0, total: 0 },
+      "Não identificado": { quantidade: 0, total: 0 },
+    }), [movimentos])
+
   const movimentosClienteBancariosCompetencia = useMemo(
     () => movimentosCliente.filter(item =>
       movimentoClienteEhBancario(item) &&
@@ -555,17 +567,24 @@ export default function ConciliacaoBancaria({ setPage }) {
     [bancoAindaSemCorrespondencia, investigacao]
   )
 
+  const itensBancoInvestigacaoVisiveis = useMemo(
+    () => investigacao === "Entrada" && filtroRecebimento !== "Todos"
+      ? itensBancoInvestigacao.filter(item => classificarFormaExtrato(item) === filtroRecebimento)
+      : itensBancoInvestigacao,
+    [itensBancoInvestigacao, investigacao, filtroRecebimento]
+  )
+
   const totalBancoInvestigacao = useMemo(
     () => itensBancoInvestigacao.reduce((total, item) => total + Number(item.valor || 0), 0),
     [itensBancoInvestigacao]
   )
 
   const itensBancoInvestigacaoSelecaoSegura = useMemo(
-    () => itensBancoInvestigacao.filter(item => {
+    () => itensBancoInvestigacaoVisiveis.filter(item => {
       const analise = analiseConciliacao[item.id] || {}
       return analise.status === "FALTANDO" && analise.titulo === "Sem lançamento correspondente"
     }),
-    [itensBancoInvestigacao, analiseConciliacao]
+    [itensBancoInvestigacaoVisiveis, analiseConciliacao]
   )
 
   const totalBancoInvestigacaoSelecaoSegura = useMemo(
@@ -868,7 +887,7 @@ export default function ConciliacaoBancaria({ setPage }) {
       return alert(`Diferença restante de ${moeda(diferencaInvestigacaoAtual)}. Revise taxas, agrupamentos e arredondamentos em vez de selecionar novos lançamentos.`)
     }
     setMostrarAnaliseRestante(false)
-    const ids = itensBancoInvestigacao.map(item => item.id)
+    const ids = itensBancoInvestigacaoVisiveis.map(item => item.id)
     const todosSelecionados = ids.length > 0 && ids.every(id => selecionadosInvestigacao.includes(id))
     setSelecionadosInvestigacao(todosSelecionados ? [] : ids)
   }
@@ -1009,8 +1028,11 @@ export default function ConciliacaoBancaria({ setPage }) {
       return alert("Selecione o Plano de contas para os lançamentos.")
     }
 
-    if (!formaInvestigacao) {
-      return alert("Selecione a Forma de pagamento.")
+    const itensSemFormaReconhecida = itensSelecionadosInvestigacao.filter(item =>
+      classificarFormaExtrato(item) === "Não identificado"
+    )
+    if (itensSemFormaReconhecida.length > 0 && !formaInvestigacao) {
+      return alert(`Selecione a forma de pagamento para ${itensSemFormaReconhecida.length} linha(s) que a Nexa não conseguiu identificar.`)
     }
 
     const plano = planoContas.find(item => String(item.id) === String(planoInvestigacaoId))
@@ -1024,20 +1046,24 @@ export default function ConciliacaoBancaria({ setPage }) {
     }
 
     const tipo = investigacao === "Entrada" ? "Receita" : "Despesa"
-    const movimentosParaCriar = itensSelecionadosInvestigacao.map(item => ({
-      clienteId: cliente?.id || undefined,
-      cliente: cliente?.nome || undefined,
-      tipo,
-      data: dataIso(item.data),
-      planoContaId: Number(planoInvestigacaoId),
-      planoContaNome,
-      forma: formaInvestigacao,
-      formaPagamento: formaInvestigacao,
-      descricao: item.descricao || (tipo === "Receita" ? "Recebimento bancário" : "Pagamento bancário"),
-      valor: Number(item.valor || 0),
-      comprovante: "",
-      status: "Pendente",
-    }))
+    const movimentosParaCriar = itensSelecionadosInvestigacao.map(item => {
+      const formaDetectada = classificarFormaExtrato(item)
+      const formaPagamento = formaDetectada === "Não identificado" ? formaInvestigacao : formaDetectada
+      return {
+        clienteId: cliente?.id || undefined,
+        cliente: cliente?.nome || undefined,
+        tipo,
+        data: dataIso(item.data),
+        planoContaId: Number(planoInvestigacaoId),
+        planoContaNome,
+        forma: formaPagamento,
+        formaPagamento,
+        descricao: item.descricao || (tipo === "Receita" ? "Recebimento bancário" : "Pagamento bancário"),
+        valor: Number(item.valor || 0),
+        comprovante: "",
+        status: "Pendente",
+      }
+    })
 
     const complemento = totalSelecionadoInvestigacao < diferencaAtual - TOLERANCIA_FECHAMENTO
       ? `\n\nApós este lote ainda restará aproximadamente ${moeda(diferencaAtual - totalSelecionadoInvestigacao)} para revisar.`
@@ -1045,7 +1071,8 @@ export default function ConciliacaoBancaria({ setPage }) {
 
     if (!confirm(
       `Criar ${movimentosParaCriar.length} lançamento(s) individual(is) em Movimentos Clientes?\n\n` +
-      `Tipo: ${tipo}\nPlano: ${planoContaNome}\nForma: ${formaInvestigacao}\n` +
+      `Tipo: ${tipo}\nPlano: ${planoContaNome}\n` +
+      `PIX: ${movimentosParaCriar.filter(item => item.formaPagamento === "PIX").length} • Cartão: ${movimentosParaCriar.filter(item => item.formaPagamento === "Cartão").length} • Outra forma: ${movimentosParaCriar.filter(item => !["PIX", "Cartão"].includes(item.formaPagamento)).length}\n` +
       `Total selecionado: ${moeda(totalSelecionadoInvestigacao)}\n\n` +
       "A Nexa manterá a data, descrição e valor de cada linha do extrato." +
       complemento
@@ -1321,6 +1348,28 @@ export default function ConciliacaoBancaria({ setPage }) {
     }
   }
 
+  async function corrigirFormasJaConciliadas() {
+    if (!contaExtratoId) return
+    if (!confirm(
+      "Corrigir os lançamentos já conciliados deste mês?\n\n" +
+      "A Nexa usará a descrição do extrato para trocar somente a forma de pagamento para PIX ou Cartão. Valores, datas e planos de contas não serão alterados."
+    )) return
+
+    setProcessando(true)
+    try {
+      const r = await api.post("/extratos-bancarios/movimentos/corrigir-formas-recebimento", {
+        contaBancariaId: contaExtratoId,
+        competencia,
+      })
+      await carregarExtratos()
+      alert(r.data?.message || "Formas de recebimento corrigidas.")
+    } catch (e) {
+      alert(e.response?.data?.message || "Não foi possível corrigir as formas de recebimento.")
+    } finally {
+      setProcessando(false)
+    }
+  }
+
   function voltarEmpresa() {
     if (!clienteId) return
     localStorage.setItem("nexaAbrirClienteId", String(clienteId))
@@ -1540,6 +1589,27 @@ export default function ConciliacaoBancaria({ setPage }) {
               </div>
             </div>
 
+            <div style={s.receiptBreakdown}>
+              <div style={s.receiptBreakdownHeader}>
+                <div>
+                  <strong style={{ display: "block", marginBottom: 4 }}>Entradas separadas por recebimento</strong>
+                  <span>A classificação considera a descrição informada pelo banco no OFX ou CSV.</span>
+                </div>
+                <button style={s.secondary} disabled={processando || !movimentos.length} onClick={corrigirFormasJaConciliadas}>
+                  {processando ? "Corrigindo..." : "Corrigir lançamentos já feitos"}
+                </button>
+              </div>
+              <div style={s.receiptBreakdownGrid}>
+                {["Cartão", "PIX", "Não identificado"].map(forma => (
+                  <div key={forma} style={s.receiptBreakdownCard}>
+                    <span>{forma}</span>
+                    <strong>{moeda(resumoFormasRecebimento[forma].total)}</strong>
+                    <small>{resumoFormasRecebimento[forma].quantidade} entrada(s)</small>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div style={s.reconGrid}>
               <div style={{ ...s.reconCard, ...(entradasBatem ? s.reconCardOk : s.reconCardWarn) }}>
                 <div style={s.reconTitle}>
@@ -1650,6 +1720,25 @@ export default function ConciliacaoBancaria({ setPage }) {
                       Abaixo estão movimentos do extrato ainda sem correspondência automática. Use <b>Selecionar só o que falta</b>: a Nexa considera automaticamente apenas linhas classificadas como faltantes seguros e ignora possíveis correspondências, agrupamentos e taxas. Revise antes de lançar. Cada linha será salva separadamente, mantendo data, descrição e valor. Se não fizerem parte da conciliação, use <b>Justificar</b>.
                     </div>
 
+                    {investigacao === "Entrada" && (
+                      <div style={s.receiptFilters}>
+                        <strong>Mostrar recebimentos:</strong>
+                        {["Todos", "Cartão", "PIX", "Não identificado"].map(forma => (
+                          <button
+                            type="button"
+                            key={forma}
+                            style={{ ...s.filterButton, ...(filtroRecebimento === forma ? s.filterButtonActive : {}) }}
+                            onClick={() => {
+                              setFiltroRecebimento(forma)
+                              setSelecionadosInvestigacao([])
+                            }}
+                          >
+                            {forma}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     {modoTaxasCentavos && (
                       <div style={{ ...s.investigationTip, marginBottom: 12, border: "1px solid rgba(255, 196, 64, .55)", background: "rgba(255, 196, 64, .08)" }}>
                         <strong style={{ display: "block", marginBottom: 6 }}>
@@ -1661,8 +1750,8 @@ export default function ConciliacaoBancaria({ setPage }) {
 
                     <div style={s.investigationSummary}>
                       <div>
-                        <strong>{itensBancoInvestigacao.length} linha(s) sem correspondência</strong>
-                        <span style={{ display: "block", marginTop: 4 }}>Total das linhas: {moeda(totalBancoInvestigacao)} • Seleção segura: {itensBancoInvestigacaoSelecaoSegura.length} linha(s) / {moeda(totalBancoInvestigacaoSelecaoSegura)} • Diferença do mês: {moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}</span>
+                        <strong>{itensBancoInvestigacaoVisiveis.length} linha(s) exibida(s) de {itensBancoInvestigacao.length}</strong>
+                        <span style={{ display: "block", marginTop: 4 }}>Total geral pendente: {moeda(totalBancoInvestigacao)} • Seleção segura no filtro: {itensBancoInvestigacaoSelecaoSegura.length} linha(s) / {moeda(totalBancoInvestigacaoSelecaoSegura)} • Diferença do mês: {moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}</span>
                       </div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                         <button
@@ -1679,10 +1768,10 @@ export default function ConciliacaoBancaria({ setPage }) {
                             ? `Modo taxa/centavos • ${moeda(diferencaInvestigacaoAtual)}`
                             : `Selecionar só o que falta • ${moeda(investigacao === "Entrada" ? diferencaEntradas : diferencaSaidas)}`}
                         </button>
-                        <button style={s.secondary} disabled={processando || modoTaxasCentavos || !itensBancoInvestigacao.length} onClick={selecionarTodosInvestigacao}>
-                          {itensBancoInvestigacao.length > 0 && itensBancoInvestigacao.every(item => selecionadosInvestigacao.includes(item.id))
-                            ? "Desmarcar todos"
-                            : "Selecionar todos"}
+                        <button style={s.secondary} disabled={processando || modoTaxasCentavos || !itensBancoInvestigacaoVisiveis.length} onClick={selecionarTodosInvestigacao}>
+                          {itensBancoInvestigacaoVisiveis.length > 0 && itensBancoInvestigacaoVisiveis.every(item => selecionadosInvestigacao.includes(item.id))
+                            ? "Desmarcar visíveis"
+                            : "Selecionar visíveis"}
                         </button>
                       </div>
                     </div>
@@ -1706,7 +1795,7 @@ export default function ConciliacaoBancaria({ setPage }) {
                               ))}
                             </select>
                           </label>
-                          <label style={s.label}>Forma de pagamento
+                          <label style={s.label}>Forma para não identificados
                             <select style={s.input} value={formaInvestigacao} onChange={e => setFormaInvestigacao(e.target.value)}>
                               <option value="">Selecione</option>
                               {formasPagamento.filter(forma => forma.ativo !== false).map(forma => (
@@ -1882,7 +1971,7 @@ export default function ConciliacaoBancaria({ setPage }) {
                     )}
 
                     <div style={s.investigationList}>
-                      {itensBancoInvestigacao.map(item => (
+                      {itensBancoInvestigacaoVisiveis.map(item => (
                         <div key={item.id} style={s.investigationItemSelectable}>
                           <input
                             type="checkbox"
@@ -1891,13 +1980,13 @@ export default function ConciliacaoBancaria({ setPage }) {
                             onChange={() => alternarSelecaoInvestigacao(item.id)}
                             aria-label={`Selecionar movimento ${item.id}`}
                           />
-                          <span><b>{dataBr(item.data)}</b> • {item.descricao || "Sem descrição"}</span>
+                          <span><b>{dataBr(item.data)}</b> • {item.descricao || "Sem descrição"}<small style={{ display: "block", marginTop: 3, color: "#73ffd4" }}>{classificarFormaExtrato(item)}</small></span>
                           <strong style={{ color: investigacao === "Entrada" ? "#42f5a7" : "#ff9ba4" }}>{moeda(item.valor)}</strong>
                           <button style={s.justifyButton} disabled={processando} onClick={() => classificarUm(item, "Ignorado")}>Justificar</button>
                         </div>
                       ))}
-                      {itensBancoInvestigacao.length === 0 && (
-                        <div style={s.empty}>Não há linhas bancárias pendentes dessa natureza. Atualize a conferência ou revise os lançamentos do cliente.</div>
+                      {itensBancoInvestigacaoVisiveis.length === 0 && (
+                        <div style={s.empty}>Não há linhas bancárias pendentes para este filtro.</div>
                       )}
                     </div>
                   </>
@@ -2085,6 +2174,18 @@ function valorBancoConciliavel(item) {
   return Number(item?.valor || 0) + Number(item?.ajusteComparacao || 0)
 }
 
+function classificarFormaExtrato(item) {
+  const texto = `${item?.descricao || ""} ${item?.tipoBanco || ""}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+
+  if (/\bpix\b|pix recebido|recebimento pix|transf pix/.test(texto)) return "PIX"
+  if (/cartao|maquininha|adquirente|stone|cielo|redecard|rede itau|pagseguro|pagbank|sumup|getnet|infinitepay|infinite pay|safrapay|sipag|moderninha|mercado pago|mercadopago|\bton\b|\bvero\b/.test(texto)) return "Cartão"
+  return "Não identificado"
+}
+
 function movimentoClienteEhBancario(item) {
   const observacao = String(item?.observacao || "")
     .normalize("NFD")
@@ -2138,6 +2239,13 @@ const s = {
   disabled: { opacity: 0.4, cursor: "not-allowed", filter: "grayscale(.55)" },
   titleRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" },
   next: { background: "#164f69", color: "#65ffd0", padding: "8px 12px", borderRadius: 999, fontSize: 12, fontWeight: 800 },
+  receiptBreakdown: { margin: "16px 0", padding: 16, borderRadius: 14, border: "1px solid rgba(38,222,170,.35)", background: "rgba(7,31,67,.72)" },
+  receiptBreakdownHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 12, color: "#bcd8f5" },
+  receiptBreakdownGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 10 },
+  receiptBreakdownCard: { display: "flex", flexDirection: "column", gap: 5, padding: 14, borderRadius: 12, background: "#0b2852", border: "1px solid #22558d" },
+  receiptFilters: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 0 14px", color: "#bcd8f5" },
+  filterButton: { border: "1px solid #2f74ae", borderRadius: 999, padding: "8px 12px", background: "#0c315d", color: "#d9ecff", cursor: "pointer" },
+  filterButtonActive: { borderColor: "#31e6ad", background: "#126451", color: "#fff", fontWeight: 800 },
   table: { width: "100%", borderCollapse: "collapse" },
   actions: { display: "flex", gap: 8, flexWrap: "wrap" },
   principal: { display: "inline-block", marginLeft: 8, padding: "3px 7px", background: "#167a64", borderRadius: 999, fontSize: 10 },
