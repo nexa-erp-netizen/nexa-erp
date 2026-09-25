@@ -1448,9 +1448,22 @@ export default function Clientes({ setPage, usuarioLogado }) {
               {ramosAtividade.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
 
-            <select style={input} value={situacaoEmpresa} onChange={(e) => setSituacaoEmpresa(e.target.value)}>
-              {situacoesEmpresa.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
+            <label style={{ color: "#c9d6e6", fontSize: 13, fontWeight: 700 }}>
+              Situação da empresa
+              <select
+                style={{ ...input, width: "100%", marginTop: 7 }}
+                value={situacaoEmpresa}
+                onChange={(e) => setSituacaoEmpresa(e.target.value)}
+              >
+                {situacoesEmpresa.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+
+            {situacaoEmpresa === "Baixada" && (
+              <div style={{ color: "#ffd75e", fontSize: 12, lineHeight: 1.5 }}>
+                O histórico, os documentos e os parcelamentos serão preservados. Use um novo cadastro para um novo CNPJ.
+              </div>
+            )}
 
             {regime === "Simples Nacional" && (
               <>

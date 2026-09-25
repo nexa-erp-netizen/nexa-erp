@@ -16,10 +16,17 @@ export default function PortalCliente({ setPage }) {
 
   const nomeEmpresa =
     usuario?.clienteVinculado || usuario?.nome || "sua empresa"
+  const empresasDisponiveis = Array.isArray(usuario?.clientesVinculados)
+    ? usuario.clientesVinculados
+    : []
+  const empresaAtiva = empresasDisponiveis.find(
+    (empresa) => Number(empresa.id) === Number(usuario?.clienteId)
+  )
 
   const [movimentos, setMovimentos] = useState([])
   const [solicitacoes, setSolicitacoes] = useState([])
   const [guiasFiscais, setGuiasFiscais] = useState([])
+  const [trocandoEmpresa, setTrocandoEmpresa] = useState(false)
   const [mostrarValores, setMostrarValores] = useState(() => {
     return localStorage.getItem("nexaMostrarValoresCliente") === "true"
   })
@@ -58,6 +65,20 @@ export default function PortalCliente({ setPage }) {
     } catch (error) {
       console.error("ERRO GUIAS FISCAIS PORTAL:", error)
       setGuiasFiscais([])
+    }
+  }
+
+  async function selecionarEmpresa(clienteId) {
+    if (!clienteId || Number(clienteId) === Number(usuario?.clienteId) || trocandoEmpresa) return
+    setTrocandoEmpresa(true)
+    try {
+      const resposta = await api.post("/auth/selecionar-cliente", { clienteId: Number(clienteId) })
+      localStorage.setItem("token", resposta.data.token)
+      localStorage.setItem("usuario", JSON.stringify(resposta.data.usuario))
+      window.location.reload()
+    } catch (error) {
+      alert(error.response?.data?.message || "Erro ao trocar de empresa")
+      setTrocandoEmpresa(false)
     }
   }
 
@@ -236,6 +257,29 @@ export default function PortalCliente({ setPage }) {
           white-space: nowrap;
         }
 
+        .pc-company-select {
+          min-width: 250px;
+          max-width: 100%;
+          padding: 11px 13px;
+          border: 1px solid rgba(255,255,255,.18);
+          border-radius: 12px;
+          background: #061f47;
+          color: white;
+          font-weight: 700;
+        }
+
+        .pc-company-status {
+          display: inline-flex;
+          margin-left: 8px;
+          padding: 4px 8px;
+          border-radius: 999px;
+          background: rgba(255,193,7,.14);
+          color: #ffd75e;
+          font-size: 11px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+
         .pc-cards {
           display: grid;
           grid-template-columns: repeat(3, minmax(210px, 1fr));
@@ -389,6 +433,10 @@ export default function PortalCliente({ setPage }) {
             width: 100%;
           }
 
+          .pc-company-select {
+            width: 100%;
+          }
+
           .pc-cards {
             grid-template-columns: 1fr;
           }
@@ -437,7 +485,26 @@ export default function PortalCliente({ setPage }) {
       <div className="pc-top">
         <div className="pc-hello">
           Olá, {nomeEmpresa} 👋
+          {empresaAtiva?.situacaoEmpresa && empresaAtiva.situacaoEmpresa !== "Ativa" && (
+            <span className="pc-company-status">{empresaAtiva.situacaoEmpresa}</span>
+          )}
         </div>
+
+        {empresasDisponiveis.length > 1 && (
+          <select
+            className="pc-company-select"
+            aria-label="Empresa acessada no Portal"
+            value={usuario?.clienteId || ""}
+            disabled={trocandoEmpresa}
+            onChange={(e) => selecionarEmpresa(e.target.value)}
+          >
+            {empresasDisponiveis.map((empresa) => (
+              <option key={empresa.id} value={empresa.id}>
+                {empresa.nome} · {empresa.situacaoEmpresa || "Ativa"}
+              </option>
+            ))}
+          </select>
+        )}
 
         <button
           type="button"

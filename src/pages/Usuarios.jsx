@@ -21,6 +21,8 @@ export default function Usuarios({ usuarioLogado }) {
   const [senha, setSenha] = useState("")
   const [perfil, setPerfil] = useState("Cliente")
   const [clienteVinculado, setClienteVinculado] = useState("")
+  const [clienteIds, setClienteIds] = useState([])
+  const [clientePrincipalId, setClientePrincipalId] = useState("")
   const [escritorioNome, setEscritorioNome] = useState("")
   const [codigoAcesso, setCodigoAcesso] = useState("")
   const [acessoCriado, setAcessoCriado] = useState(null)
@@ -34,9 +36,9 @@ export default function Usuarios({ usuarioLogado }) {
 
   const clienteSelecionado = useMemo(() => {
     return clientes.find(
-      (cliente) => cliente.nome === clienteVinculado
+      (cliente) => Number(cliente.id) === Number(clientePrincipalId)
     )
-  }, [clientes, clienteVinculado])
+  }, [clientes, clientePrincipalId])
 
   async function carregarUsuarios() {
     try {
@@ -68,22 +70,36 @@ export default function Usuarios({ usuarioLogado }) {
     )
   }
 
-  function selecionarClienteVinculado(valor) {
-    setClienteVinculado(valor)
+  function alternarCliente(cliente) {
+    const id = Number(cliente.id)
+    const selecionado = clienteIds.includes(id)
+    const proximos = selecionado
+      ? clienteIds.filter((clienteId) => clienteId !== id)
+      : [...clienteIds, id]
+    setClienteIds(proximos)
 
-    const cliente = clientes.find(
-      (item) => item.nome === valor
-    )
-
-    if (!cliente || editandoId) return
-
-    setNome(cliente.nome || "")
-
-    const emailCliente = obterEmailCliente(cliente)
-
-    if (emailCliente) {
-      setEmail(emailCliente)
+    if (!proximos.length) {
+      setClientePrincipalId("")
+      setClienteVinculado("")
+      return
     }
+
+    if (!selecionado && proximos.length === 1) {
+      definirClientePrincipal(cliente)
+    } else if (selecionado && Number(clientePrincipalId) === id) {
+      const novoPrincipal = clientes.find((item) => Number(item.id) === Number(proximos[0]))
+      definirClientePrincipal(novoPrincipal)
+    }
+  }
+
+  function definirClientePrincipal(cliente) {
+    if (!cliente) return
+    setClientePrincipalId(String(cliente.id))
+    setClienteVinculado(cliente.nome || "")
+    if (editandoId) return
+    setNome((atual) => atual || cliente.nome || "")
+    const emailCliente = obterEmailCliente(cliente)
+    if (emailCliente) setEmail((atual) => atual || emailCliente)
   }
 
   async function salvarUsuario() {
@@ -92,8 +108,8 @@ export default function Usuarios({ usuarioLogado }) {
       return
     }
 
-    if (perfil === "Cliente" && !clienteVinculado) {
-      alert("Selecione o cliente vinculado")
+    if (perfil === "Cliente" && !clienteIds.length) {
+      alert("Selecione ao menos uma empresa vinculada")
       return
     }
 
@@ -139,6 +155,8 @@ export default function Usuarios({ usuarioLogado }) {
       perfil,
       clienteVinculado:
         perfil === "Cliente" ? clienteVinculado : null,
+      clienteIds: perfil === "Cliente" ? clienteIds : [],
+      clientePrincipalId: perfil === "Cliente" ? Number(clientePrincipalId || clienteIds[0]) : null,
     }
 
     try {
@@ -166,6 +184,12 @@ export default function Usuarios({ usuarioLogado }) {
     setSenha("")
     setPerfil(usuario.perfil)
     setClienteVinculado(usuario.clienteVinculado || "")
+    const ids = Array.isArray(usuario.clienteIds) && usuario.clienteIds.length
+      ? usuario.clienteIds.map(Number)
+      : clientes.filter((cliente) => cliente.nome === usuario.clienteVinculado).map((cliente) => Number(cliente.id))
+    setClienteIds(ids)
+    const principal = usuario.clientesVinculados?.find((cliente) => cliente.principal)
+    setClientePrincipalId(String(principal?.id || ids[0] || ""))
   }
 
   async function alterarAcessoUsuario(usuario) {
@@ -217,6 +241,8 @@ export default function Usuarios({ usuarioLogado }) {
     setSenha("")
     setPerfil("Cliente")
     setClienteVinculado("")
+    setClienteIds([])
+    setClientePrincipalId("")
     setEscritorioNome("")
     setCodigoAcesso("")
     if (!opcoes.preservarAcesso) setAcessoCriado(null)
@@ -293,6 +319,8 @@ export default function Usuarios({ usuarioLogado }) {
 
             if (e.target.value !== "Cliente") {
               setClienteVinculado("")
+              setClienteIds([])
+              setClientePrincipalId("")
             }
           }}
         >
@@ -303,21 +331,38 @@ export default function Usuarios({ usuarioLogado }) {
         </select>
 
         {perfil === "Cliente" && (
-          <select
-            style={input}
-            value={clienteVinculado}
-            onChange={(e) =>
-              selecionarClienteVinculado(e.target.value)
-            }
-          >
-            <option value="">Cliente vinculado</option>
-
-            {clientes.map((cliente) => (
-              <option key={cliente.id} value={cliente.nome}>
-                {cliente.nome}
-              </option>
-            ))}
-          </select>
+          <fieldset style={empresasBox}>
+            <legend style={empresasLegenda}>Empresas vinculadas ao mesmo login</legend>
+            {clientes.map((cliente) => {
+              const marcado = clienteIds.includes(Number(cliente.id))
+              return (
+                <div key={cliente.id} style={empresaLinha}>
+                  <label style={empresaCheck}>
+                    <input
+                      type="checkbox"
+                      checked={marcado}
+                      onChange={() => alternarCliente(cliente)}
+                    />
+                    <span>
+                      <strong>{cliente.nome}</strong>
+                      <small>{cliente.cnpj || cliente.cpf || "Sem documento"} · {cliente.situacaoEmpresa || "Ativa"}</small>
+                    </span>
+                  </label>
+                  {marcado && (
+                    <label style={principalCheck} title="Empresa aberta automaticamente após o login">
+                      <input
+                        type="radio"
+                        name="cliente-principal"
+                        checked={Number(clientePrincipalId) === Number(cliente.id)}
+                        onChange={() => definirClientePrincipal(cliente)}
+                      />
+                      Principal
+                    </label>
+                  )}
+                </div>
+              )
+            })}
+          </fieldset>
         )}
 
         {perfil === "Empresa" && !editandoId && (
@@ -354,7 +399,7 @@ export default function Usuarios({ usuarioLogado }) {
 
       {perfil === "Cliente" && clienteSelecionado && (
         <div style={clienteInfo}>
-          <strong>Cliente selecionado:</strong>{" "}
+          <strong>Empresa principal:</strong>{" "}
           {clienteSelecionado.nome}
           <br />
           <span>
@@ -383,11 +428,16 @@ export default function Usuarios({ usuarioLogado }) {
               <td style={td}>{usuario.email}</td>
               <td style={td}>{usuario.perfil}</td>
               <td style={td}>
-                {usuario.clienteVinculado || "-"}
+                {(usuario.clientesVinculados || []).length
+                  ? usuario.clientesVinculados.map((cliente) => `${cliente.nome}${cliente.principal ? " (principal)" : ""}`).join(", ")
+                  : usuario.clienteVinculado || "-"}
               </td>
               <td style={td}>
                 {usuario.perfil === "Cliente" ? (
-                  <ClienteAcessoResumo compacto clienteId={clientes.find((cliente) => cliente.nome === usuario.clienteVinculado)?.id} />
+                  <ClienteAcessoResumo
+                    compacto
+                    clienteId={usuario.clientesVinculados?.find((cliente) => cliente.principal)?.id || usuario.clientesVinculados?.[0]?.id || clientes.find((cliente) => cliente.nome === usuario.clienteVinculado)?.id}
+                  />
                 ) : "-"}
               </td>
               <td style={td}>
@@ -449,6 +499,48 @@ const input = {
   background: "#061f47",
   color: "white",
   fontSize: "15px",
+}
+
+const empresasBox = {
+  gridColumn: "1 / -1",
+  border: "1px solid rgba(255,255,255,.15)",
+  borderRadius: "14px",
+  padding: "12px 14px 8px",
+  minWidth: 0,
+}
+
+const empresasLegenda = {
+  color: "#a9b8cc",
+  padding: "0 7px",
+  fontSize: "13px",
+  fontWeight: 700,
+}
+
+const empresaLinha = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "14px",
+  padding: "10px 4px",
+  borderBottom: "1px solid rgba(255,255,255,.08)",
+}
+
+const empresaCheck = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  cursor: "pointer",
+  minWidth: 0,
+}
+
+const principalCheck = {
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  color: "#37ff74",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  fontSize: "13px",
 }
 
 const clienteInfo = {
