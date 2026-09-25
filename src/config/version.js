@@ -1,7 +1,7 @@
 const NEXA_VERSION = {
-  version: "3.59.0",
-  build: "35900",
-  release: "Um login para vários CNPJs",
+  version: "3.59.1",
+  build: "35901",
+  release: "Conexão resiliente em APIs lentas",
   date: "25/09/2026",
   status: "Preparada",
   frontend: "Vercel",
@@ -9,6 +9,7 @@ const NEXA_VERSION = {
   banco: "PostgreSQL",
   storage: "Supabase",
   changelog: [
+    { version: "3.59.1", release: "Conexão resiliente em APIs lentas", date: "25/09/2026", items: ["Health check passa a aguardar até 15 segundos durante o aquecimento do Render", "Falhas de rede e timeout recebem uma segunda tentativa antes de declarar indisponibilidade", "Painel diferencia API lenta de provedor de IA realmente indisponível", "OpenAI e Groq deixam de aparecer falsamente offline quando a rota de status não foi confirmada"] },
     { version: "3.59.0", release: "Um login para vários CNPJs", date: "25/09/2026", items: ["Um usuário Cliente pode ser vinculado a duas ou mais empresas do mesmo escritório", "Portal permite alternar o CNPJ ativo sem solicitar outra senha", "Cada troca gera sessão validada e mantém Fiscal, Movimentos, Documentos e Pendências isolados", "Vínculos atuais são migrados automaticamente sem alterar os logins existentes", "Empresa principal é aberta automaticamente no login", "Situação Baixada permanece acessível para histórico, documentos e parcelamentos", "Cadastro identifica claramente a situação da empresa e orienta criar novo registro para novo CNPJ", "Bloqueio de um Portal não impede acesso às demais empresas autorizadas"] },
     { version: "3.58.3", release: "Conciliação separada por PIX e Cartão", date: "15/09/2026", items: ["Entradas do extrato resumidas separadamente em Cartão, PIX e Não identificado", "Filtro por forma de recebimento durante a investigação", "Lançamento em lote preserva a modalidade individual de cada linha", "Linhas sem identificação exigem escolha manual em vez de assumir PIX", "Correção segura atualiza a forma dos lançamentos já conciliados sem alterar valores ou datas"] },
     { version: "3.58.2", release: "Janela completa e envio por arrastar", date: "11/09/2026", items: ["Nexa abre maximizada para aproveitar toda a tela", "Controles para minimizar, maximizar, restaurar e fechar", "PDF e outros documentos podem ser arrastados diretamente para a conversa", "Área visual confirma onde soltar o arquivo antes da análise", "Botão Documento permanece disponível como alternativa"] },

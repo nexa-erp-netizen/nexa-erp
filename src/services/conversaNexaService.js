@@ -311,13 +311,23 @@ export async function verificarOllama() {
   }
 }
 
+async function consultarStatusProvedores() {
+  try {
+    return await api.get("/conversa/status", { timeout: 30000 })
+  } catch (primeiroErro) {
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    return api.get("/conversa/status", { timeout: 30000 })
+  }
+}
+
 export async function verificarProvedores() {
   const [statusResultado, ollamaResultado] = await Promise.allSettled([
-    api.get("/conversa/status"),
+    consultarStatusProvedores(),
     verificarOllama(),
   ])
 
-  const status = statusResultado.status === "fulfilled" ? statusResultado.value.data || {} : {}
+  const statusVerificado = statusResultado.status === "fulfilled"
+  const status = statusVerificado ? statusResultado.value.data || {} : {}
   const openai = statusResultado.status === "fulfilled"
     ? status.openai || {}
     : { configurada: false, online: false, modelo: "", mensagem: "Não foi possível verificar a OpenAI" }
@@ -329,7 +339,17 @@ export async function verificarProvedores() {
     ? ollamaResultado.value
     : { online: false, instalado: false, modelo: configuracaoLocal().modelo, modelos: [] }
 
-  return { openai, groq, ollama, piloto: status.piloto || null, provedorPrincipal: status.provedorPrincipal || "openai" }
+  return {
+    openai,
+    groq,
+    ollama,
+    statusVerificado,
+    statusMensagem: statusVerificado
+      ? "Status dos provedores confirmado"
+      : "A API está respondendo lentamente; o status dos provedores ainda não foi confirmado",
+    piloto: status.piloto || null,
+    provedorPrincipal: status.provedorPrincipal || "openai",
+  }
 }
 
 export async function baixarRelatorioNexa(configuracao) {

@@ -59,6 +59,8 @@ export default function Dashboard({ setPage }) {
   })
   const [statusNexaAssist, setStatusNexaAssist] = useState({
     verificando: true,
+    statusVerificado: false,
+    openai: { online: false, modelo: "" },
     groq: { online: false, modelo: "" },
     ollama: { online: false, instalado: false, modelo: "" },
   })
@@ -1693,6 +1695,10 @@ export default function Dashboard({ setPage }) {
               <div className="nexa-assist-statuses">
                 {statusNexaAssist.verificando ? (
                   <span className="nexa-status-pill nexa-status-offline">Verificando conexão...</span>
+                ) : !statusNexaAssist.statusVerificado ? (
+                  <span className="nexa-status-pill nexa-status-offline" title={statusNexaAssist.statusMensagem}>
+                    API lenta — status dos provedores não confirmado
+                  </span>
                 ) : (
                   <>
                     <span className={`nexa-status-pill ${statusNexaAssist.openai?.online ? "nexa-status-online" : "nexa-status-offline"}`}>

@@ -5,7 +5,10 @@ import { registrarIncidenteWeb } from "./incidentesNexaService"
 const URL_PRINCIPAL = String(import.meta.env.VITE_API_PRIMARY_URL || "https://nexa-erp-api.onrender.com").replace(/\/+$/, "")
 const URL_SECUNDARIA = String(import.meta.env.VITE_API_SECONDARY_URL || "https://nexa-erp-api-secondary.onrender.com").replace(/\/+$/, "")
 const TEMPO_CACHE_SAUDE_MS = 30000
-const TIMEOUT_HEALTH_MS = 5000
+// O Render pode levar mais de 10 segundos para responder enquanto a instância
+// aquece. Cinco segundos gerava falso offline mesmo com servidor e banco online.
+const TIMEOUT_HEALTH_MS = 15000
+const INTERVALO_RETRY_HEALTH_MS = 750
 const STATUS_INFRAESTRUTURA = new Set([502, 503, 504])
 
 let urlAtiva = URL_PRINCIPAL
@@ -52,7 +55,11 @@ function avisarStatus(disponivel, extras = {}) {
   }))
 }
 
-async function consultarSaude(url) {
+function aguardar(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function consultarSaudeUmaVez(url) {
   if (!url) return { ok: false, motivo: "url-ausente" }
 
   const controller = new AbortController()
@@ -94,6 +101,15 @@ async function consultarSaude(url) {
   } finally {
     clearTimeout(timer)
   }
+}
+
+async function consultarSaude(url) {
+  const primeira = await consultarSaudeUmaVez(url)
+  if (primeira.ok || !["timeout", "rede"].includes(primeira.motivo)) return primeira
+
+  await aguardar(INTERVALO_RETRY_HEALTH_MS)
+  const segunda = await consultarSaudeUmaVez(url)
+  return segunda.ok ? { ...segunda, recuperadaAposRetry: true } : segunda
 }
 
 function ativarEndpoint(url, saude, { contingencia = false } = {}) {
