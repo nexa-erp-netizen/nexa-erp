@@ -349,7 +349,17 @@ export async function verificarProvedores() {
       : "A API está respondendo lentamente; o status dos provedores ainda não foi confirmado",
     piloto: status.piloto || null,
     provedorPrincipal: status.provedorPrincipal || "openai",
+    verificadoEm: status.verificadoEm || null,
   }
+}
+
+export function resumirStatusNexa(status = {}) {
+  if (status.verificando) return { tipo: "verificando", titulo: "Verificando conexão da IA...", detalhe: "Isso pode levar alguns segundos." }
+  if (!status.statusVerificado) return { tipo: "nao-confirmado", titulo: "Conexão da IA não confirmada", detalhe: status.statusMensagem || "A API está respondendo lentamente." }
+  if (status.openai?.online) return { tipo: "online", titulo: "Nexa conectada", detalhe: `OpenAI ativa${status.openai.latenciaMs ? ` • ${status.openai.latenciaMs} ms` : ""}` }
+  if (status.groq?.online) return { tipo: "online", titulo: "Nexa conectada pela reserva", detalhe: `Groq ativa${status.groq.latenciaMs ? ` • ${status.groq.latenciaMs} ms` : ""}` }
+  if (!status.openai?.configurada && !status.groq?.configurada) return { tipo: "offline", titulo: "IA não configurada", detalhe: "Configure uma chave da OpenAI ou Groq na API." }
+  return { tipo: "offline", titulo: "IA indisponível", detalhe: status.openai?.mensagem || status.groq?.mensagem || "Nenhum provedor respondeu à verificação." }
 }
 
 export async function baixarRelatorioNexa(configuracao) {

@@ -13,6 +13,7 @@ import {
   baixarRelatorioNexa,
   analisarDocumentoNexa,
   analisarTelaComNexa,
+  resumirStatusNexa,
   verificarProvedores,
 } from "../services/conversaNexaService"
 import {
@@ -181,7 +182,7 @@ export default function ConversaNexa({ usuario, setPage, flutuante = false }) {
     [clientes, clienteId]
   )
 
-  const algumProvedorDisponivel = provedores.openai?.online || provedores.groq.online || (provedores.ollama.online && provedores.ollama.instalado)
+  const statusResumido = resumirStatusNexa(provedores)
 
   async function carregarDadosIniciais() {
     if (contextoInicialAplicadoRef.current) return
@@ -736,9 +737,9 @@ export default function ConversaNexa({ usuario, setPage, flutuante = false }) {
         </div>
       </header>}
 
-      {!flutuante && <div style={{ ...styles.providerStatus, ...(algumProvedorDisponivel ? styles.providerOnline : styles.providerOffline) }}>
-        <strong>{provedores.verificando ? "Verificando IA..." : provedores.openai?.online ? "OpenAI conectada — IA principal" : provedores.groq.online ? "Groq conectada — IA de reserva" : "IA indisponível"}</strong>
-        <span>{provedores.ollama.online && provedores.ollama.instalado ? `Ollama pronto como alternativa local • ${provedores.ollama.modelo}` : "Ollama local opcional"}</span>
+      {!flutuante && <div style={{ ...styles.providerStatus, ...(statusResumido.tipo === "online" ? styles.providerOnline : styles.providerOffline) }}>
+        <strong>{statusResumido.titulo}</strong>
+        <span>{statusResumido.detalhe}</span>
       </div>}
 
       {!flutuante && mostrarMemorias && (

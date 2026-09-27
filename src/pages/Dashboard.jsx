@@ -9,7 +9,7 @@ import {
 import { montarFilaAssistenteDia, montarResumoAssistenteDia } from "../services/assistenteDiaService"
 import { carregarJornadaDia, EVENTO_JORNADA_ATUALIZADA } from "../services/jornadaDiaService"
 import { montarAlertasIdentidadeDigital, resumirAlertasIdentidade } from "../services/alertasIdentidadeService"
-import { verificarProvedores } from "../services/conversaNexaService"
+import { resumirStatusNexa, verificarProvedores } from "../services/conversaNexaService"
 import {
   criarMapaClientesOperacionais,
   filtrarClientesOperacionais,
@@ -18,15 +18,8 @@ import {
 import Calendar from "react-calendar"
 import "react-calendar/dist/Calendar.css"
 import {
-  FaUsers,
-  FaClipboardList,
-  FaExclamationTriangle,
-  FaFileAlt,
-  FaBell,
   FaSyncAlt,
   FaCalendarAlt,
-  FaBolt,
-  FaKey,
   FaRobot,
   FaComments,
   FaArrowRight,
@@ -816,13 +809,6 @@ export default function Dashboard({ setPage }) {
     })
   }, [pendenciasPainel])
 
-  const totalEmAtraso = useMemo(() => {
-    return pendenciasPainel.filter((acao) => {
-      const dias = diferencaDias(acao.data)
-      return dias !== null && dias < 0
-    }).length
-  }, [pendenciasPainel])
-
   const prioridadesDoDia = useMemo(() => {
     const lista = [...prioridades]
     const idsExistentes = new Set(lista.map((item) => String(item.id)))
@@ -988,6 +974,8 @@ export default function Dashboard({ setPage }) {
   function nomeUsuario() {
     return usuario?.nome?.split(" ")[0] || "Fabio"
   }
+
+  const statusNexaResumo = resumirStatusNexa(statusNexaAssist)
 
   return (
     <div className="dashboard-page">
@@ -1693,25 +1681,9 @@ export default function Dashboard({ setPage }) {
                 Converse com a Nexa, consulte clientes e pendências ou use comandos para abrir qualquer área do sistema.
               </p>
               <div className="nexa-assist-statuses">
-                {statusNexaAssist.verificando ? (
-                  <span className="nexa-status-pill nexa-status-offline">Verificando conexão...</span>
-                ) : !statusNexaAssist.statusVerificado ? (
-                  <span className="nexa-status-pill nexa-status-offline" title={statusNexaAssist.statusMensagem}>
-                    API lenta — status dos provedores não confirmado
-                  </span>
-                ) : (
-                  <>
-                    <span className={`nexa-status-pill ${statusNexaAssist.openai?.online ? "nexa-status-online" : "nexa-status-offline"}`}>
-                      {statusNexaAssist.openai?.online ? "OpenAI online — principal" : "OpenAI indisponível"}
-                    </span>
-                    <span className={`nexa-status-pill ${statusNexaAssist.groq?.online ? "nexa-status-local" : "nexa-status-offline"}`}>
-                      {statusNexaAssist.groq?.online ? "Groq online — reserva" : "Groq indisponível"}
-                    </span>
-                    <span className={`nexa-status-pill ${statusNexaAssist.ollama?.online && statusNexaAssist.ollama?.instalado ? "nexa-status-local" : "nexa-status-offline"}`}>
-                      {statusNexaAssist.ollama?.online && statusNexaAssist.ollama?.instalado ? "Ollama local disponível" : "Ollama local em espera"}
-                    </span>
-                  </>
-                )}
+                <span className={`nexa-status-pill ${statusNexaResumo.tipo === "online" ? "nexa-status-online" : "nexa-status-offline"}`} title={statusNexaResumo.detalhe}>
+                  {statusNexaResumo.titulo}
+                </span>
               </div>
             </div>
           </div>
@@ -1761,7 +1733,7 @@ export default function Dashboard({ setPage }) {
 
         <div className="nexa-pending-list">
           <div className="nexa-pending-list-title">Todas as pendências para olhar</div>
-          {pendenciasParaOlhar.length ? pendenciasParaOlhar.map((acao) => (
+          {pendenciasParaOlhar.length ? pendenciasParaOlhar.slice(0, 5).map((acao) => (
             <button
               type="button"
               className="nexa-pending-item"
@@ -1781,6 +1753,12 @@ export default function Dashboard({ setPage }) {
                 <span>O painel está atualizado.</span>
               </div>
             </div>
+          )}
+          {pendenciasParaOlhar.length > 5 && (
+            <button type="button" className="nexa-pending-item" onClick={() => setPage("Assistente do Dia")}>
+              <div><strong>Ver todas as {pendenciasParaOlhar.length} pendências</strong><span>Abrir a fila completa no Assistente do Dia.</span></div>
+              <em>Abrir</em>
+            </button>
           )}
         </div>
 
@@ -1807,50 +1785,6 @@ export default function Dashboard({ setPage }) {
             <small>Última ação: {progressoDiaSalvo.historicoDia[0].hora} • {progressoDiaSalvo.historicoDia[0].texto}</small>
           )}
         </div>
-      </section>
-
-      <div className="cards">
-        <ResumoCard icon={<FaUsers />} label="Clientes Ativos" value={resumo.clientes} color="blue" />
-        <ResumoCard icon={<FaClipboardList />} label="Obrigações Pendentes" value={resumo.obrigacoesPendentes} color="warning" />
-        <ResumoCard icon={<FaBolt />} label="Aguardando Ação" value={resumo.aguardandoAcao} color="warning" />
-        <ResumoCard icon={<FaExclamationTriangle />} label="Em Atraso" value={totalEmAtraso} color="danger" />
-        <ResumoCard icon={<FaFileAlt />} label="Documentos Pendentes" value={resumo.documentosPendentes} color="success" />
-        <ResumoCard icon={<FaBell />} label="Notificações" value={resumo.notificacoes} color="warning" />
-        <ResumoCard icon={<FaKey />} label="Alertas Digitais" value={resumoIdentidade.total} color="warning" />
-      </div>
-
-      <section className="box dia-box">
-        <div className="dia-row">
-          <div>
-            <div className="box-title" style={{ marginBottom: 0 }}>☀️ Assistente do Dia</div>
-            <div className="assist-subtitle">
-              Fila operacional montada com dados reais do Fiscal, Documentos e Atendimento.
-            </div>
-          </div>
-
-          <button type="button" className="dia-action" onClick={() => setPage("Assistente do Dia")}>
-            Iniciar o Dia
-          </button>
-        </div>
-
-        <div className="dia-progress">
-          <div className="dia-progress-bar" style={{ width: `${resumoAssistenteDia.progresso}%` }} />
-        </div>
-
-        <div className="dia-stats">
-          <div className="dia-stat"><span>Urgentes</span><strong className="danger">{resumoAssistenteDia.urgentes}</strong></div>
-          <div className="dia-stat"><span>Atenção</span><strong className="warning">{resumoAssistenteDia.atencao}</strong></div>
-          <div className="dia-stat"><span>Programados</span><strong className="success">{resumoAssistenteDia.programados}</strong></div>
-          <div className="dia-stat"><span>Ações reais</span><strong className="blue">{resumoAssistenteDia.acoes}</strong></div>
-        </div>
-
-        {filaAssistenteDia[0] ? (
-          <div className="dia-next">
-            Primeiro cliente: <strong>{filaAssistenteDia[0].cliente}</strong> • {filaAssistenteDia[0].motivos[0]}
-          </div>
-        ) : (
-          <div className="dia-next">Nenhuma ação real encontrada para hoje.</div>
-        )}
       </section>
 
       <section className="box assist-box">
@@ -2028,16 +1962,6 @@ export default function Dashboard({ setPage }) {
           </div>
         </section>
       </div>
-    </div>
-  )
-}
-
-function ResumoCard({ icon, label, value, color }) {
-  return (
-    <div className="card">
-      <div className={`card-icon ${color}`}>{icon}</div>
-      <div className="card-label">{label}</div>
-      <div className={`card-value ${color}`}>{value}</div>
     </div>
   )
 }
