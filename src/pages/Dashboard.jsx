@@ -9,7 +9,6 @@ import {
 import { montarFilaAssistenteDia, montarResumoAssistenteDia } from "../services/assistenteDiaService"
 import { carregarJornadaDia, EVENTO_JORNADA_ATUALIZADA } from "../services/jornadaDiaService"
 import { montarAlertasIdentidadeDigital, resumirAlertasIdentidade } from "../services/alertasIdentidadeService"
-import { resumirStatusNexa, verificarProvedores } from "../services/conversaNexaService"
 import {
   criarMapaClientesOperacionais,
   filtrarClientesOperacionais,
@@ -20,9 +19,6 @@ import "react-calendar/dist/Calendar.css"
 import {
   FaSyncAlt,
   FaCalendarAlt,
-  FaRobot,
-  FaComments,
-  FaArrowRight,
 } from "react-icons/fa"
 
 export default function Dashboard({ setPage }) {
@@ -50,18 +46,9 @@ export default function Dashboard({ setPage }) {
     historicoDia: [],
     inicioDia: null,
   })
-  const [statusNexaAssist, setStatusNexaAssist] = useState({
-    verificando: true,
-    statusVerificado: false,
-    openai: { online: false, modelo: "" },
-    groq: { online: false, modelo: "" },
-    ollama: { online: false, instalado: false, modelo: "" },
-  })
-
   useEffect(() => {
     carregarDashboard()
     carregarProgressoDia()
-    carregarStatusNexaAssist()
 
     const atualizarAoVoltar = () => carregarProgressoDia()
     window.addEventListener("focus", atualizarAoVoltar)
@@ -81,44 +68,6 @@ export default function Dashboard({ setPage }) {
       historicoDia: salvo.historicoDia,
       inicioDia: salvo.inicioDia,
     })
-  }
-
-  async function carregarStatusNexaAssist() {
-    try {
-      const status = await verificarProvedores()
-      setStatusNexaAssist({ verificando: false, ...status })
-    } catch (error) {
-      console.warn("Não foi possível verificar o status da Nexa Assist", error)
-      setStatusNexaAssist((atual) => ({ ...atual, verificando: false }))
-    }
-  }
-
-  function abrirNexaAssist() {
-    localStorage.setItem("nexaAbrirConversaGeral", "true")
-    localStorage.removeItem("nexaVoiceClienteId")
-    localStorage.removeItem("nexaVoiceClienteNome")
-    if (typeof setPage === "function") setPage("Conversa com a Nexa")
-  }
-
-  function abrirPendenciasNexa() {
-    localStorage.setItem(
-      "nexaConsultaAutomatica",
-      "Quais são todas as pendências de hoje?"
-    )
-    abrirNexaAssist()
-  }
-
-  function mostrarProximosVencimentos() {
-    localStorage.removeItem("nexaFiltroFiscalCliente")
-    localStorage.removeItem("nexaFiltroFiscalId")
-
-    document
-      .getElementById("nexa-proximos-vencimentos")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }
-
-  function abrirAtalhoNexa(pagina) {
-    if (typeof setPage === "function") setPage(pagina)
   }
 
   async function carregarDashboard() {
@@ -975,8 +924,6 @@ export default function Dashboard({ setPage }) {
     return usuario?.nome?.split(" ")[0] || "Fabio"
   }
 
-  const statusNexaResumo = resumirStatusNexa(statusNexaAssist)
-
   return (
     <div className="dashboard-page">
       <style>{`
@@ -1271,102 +1218,6 @@ export default function Dashboard({ setPage }) {
         .bg-neutral { background: rgba(255,255,255,.14); color: white; }
         .bg-document { background: #b388ff; color: #00112b; }
 
-        .nexa-assist-dashboard {
-          position: relative;
-          overflow: hidden;
-          margin-bottom: 24px;
-          background: linear-gradient(135deg, #071f48 0%, #0a3265 52%, rgba(0,168,255,.24) 78%, rgba(55,255,116,.16) 100%);
-          border: 1px solid rgba(0,168,255,.38);
-          border-radius: 26px;
-          padding: 25px;
-          box-shadow: 0 18px 45px rgba(0,0,0,.22);
-        }
-
-        .nexa-assist-dashboard::after {
-          content: "";
-          position: absolute;
-          width: 240px;
-          height: 240px;
-          right: -90px;
-          top: -110px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(55,255,116,.20), transparent 68%);
-          pointer-events: none;
-        }
-
-        .nexa-assist-main {
-          position: relative;
-          z-index: 1;
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) auto;
-          gap: 22px;
-          align-items: center;
-        }
-
-        .nexa-assist-brand { display: flex; gap: 16px; align-items: flex-start; }
-        .nexa-assist-logo {
-          width: 54px;
-          height: 54px;
-          flex: 0 0 54px;
-          border-radius: 18px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 25px;
-          color: #00112b;
-          background: linear-gradient(135deg, #00a8ff, #37ff74);
-          box-shadow: 0 10px 26px rgba(0,168,255,.28);
-        }
-
-        .nexa-assist-kicker { color: #37ff74; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-        .nexa-assist-heading { margin: 5px 0 7px; font-size: 25px; font-weight: 900; }
-        .nexa-assist-description { color: #c8d7eb; line-height: 1.45; margin: 0; max-width: 720px; }
-        .nexa-assist-statuses { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
-        .nexa-status-pill { border-radius: 999px; padding: 7px 10px; font-size: 12px; font-weight: 900; border: 1px solid rgba(255,255,255,.12); background: rgba(1,17,43,.68); }
-        .nexa-status-online { color: #37ff74; border-color: rgba(55,255,116,.28); }
-        .nexa-status-local { color: #00c8ff; border-color: rgba(0,200,255,.28); }
-        .nexa-status-offline { color: #ffc107; border-color: rgba(255,193,7,.28); }
-
-        .nexa-assist-open {
-          position: relative;
-          z-index: 1;
-          border: none;
-          border-radius: 15px;
-          min-height: 48px;
-          padding: 0 19px;
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          background: linear-gradient(90deg, #00a8ff, #37ff74);
-          color: #00112b;
-          font-weight: 900;
-          cursor: pointer;
-          white-space: nowrap;
-        }
-
-        .nexa-assist-shortcuts {
-          position: relative;
-          z-index: 1;
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 10px;
-          margin-top: 19px;
-        }
-
-        .nexa-shortcut {
-          border: 1px solid rgba(255,255,255,.11);
-          border-radius: 14px;
-          padding: 12px;
-          background: rgba(1,17,43,.66);
-          color: white;
-          text-align: left;
-          cursor: pointer;
-          font-weight: 800;
-          min-height: 44px;
-        }
-
-        .nexa-shortcut:hover { border-color: rgba(55,255,116,.38); transform: translateY(-1px); transition: .2s; }
-
         .nexa-daily-panel {
           margin-bottom: 24px;
           background: linear-gradient(135deg, #071f48 0%, #0c3970 58%, rgba(55,255,116,.14) 100%);
@@ -1581,18 +1432,6 @@ export default function Dashboard({ setPage }) {
           .dash-header {
             flex-direction: column;
           }
-
-          .nexa-assist-main { grid-template-columns: 1fr; }
-          .nexa-assist-open { width: 100%; justify-content: center; }
-          .nexa-assist-shortcuts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-
-        @media (max-width: 620px) {
-          .nexa-assist-dashboard { padding: 19px; }
-          .nexa-assist-brand { gap: 12px; }
-          .nexa-assist-logo { width: 46px; height: 46px; flex-basis: 46px; border-radius: 15px; }
-          .nexa-assist-heading { font-size: 21px; }
-          .nexa-assist-shortcuts { grid-template-columns: 1fr; }
         }
       `}</style>
 
@@ -1669,39 +1508,6 @@ export default function Dashboard({ setPage }) {
           </button>
         </div>
       </div>
-
-      <section className="nexa-assist-dashboard">
-        <div className="nexa-assist-main">
-          <div className="nexa-assist-brand">
-            <div className="nexa-assist-logo"><FaRobot /></div>
-            <div>
-              <div className="nexa-assist-kicker">Nexa Assist</div>
-              <h2 className="nexa-assist-heading">Sua assistente inteligente está pronta.</h2>
-              <p className="nexa-assist-description">
-                Converse com a Nexa, consulte clientes e pendências ou use comandos para abrir qualquer área do sistema.
-              </p>
-              <div className="nexa-assist-statuses">
-                <span className={`nexa-status-pill ${statusNexaResumo.tipo === "online" ? "nexa-status-online" : "nexa-status-offline"}`} title={statusNexaResumo.detalhe}>
-                  {statusNexaResumo.titulo}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <button type="button" className="nexa-assist-open" onClick={abrirNexaAssist}>
-            <FaComments />
-            Conversar com a Nexa
-            <FaArrowRight />
-          </button>
-        </div>
-
-        <div className="nexa-assist-shortcuts">
-          <button type="button" className="nexa-shortcut" onClick={() => abrirAtalhoNexa("Assistente do Dia")}>Iniciar meu dia</button>
-          <button type="button" className="nexa-shortcut" onClick={abrirPendenciasNexa}>Ver pendências</button>
-          <button type="button" className="nexa-shortcut" onClick={() => abrirAtalhoNexa("Clientes")}>Abrir clientes</button>
-          <button type="button" className="nexa-shortcut" onClick={mostrarProximosVencimentos}>Próximos vencimentos</button>
-        </div>
-      </section>
 
       <section className="nexa-daily-panel">
         <div className="nexa-daily-head">
