@@ -142,15 +142,35 @@ export default function DRE() {
   }, [clientes, empresaSelecionada])
 
   const competencias = useMemo(() => {
-    return [
-      "Todas",
-      ...new Set(
-        movimentos
-          .filter((item) => item.data)
-          .map((item) => obterCompetencia(item.data))
-      ),
-    ]
-  }, [movimentos])
+    const empresaNormalizada = normalizarNome(empresaSelecionada)
+    const disponiveis = movimentos
+      .filter((item) => {
+        if (!dataLancamentoValida(item.data)) return false
+        if (empresaSelecionada === "Todas" || empresaSelecionada === "") return true
+
+        return clienteSelecionado?.id && item.clienteId
+          ? Number(item.clienteId) === Number(clienteSelecionado.id)
+          : normalizarNome(item.cliente) === empresaNormalizada
+      })
+      .map((item) => obterCompetencia(item.data))
+
+    const ordenadas = [...new Set(disponiveis)].sort((a, b) => {
+      const [mesA, anoA] = a.split("/").map(Number)
+      const [mesB, anoB] = b.split("/").map(Number)
+      return anoB - anoA || mesB - mesA
+    })
+
+    return ["Todas", ...ordenadas]
+  }, [movimentos, empresaSelecionada, clienteSelecionado])
+
+  useEffect(() => {
+    if (
+      competenciaSelecionada !== "Todas" &&
+      !competencias.includes(competenciaSelecionada)
+    ) {
+      setCompetenciaSelecionada("Todas")
+    }
+  }, [competencias, competenciaSelecionada])
 
   const movimentosFiltrados = useMemo(() => {
     const empresaNormalizada = normalizarNome(empresaSelecionada)
