@@ -305,7 +305,12 @@ export default function Fiscal() {
       }
     }
 
+    const clienteSelecionado = clientesCadastrados.find(
+      (item) => String(item.nome || "").trim() === String(cliente || "").trim()
+    )
+
     const novaObrigacao = {
+      clienteId: clienteSelecionado?.id || null,
       cliente,
       obrigacao,
       competencia,
@@ -384,6 +389,7 @@ export default function Fiscal() {
         ]
 
         await api.post("/fiscal", {
+          clienteId: item.clienteId || null,
           cliente: item.cliente,
           obrigacao: "Parcelamento",
           competencia: proximaCompetencia(item.competencia),
@@ -401,7 +407,12 @@ export default function Fiscal() {
       await api.patch(`/fiscal/${item.id}/concluir`)
       await carregarObrigacoes()
     } catch (error) {
-      alert("Erro ao concluir obrigação")
+      const detalhe =
+        error?.response?.data?.erro ||
+        error?.response?.data?.message ||
+        "Erro ao concluir obrigação"
+
+      alert(`Não foi possível concluir a obrigação: ${detalhe}`)
       console.error(error)
     }
   }
