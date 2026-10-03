@@ -225,7 +225,7 @@ export default function ConciliacaoBancaria({ setPage }) {
   async function importarExtrato(e) {
     e.preventDefault()
     if (!contaExtratoId) return alert("Selecione a conta bancária")
-    if (!arquivo) return alert("Selecione um arquivo OFX ou CSV")
+    if (!arquivo) return alert("Selecione um arquivo PDF, OFX ou CSV")
 
     const dados = new FormData()
     dados.append("contaBancariaId", contaExtratoId)
@@ -505,24 +505,24 @@ export default function ConciliacaoBancaria({ setPage }) {
     diagnosticoSaldo?.saldoAnterior !== undefined
     ? Number(diagnosticoSaldo.saldoAnterior)
     : null
-  // Quando o OFX informa o saldo final do mês, ele é a referência mais forte
+  // Quando o extrato informa o saldo final do mês, ele é a referência mais forte
   // para reconstruir o saldo de abertura. Isso evita tratar uma base cadastrada
   // no meio do mês como se fosse o saldo de 01/MM.
-  const saldoInicialBancoDerivadoOfx = saldoFinalBancoInformado !== null &&
+  const saldoInicialBancoDerivadoExtrato = saldoFinalBancoInformado !== null &&
     Number.isFinite(saldoFinalBancoInformado)
     ? saldoFinalBancoInformado - variacaoBancoMes
     : null
-  const saldoInicialBancoMes = saldoInicialBancoDerivadoOfx !== null
-    ? saldoInicialBancoDerivadoOfx
+  const saldoInicialBancoMes = saldoInicialBancoDerivadoExtrato !== null
+    ? saldoInicialBancoDerivadoExtrato
     : saldoInicialBancoCadastrado
-  const saldoInicialBancoOrigem = saldoInicialBancoDerivadoOfx !== null ? "OFX" : "Cadastro"
+  const saldoInicialBancoOrigem = saldoInicialBancoDerivadoExtrato !== null ? "Extrato" : "Cadastro"
   const saldoFinalBancoCalculado = saldoInicialBancoMes === null
     ? null
     : saldoInicialBancoMes + variacaoBancoMes
   const resultadoClienteBancos = resumoClienteBancos.receitas - resumoClienteBancos.despesas
   const variacaoBancoConciliavel = resumoBancoComparavel.entradas - resumoBancoComparavel.saidas
   const diferencaVariacaoBancoCliente = variacaoBancoConciliavel - resultadoClienteBancos
-  const diferencaSaldoOfx = saldoFinalBancoCalculado !== null && saldoFinalBancoInformado !== null
+  const diferencaSaldoExtrato = saldoFinalBancoCalculado !== null && saldoFinalBancoInformado !== null
     ? saldoFinalBancoInformado - saldoFinalBancoCalculado
     : null
 
@@ -1431,7 +1431,7 @@ export default function ConciliacaoBancaria({ setPage }) {
         <div style={s.card}>
           <div style={s.titleRow}>
             <div><h3 style={s.h3}>Contas da empresa</h3><p style={s.p}>{contas.length} conta(s) cadastrada(s).</p></div>
-            <span style={s.next}>Importação OFX e CSV disponível</span>
+            <span style={s.next}>Importação PDF, OFX e CSV disponível</span>
           </div>
 
           {contas.length === 0 ? (
@@ -1461,7 +1461,7 @@ export default function ConciliacaoBancaria({ setPage }) {
             <div style={s.titleRow}>
               <div>
                 <h3 style={s.h3}>Importar extrato bancário</h3>
-                <p style={s.p}>Envie o extrato em OFX ou CSV. O arquivo fica separado dos lançamentos do cliente e serve apenas para conferência.</p>
+                <p style={s.p}>Envie o PDF original baixado pelo banco para preservar descrições como PIX, débito e crédito. OFX e CSV continuam disponíveis. O extrato fica separado dos lançamentos do cliente e serve apenas para conferência.</p>
               </div>
               <span style={s.next}>Importação não gera lançamentos</span>
             </div>
@@ -1473,7 +1473,7 @@ export default function ConciliacaoBancaria({ setPage }) {
                     {contas.filter(c => c.ativo).map(c => <option key={c.id} value={c.id}>{c.bancoNome} • Ag. {c.agencia} • {c.conta}{c.digito ? `-${c.digito}` : ""}</option>)}
                   </select>
                 </Campo>
-                <Campo t="Arquivo OFX ou CSV"><input id="nexa-arquivo-extrato" type="file" accept=".ofx,.csv,text/csv,application/x-ofx" style={s.input} onChange={e => setArquivo(e.target.files?.[0] || null)} /></Campo>
+                <Campo t="Arquivo PDF, OFX ou CSV"><input id="nexa-arquivo-extrato" type="file" accept=".pdf,.ofx,.csv,application/pdf,text/csv,application/x-ofx" style={s.input} onChange={e => setArquivo(e.target.files?.[0] || null)} /></Campo>
               </div>
               <button style={s.primary} disabled={importando}>{importando ? "Lendo extrato..." : "Importar e ler extrato"}</button>
             </form>
@@ -1536,8 +1536,8 @@ export default function ConciliacaoBancaria({ setPage }) {
                   <span>Saldo inicial do banco</span>
                   <strong>{saldoInicialBancoMes === null ? "Não calculado" : moeda(saldoInicialBancoMes)}</strong>
                   <small>
-                    {saldoInicialBancoOrigem === "OFX"
-                      ? `Calculado pelo saldo final do OFX menos a movimentação do mês.${diagnosticoSaldo?.dataSaldoInicial ? ` Base manual de ${moeda(saldoInicialBancoCadastrado)} em ${dataBr(diagnosticoSaldo.dataSaldoInicial)} preservada apenas como referência.` : ""}`
+                    {saldoInicialBancoOrigem === "Extrato"
+                      ? `Calculado pelo saldo final informado no extrato menos a movimentação do mês.${diagnosticoSaldo?.dataSaldoInicial ? ` Base manual de ${moeda(saldoInicialBancoCadastrado)} em ${dataBr(diagnosticoSaldo.dataSaldoInicial)} preservada apenas como referência.` : ""}`
                       : diagnosticoSaldo?.dataSaldoInicial
                         ? `Base cadastrada em ${dataBr(diagnosticoSaldo.dataSaldoInicial)}`
                         : "Cadastre saldo inicial e data-base da conta para formar o saldo corretamente."}
@@ -1563,10 +1563,10 @@ export default function ConciliacaoBancaria({ setPage }) {
                   <strong>{saldoFinalBancoInformado === null ? "Não disponível no arquivo" : moeda(saldoFinalBancoInformado)}</strong>
                   <small>
                     {saldoFinalBancoInformado === null
-                      ? "CSV normalmente não informa saldo final; OFX pode informar."
-                      : diferencaSaldoOfx !== null && Math.abs(diferencaSaldoOfx) > TOLERANCIA_FECHAMENTO
-                        ? `Diferença para o saldo calculado: ${moeda(diferencaSaldoOfx)}`
-                        : "Saldo informado pelo OFX compatível com o cálculo."}
+                      ? "CSV normalmente não informa saldo final; PDF e OFX podem informar."
+                      : diferencaSaldoExtrato !== null && Math.abs(diferencaSaldoExtrato) > TOLERANCIA_FECHAMENTO
+                        ? `Diferença para o saldo calculado: ${moeda(diferencaSaldoExtrato)}`
+                        : "Saldo informado no extrato compatível com o cálculo."}
                   </small>
                 </div>
               </div>
@@ -1593,7 +1593,7 @@ export default function ConciliacaoBancaria({ setPage }) {
               <div style={s.receiptBreakdownHeader}>
                 <div>
                   <strong style={{ display: "block", marginBottom: 4 }}>Entradas separadas por recebimento</strong>
-                  <span>A classificação considera a descrição informada pelo banco no OFX ou CSV.</span>
+                  <span>A classificação considera a descrição informada pelo banco no PDF, OFX ou CSV.</span>
                 </div>
                 <button style={s.secondary} disabled={processando || !movimentos.length} onClick={corrigirFormasJaConciliadas}>
                   {processando ? "Corrigindo..." : "Corrigir lançamentos já feitos"}

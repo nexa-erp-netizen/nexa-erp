@@ -2098,7 +2098,7 @@ export default function Clientes({ setPage, usuarioLogado }) {
             <div style={miniResumoGrid}>
               <Info label="Empresa" value={clienteSelecionado.nome} />
               <Info label="Etapa atual" value="Cadastro de contas" />
-              <Info label="Importação" value="OFX e CSV na próxima etapa" />
+              <Info label="Importação" value="PDF, OFX e CSV na Conciliação Bancária" />
               <Info label="Destino" value="Lançamentos e DRE" />
             </div>
           </div>
